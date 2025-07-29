@@ -1,0 +1,47 @@
+#!/bin/bash
+
+# Mock Grove binary for testing E2E scenarios
+# This simulates Grove commands for demonstration purposes
+
+case "$1" in
+    "agent")
+        case "$2" in
+            "up")
+                echo "Starting Grove agent..."
+                echo "Agent started successfully"
+                exit 0
+                ;;
+            "down")
+                echo "Stopping Grove agent..."
+                echo "Agent stopped successfully"
+                exit 0
+                ;;
+            "status")
+                if [[ "$3" == "--format" && "$4" == "json" ]]; then
+                    echo '{"status": "running", "container": "grove-main-agent-12345"}'
+                else
+                    echo "Agent Status: running"
+                    echo "Container: grove-main-agent-12345"
+                fi
+                exit 0
+                ;;
+            *)
+                echo "Unknown agent command: $2"
+                exit 1
+                ;;
+        esac
+        ;;
+    "--version")
+        echo "Grove v1.0.0-mock"
+        exit 0
+        ;;
+    *)
+        echo "Grove - Development Environment Manager"
+        echo "Usage: grove <command> [args...]"
+        echo "Commands:"
+        echo "  agent    Manage Grove agent"
+        echo "  up       Start services"
+        echo "  down     Stop services"
+        exit 0
+        ;;
+esac
