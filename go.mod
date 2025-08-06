@@ -2,7 +2,6 @@ module github.com/grovepm/grove-tend
 
 go 1.24.4
 
-replace github.com/mattsolo1/grove-core => ../grove-core
 
 require (
 	github.com/charmbracelet/lipgloss v1.1.0
