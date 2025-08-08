@@ -1,0 +1,5 @@
+name: grove-tend
+description: Scenario-based testing
+binary:
+  name: tend
+  path: ./bin/tend
