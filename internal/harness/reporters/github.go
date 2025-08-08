@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/grovepm/grove-tend/internal/harness"
+	"github.com/mattsolo1/grove-tend/internal/harness"
 )
 
 // GitHubReporter outputs GitHub Actions annotations

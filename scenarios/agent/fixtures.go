@@ -1,7 +1,7 @@
 package agent
 
 import (
-	"github.com/grovepm/grove-tend/pkg/fs"
+	"github.com/mattsolo1/grove-tend/pkg/fs"
 )
 
 // BasicGroveConfig returns a minimal grove.yml for testing

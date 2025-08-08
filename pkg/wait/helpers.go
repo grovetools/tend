@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 	
-	"github.com/grovepm/grove-tend/pkg/command"
+	"github.com/mattsolo1/grove-tend/pkg/command"
 )
 
 // ForFile waits for a file to exist

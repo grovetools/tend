@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/grovepm/grove-tend/internal/harness"
+	"github.com/mattsolo1/grove-tend/internal/harness"
 )
 
 // JSONReport represents the overall test report

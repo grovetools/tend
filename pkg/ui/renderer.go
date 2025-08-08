@@ -5,7 +5,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/grovepm/grove-tend/internal/harness"
+	"github.com/mattsolo1/grove-tend/internal/harness"
 )
 
 // Renderer handles rendering test output with beautiful styling

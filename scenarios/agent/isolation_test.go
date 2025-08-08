@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/grovepm/grove-tend/internal/harness"
+	"github.com/mattsolo1/grove-tend/internal/harness"
 )
 
 func TestAgentIsolationScenario(t *testing.T) {

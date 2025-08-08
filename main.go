@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/grovepm/grove-tend/cmd"
+	"github.com/mattsolo1/grove-tend/cmd"
 )
 
 func main() {

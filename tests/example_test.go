@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/grovepm/grove-tend/internal/harness"
-	"github.com/grovepm/grove-tend/pkg/fs"
-	"github.com/grovepm/grove-tend/pkg/git"
+	"github.com/mattsolo1/grove-tend/internal/harness"
+	"github.com/mattsolo1/grove-tend/pkg/fs"
+	"github.com/mattsolo1/grove-tend/pkg/git"
 )
 
 func TestCoreAbstractions(t *testing.T) {

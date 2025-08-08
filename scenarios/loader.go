@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/grovepm/grove-tend/internal/harness"
-	"github.com/grovepm/grove-tend/scenarios/agent"
+	"github.com/mattsolo1/grove-tend/internal/harness"
+	"github.com/mattsolo1/grove-tend/scenarios/agent"
 )
 
 // Loader handles loading and managing test scenarios

@@ -9,10 +9,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/grovepm/grove-tend/internal/harness"
-	"github.com/grovepm/grove-tend/internal/harness/reporters"
-	"github.com/grovepm/grove-tend/pkg/ui"
-	"github.com/grovepm/grove-tend/scenarios"
+	"github.com/mattsolo1/grove-tend/internal/harness"
+	"github.com/mattsolo1/grove-tend/internal/harness/reporters"
+	"github.com/mattsolo1/grove-tend/pkg/ui"
+	"github.com/mattsolo1/grove-tend/scenarios"
 )
 
 var (
