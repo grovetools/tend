@@ -76,6 +76,12 @@ run-scenarios: build
 	@echo "Running agent-isolation scenario..."
 	@./$(BIN_DIR)/$(BINARY_NAME) run agent-isolation
 
+# Build custom tend example
+build-custom-example:
+	@echo "Building custom tend example..."
+	@mkdir -p $(DIST_DIR)
+	@go build $(LDFLAGS) -o $(DIST_DIR)/custom-tend ./examples/custom-tend
+
 # Cross-compilation targets
 PLATFORMS ?= darwin/amd64 darwin/arm64 linux/amd64 linux/arm64
 DIST_DIR ?= dist
@@ -104,3 +110,5 @@ help:
 	@echo "  make check       - Run all checks"
 	@echo "  make dev         - Build with race detector"
 	@echo "  make run-scenarios - Run agent-isolation scenario"
+	@echo "  make build-custom-example - Build custom tend example"
+	@echo "  make build-all   - Build for multiple platforms"

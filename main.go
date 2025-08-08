@@ -7,7 +7,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/mattsolo1/grove-tend/cmd"
+	"github.com/mattsolo1/grove-tend/internal/harness"
+	"github.com/mattsolo1/grove-tend/pkg/app"
 )
 
 func main() {
@@ -24,8 +25,12 @@ func main() {
 		cancel()
 	}()
 
-	// Execute the root command
-	if err := cmd.Execute(ctx); err != nil {
+	// No built-in scenarios - grove-tend is now a pure library
+	// Scenarios should be defined in the repositories they test
+	var allScenarios []*harness.Scenario
+
+	// Execute the application
+	if err := app.Execute(ctx, allScenarios); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}

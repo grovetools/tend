@@ -8,7 +8,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var versionCmd = &cobra.Command{
+// newVersionCmd creates the version command
+func newVersionCmd() *cobra.Command {
+	versionCmd := &cobra.Command{
 	Use:   "version",
 	Short: "Print the version information for this binary",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -26,9 +28,8 @@ var versionCmd = &cobra.Command{
 		}
 		return nil
 	},
-}
-
-func init() {
+	}
+	
 	versionCmd.Flags().Bool("json", false, "Output version information in JSON format")
-	rootCmd.AddCommand(versionCmd)
+	return versionCmd
 }

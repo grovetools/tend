@@ -1,12 +1,17 @@
-package scenarios
+package main
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/mattsolo1/grove-tend/internal/harness"
+	"github.com/mattsolo1/grove-tend/pkg/app"
 	"github.com/mattsolo1/grove-tend/pkg/command"
 	"github.com/mattsolo1/grove-tend/pkg/fs"
 	"github.com/mattsolo1/grove-tend/pkg/git"
@@ -374,5 +379,51 @@ func ExampleGroveVersionScenario() *harness.Scenario {
 				},
 			},
 		},
+	}
+}
+
+// CustomScenario is an example of a scenario specific to this consumer
+var CustomScenario = &harness.Scenario{
+	Name:        "my-custom-scenario",
+	Description: "A scenario defined in a different repository",
+	Tags:        []string{"custom"},
+	Steps: []harness.Step{
+		harness.NewStep("Run custom logic", func(ctx *harness.Context) error {
+			fmt.Println("This is a custom step from an external binary!")
+			ctx.Set("custom_key", "custom_value")
+			return nil
+		}),
+	},
+}
+
+func main() {
+	// This example includes both the framework examples and custom scenarios
+	// In a real repository, you would only include your custom scenarios
+	myScenarios := []*harness.Scenario{
+		// Example scenarios from the framework (for demonstration)
+		ExampleBasicScenario(),
+		ExampleGitScenario(),
+		ExampleCommandScenario(),
+		ExampleGroveVersionScenario(),
+		
+		// Custom scenarios specific to this repository
+		CustomScenario,
+	}
+
+	// Setup signal handling
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-sigChan
+		fmt.Println("\nReceived interrupt signal, shutting down...")
+		cancel()
+	}()
+
+	// Execute the custom tend application
+	if err := app.Execute(ctx, myScenarios); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
 	}
 }

@@ -2,17 +2,16 @@ package cmd
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 
 	"github.com/mattsolo1/grove-tend/internal/harness"
 	"github.com/mattsolo1/grove-tend/pkg/ui"
-	"github.com/mattsolo1/grove-tend/scenarios"
 )
 
-// validateCmd represents the validate command
-var validateCmd = &cobra.Command{
+// newValidateCmd creates the validate command with the provided scenarios
+func newValidateCmd(allScenarios []*harness.Scenario) *cobra.Command {
+	validateCmd := &cobra.Command{
 	Use:   "validate",
 	Short: "Validate test scenarios",
 	Long: `Validate that all test scenarios are properly defined and can be loaded.
@@ -28,20 +27,18 @@ This is useful for CI/CD pipelines to catch configuration errors early.
 Examples:
   tend validate              # Validate all scenarios
   tend validate --verbose    # Show detailed validation output`,
-	RunE: validateScenarios,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return validateScenarios(cmd, args, allScenarios)
+	},
+	}
+	
+	return validateCmd
 }
 
-func validateScenarios(cmd *cobra.Command, args []string) error {
+func validateScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Scenario) error {
 	// Create UI renderer
 	renderer := ui.NewRenderer(cmd.OutOrStdout(), verbose, 80)
 	
-	// Load scenarios
-	scenarioLoader := scenarios.NewLoader(filepath.Join(rootDir, scenarioDir))
-	allScenarios, err := scenarioLoader.LoadAll()
-	if err != nil {
-		renderer.RenderError(fmt.Errorf("failed to load scenarios: %w", err))
-		return err
-	}
 	
 	if len(allScenarios) == 0 {
 		renderer.RenderInfo("No scenarios found to validate")

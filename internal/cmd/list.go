@@ -2,18 +2,17 @@ package cmd
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/mattsolo1/grove-tend/internal/harness"
 	"github.com/mattsolo1/grove-tend/pkg/ui"
-	"github.com/mattsolo1/grove-tend/scenarios"
 )
 
-// listCmd represents the list command
-var listCmd = &cobra.Command{
+// newListCmd creates the list command with the provided scenarios
+func newListCmd(allScenarios []*harness.Scenario) *cobra.Command {
+	listCmd := &cobra.Command{
 	Use:   "list",
 	Short: "List available test scenarios",
 	Long: `List all available test scenarios with their descriptions and tags.
@@ -25,20 +24,18 @@ Examples:
   tend list                    # List all scenarios
   tend list --tags=smoke       # List scenarios tagged with 'smoke'
   tend list --verbose          # List with detailed information`,
-	RunE: listScenarios,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return listScenarios(cmd, args, allScenarios)
+	},
+	}
+	
+	return listCmd
 }
 
-func listScenarios(cmd *cobra.Command, args []string) error {
+func listScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Scenario) error {
 	// Create UI renderer
 	renderer := ui.NewRenderer(cmd.OutOrStdout(), verbose, 80)
 	
-	// Load scenarios
-	scenarioLoader := scenarios.NewLoader(filepath.Join(rootDir, scenarioDir))
-	allScenarios, err := scenarioLoader.LoadAll()
-	if err != nil {
-		renderer.RenderError(fmt.Errorf("failed to load scenarios: %w", err))
-		return err
-	}
 	
 	// Filter scenarios by tags if specified
 	filteredScenarios := filterScenarios(allScenarios, []string{}, tags)

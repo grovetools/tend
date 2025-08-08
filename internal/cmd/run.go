@@ -12,21 +12,20 @@ import (
 	"github.com/mattsolo1/grove-tend/internal/harness"
 	"github.com/mattsolo1/grove-tend/internal/harness/reporters"
 	"github.com/mattsolo1/grove-tend/pkg/ui"
-	"github.com/mattsolo1/grove-tend/scenarios"
 )
 
 var (
 	parallel    bool
 	timeout     time.Duration
 	noCleanup   bool
-	scenarioDir string
 	outputFormat string
 	junitOutput  string
 	jsonOutput   string
 )
 
-// runCmd represents the run command
-var runCmd = &cobra.Command{
+// newRunCmd creates the run command with the provided scenarios
+func newRunCmd(allScenarios []*harness.Scenario) *cobra.Command {
+	runCmd := &cobra.Command{
 	Use:   "run [scenario...]",
 	Short: "Run test scenarios",
 	Long: `Run one or more test scenarios.
@@ -40,32 +39,27 @@ Examples:
   tend run --tags=smoke              # Run scenarios tagged with 'smoke'
   tend run --interactive agent-*     # Run agent scenarios interactively
   tend run --parallel --timeout=5m   # Run with 5 minute timeout in parallel`,
-	RunE: runScenarios,
-}
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runScenarios(cmd, args, allScenarios)
+	},
+	}
 
-func init() {
 	runCmd.Flags().BoolVarP(&parallel, "parallel", "p", false, "Run scenarios in parallel")
 	runCmd.Flags().DurationVar(&timeout, "timeout", 10*time.Minute, "Timeout for scenario execution")
 	runCmd.Flags().BoolVar(&noCleanup, "no-cleanup", false, "Skip cleanup after scenario execution")
-	runCmd.Flags().StringVar(&scenarioDir, "scenario-dir", "scenarios", "Directory containing scenarios")
 	runCmd.Flags().StringVar(&outputFormat, "format", "text", "Output format (text, json, junit)")
 	runCmd.Flags().StringVar(&junitOutput, "junit", "", "Write JUnit XML to file")
 	runCmd.Flags().StringVar(&jsonOutput, "json", "", "Write JSON report to file")
+	
+	return runCmd
 }
 
-func runScenarios(cmd *cobra.Command, args []string) error {
+func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Scenario) error {
 	ctx := cmd.Context()
 	
 	// Create UI renderer
 	renderer := ui.NewRenderer(os.Stdout, verbose, 80)
 	
-	// Load scenarios
-	scenarioLoader := scenarios.NewLoader(filepath.Join(rootDir, scenarioDir))
-	allScenarios, err := scenarioLoader.LoadAll()
-	if err != nil {
-		renderer.RenderError(fmt.Errorf("failed to load scenarios: %w", err))
-		return err
-	}
 	
 	// Filter scenarios
 	selectedScenarios := filterScenarios(allScenarios, args, tags)
@@ -107,6 +101,7 @@ func runScenarios(cmd *cobra.Command, args []string) error {
 	// Run scenarios
 	var results []*harness.Result
 	var totalSuccess int
+	var err error
 	
 	if parallel {
 		results, err = runScenariosParallel(ctx, h, selectedScenarios, renderer)
