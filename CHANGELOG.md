@@ -1,3 +1,9 @@
+## v0.2.5 (2025-08-08)
+
+### Bug Fixes
+
+* make harness a public pkg
+
 ## v0.2.4 (2025-08-08)
 
 ### Code Refactoring
