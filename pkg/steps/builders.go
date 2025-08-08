@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 	
-	"github.com/mattsolo1/grove-tend/internal/harness"
+	"github.com/mattsolo1/grove-tend/pkg/harness"
 	"github.com/mattsolo1/grove-tend/pkg/retry"
 	"github.com/mattsolo1/grove-tend/pkg/verify"
 	"github.com/mattsolo1/grove-tend/pkg/wait"

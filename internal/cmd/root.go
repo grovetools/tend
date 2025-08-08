@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/mattsolo1/grove-core/cli"
-	"github.com/mattsolo1/grove-tend/internal/harness"
+	"github.com/mattsolo1/grove-tend/pkg/harness"
 	"github.com/spf13/cobra"
 )
 
