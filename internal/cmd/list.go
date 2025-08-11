@@ -2,8 +2,11 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
 	"github.com/spf13/cobra"
 
 	"github.com/mattsolo1/grove-tend/pkg/harness"
@@ -12,6 +15,8 @@ import (
 
 // newListCmd creates the list command with the provided scenarios
 func newListCmd(allScenarios []*harness.Scenario) *cobra.Command {
+	var keyword string
+	
 	listCmd := &cobra.Command{
 	Use:   "list",
 	Short: "List available test scenarios",
@@ -21,41 +26,113 @@ This command helps you discover what scenarios are available and understand
 their purpose before running them.
 
 Examples:
-  tend list                    # List all scenarios
-  tend list --tags=smoke       # List scenarios tagged with 'smoke'
-  tend list --verbose          # List with detailed information`,
+  tend list                         # List all scenarios
+  tend list --tags=smoke            # List scenarios tagged with 'smoke'
+  tend list --keyword=git           # List scenarios containing 'git' in name, description, or tags
+  tend list --verbose               # List with detailed information`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return listScenarios(cmd, args, allScenarios)
+		return listScenarios(cmd, args, allScenarios, keyword)
 	},
 	}
+	
+	listCmd.Flags().StringVarP(&keyword, "keyword", "k", "", "Filter scenarios by keyword (searches name, description, and tags)")
 	
 	return listCmd
 }
 
-func listScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Scenario) error {
+func listScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Scenario, keyword string) error {
 	// Create UI renderer
 	renderer := ui.NewRenderer(cmd.OutOrStdout(), verbose, 80)
 	
 	
-	// Filter scenarios by tags if specified
+	// Filter scenarios by tags and keyword if specified
 	filteredScenarios := filterScenarios(allScenarios, []string{}, tags)
+	
+	// Apply keyword filtering if specified
+	if keyword != "" {
+		filteredScenarios = filterByKeyword(filteredScenarios, keyword)
+	}
 	
 	if len(filteredScenarios) == 0 {
 		renderer.RenderInfo("No scenarios found matching the specified criteria")
 		return nil
 	}
 	
-	// Display scenarios
-	renderer.RenderList(fmt.Sprintf("Available scenarios (%d):", len(filteredScenarios)), []string{})
+	// Display header
+	fmt.Printf("Available scenarios (%d):\n\n", len(filteredScenarios))
+	
+	// Build table data
+	headers := []string{"NAME", "DESCRIPTION", "TAGS", "STEPS"}
+	var rows [][]string
 	
 	for _, scenario := range filteredScenarios {
-		displayScenario(renderer, scenario)
+		// Format tags
+		tagStr := "-"
+		if len(scenario.Tags) > 0 {
+			tagStr = strings.Join(scenario.Tags, ", ")
+		}
+		
+		// Format description - truncate if too long
+		description := scenario.Description
+		if len(description) > 50 && !verbose {
+			description = description[:47] + "..."
+		}
+		
+		row := []string{
+			scenario.Name,
+			description,
+			tagStr,
+			fmt.Sprintf("%d", len(scenario.Steps)),
+		}
+		rows = append(rows, row)
+	}
+	
+	// Create table renderer
+	re := lipgloss.NewRenderer(os.Stdout)
+	
+	// Define styles
+	baseStyle := re.NewStyle().Padding(0, 1)
+	headerStyle := baseStyle.Copy().Bold(true).Foreground(lipgloss.Color("#5FAFFF"))
+	
+	// Create the table
+	t := table.New().
+		Border(lipgloss.NormalBorder()).
+		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("#6C7086"))).
+		Headers(headers...).
+		Rows(rows...)
+	
+	// Apply styling
+	t.StyleFunc(func(row, col int) lipgloss.Style {
+		if row == 0 {
+			return headerStyle
+		}
+		// Style based on column
+		switch col {
+		case 0: // Name column
+			return baseStyle.Copy().Foreground(lipgloss.Color("#00D4AA")).Bold(true)
+		case 2: // Tags column
+			return baseStyle.Copy().Foreground(lipgloss.Color("#5FAFFF"))
+		case 3: // Steps column
+			return baseStyle.Copy().Foreground(lipgloss.Color("#00D787"))
+		default:
+			return baseStyle
+		}
+	})
+	
+	fmt.Println(t)
+	
+	// If verbose, show detailed step information for each scenario
+	if verbose {
+		fmt.Println("\nDetailed scenario information:")
+		for _, scenario := range filteredScenarios {
+			displayScenarioDetails(renderer, scenario)
+		}
 	}
 	
 	return nil
 }
 
-func displayScenario(renderer *ui.Renderer, scenario *harness.Scenario) {
+func displayScenarioDetails(renderer *ui.Renderer, scenario *harness.Scenario) {
 	// Scenario name and description
 	fmt.Printf("\n%s %s\n", 
 		ui.HeaderStyle.Render("●"), 
@@ -90,4 +167,34 @@ func displayScenario(renderer *ui.Renderer, scenario *harness.Scenario) {
 			}
 		}
 	}
+}
+
+// filterByKeyword filters scenarios based on a keyword search in name, description, and tags
+func filterByKeyword(scenarios []*harness.Scenario, keyword string) []*harness.Scenario {
+	var filtered []*harness.Scenario
+	lowercaseKeyword := strings.ToLower(keyword)
+	
+	for _, scenario := range scenarios {
+		// Check if keyword appears in scenario name
+		if strings.Contains(strings.ToLower(scenario.Name), lowercaseKeyword) {
+			filtered = append(filtered, scenario)
+			continue
+		}
+		
+		// Check if keyword appears in description
+		if strings.Contains(strings.ToLower(scenario.Description), lowercaseKeyword) {
+			filtered = append(filtered, scenario)
+			continue
+		}
+		
+		// Check if keyword appears in any tag
+		for _, tag := range scenario.Tags {
+			if strings.Contains(strings.ToLower(tag), lowercaseKeyword) {
+				filtered = append(filtered, scenario)
+				break
+			}
+		}
+	}
+	
+	return filtered
 }

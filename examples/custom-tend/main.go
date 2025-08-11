@@ -382,6 +382,163 @@ func ExampleGroveVersionScenario() *harness.Scenario {
 	}
 }
 
+// TestKeywordFilteringScenario creates a scenario that tests the keyword filtering feature
+func TestKeywordFilteringScenario() *harness.Scenario {
+	return &harness.Scenario{
+		Name:        "test-keyword-filtering",
+		Description: "Tests the tend list --keyword functionality",
+		Tags:        []string{"test", "filtering", "cli"},
+		Steps: []harness.Step{
+			{
+				Name:        "Test keyword filtering for 'git'",
+				Description: "Verify that --keyword=git returns only git-related scenarios",
+				Func: func(ctx *harness.Context) error {
+					// Use the current binary for testing
+					tendBinary := os.Args[0]
+					cmd := command.New(tendBinary, "list", "--keyword=git")
+					result := cmd.Run()
+					
+					if result.Error != nil {
+						return fmt.Errorf("tend list --keyword=git failed: %w", result.Error)
+					}
+					
+					// Check that output contains example-git scenario
+					if !strings.Contains(result.Stdout, "example-git") {
+						return fmt.Errorf("expected 'example-git' in output, got: %s", result.Stdout)
+					}
+					
+					// Check that output doesn't contain unrelated scenarios
+					if strings.Contains(result.Stdout, "my-custom-scenario") {
+						return fmt.Errorf("unexpected 'my-custom-scenario' in filtered output")
+					}
+					
+					// Count scenarios in output (should be 1)
+					if !strings.Contains(result.Stdout, "Available scenarios (1)") {
+						return fmt.Errorf("expected exactly 1 scenario, output: %s", result.Stdout)
+					}
+					
+					ctx.ShowCommandOutput("tend list --keyword=git", result.Stdout, result.Stderr)
+					return nil
+				},
+			},
+			{
+				Name:        "Test keyword filtering for 'example'",
+				Description: "Verify that --keyword=example returns multiple scenarios",
+				Func: func(ctx *harness.Context) error {
+					tendBinary := os.Args[0]
+					cmd := command.New(tendBinary, "list", "--keyword=example")
+					result := cmd.Run()
+					
+					if result.Error != nil {
+						return fmt.Errorf("tend list --keyword=example failed: %w", result.Error)
+					}
+					
+					// Should find multiple example scenarios
+					if !strings.Contains(result.Stdout, "example-basic") {
+						return fmt.Errorf("expected 'example-basic' in output")
+					}
+					if !strings.Contains(result.Stdout, "example-git") {
+						return fmt.Errorf("expected 'example-git' in output")
+					}
+					if !strings.Contains(result.Stdout, "example-command") {
+						return fmt.Errorf("expected 'example-command' in output")
+					}
+					
+					// Should NOT find non-example scenarios
+					if strings.Contains(result.Stdout, "my-custom-scenario") {
+						return fmt.Errorf("unexpected 'my-custom-scenario' in filtered output")
+					}
+					
+					return nil
+				},
+			},
+			{
+				Name:        "Test keyword filtering with short flag",
+				Description: "Verify that -k works as shorthand for --keyword",
+				Func: func(ctx *harness.Context) error {
+					tendBinary := os.Args[0]
+					cmd := command.New(tendBinary, "list", "-k", "custom")
+					result := cmd.Run()
+					
+					if result.Error != nil {
+						return fmt.Errorf("tend list -k custom failed: %w", result.Error)
+					}
+					
+					// Should find custom scenario
+					if !strings.Contains(result.Stdout, "my-custom-scenario") {
+						return fmt.Errorf("expected 'my-custom-scenario' in output, got: %s", result.Stdout)
+					}
+					
+					// Should be exactly 1 or 2 scenarios (my-custom-scenario and possibly test-keyword-filtering)
+					scenarioCount := 0
+					if strings.Contains(result.Stdout, "Available scenarios (1)") {
+						scenarioCount = 1
+					} else if strings.Contains(result.Stdout, "Available scenarios (2)") {
+						scenarioCount = 2
+					}
+					
+					if scenarioCount == 0 {
+						return fmt.Errorf("unexpected scenario count in output: %s", result.Stdout)
+					}
+					
+					return nil
+				},
+			},
+			{
+				Name:        "Test combining keyword and tag filters",
+				Description: "Verify that --keyword and --tags work together",
+				Func: func(ctx *harness.Context) error {
+					tendBinary := os.Args[0]
+					cmd := command.New(tendBinary, "list", "--tags=smoke", "--keyword=grove")
+					result := cmd.Run()
+					
+					if result.Error != nil {
+						return fmt.Errorf("tend list with combined filters failed: %w", result.Error)
+					}
+					
+					// Should only find example-grove-version (has both 'smoke' tag and 'grove' in name)
+					if !strings.Contains(result.Stdout, "example-grove-version") {
+						return fmt.Errorf("expected 'example-grove-version' in output")
+					}
+					
+					// Should not find example-basic (has smoke tag but no 'grove' keyword)
+					if strings.Contains(result.Stdout, "example-basic") {
+						return fmt.Errorf("unexpected 'example-basic' in filtered output")
+					}
+					
+					// Should be exactly 1 scenario
+					if !strings.Contains(result.Stdout, "Available scenarios (1)") {
+						return fmt.Errorf("expected exactly 1 scenario with combined filters")
+					}
+					
+					return nil
+				},
+			},
+			{
+				Name:        "Test case-insensitive keyword search",
+				Description: "Verify that keyword search is case-insensitive",
+				Func: func(ctx *harness.Context) error {
+					tendBinary := os.Args[0]
+					// Test uppercase keyword
+					cmd := command.New(tendBinary, "list", "--keyword=COMMAND")
+					result := cmd.Run()
+					
+					if result.Error != nil {
+						return fmt.Errorf("tend list --keyword=COMMAND failed: %w", result.Error)
+					}
+					
+					// Should still find example-command scenario
+					if !strings.Contains(result.Stdout, "example-command") {
+						return fmt.Errorf("case-insensitive search failed: expected 'example-command' with uppercase keyword")
+					}
+					
+					return nil
+				},
+			},
+		},
+	}
+}
+
 // CustomScenario is an example of a scenario specific to this consumer
 var CustomScenario = &harness.Scenario{
 	Name:        "my-custom-scenario",
@@ -408,6 +565,7 @@ func main() {
 		
 		// Custom scenarios specific to this repository
 		CustomScenario,
+		TestKeywordFilteringScenario(),
 	}
 
 	// Setup signal handling
