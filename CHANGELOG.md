@@ -1,3 +1,13 @@
+## v0.2.6 (2025-08-12)
+
+### Features
+
+* implemented Table Format for tend list Command
+
+### Chores
+
+* **deps:** bump dependencies
+
 ## v0.2.5 (2025-08-08)
 
 ### Bug Fixes
