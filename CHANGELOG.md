@@ -1,3 +1,15 @@
+## v0.2.7 (2025-08-13)
+
+### Features
+
+* add centralized binary discovery via grove.yml
+* add ci.yml
+
+### Continuous Integration
+
+* consolidate to single test job on macOS
+* reduce test matrix to macOS with Go 1.24.4 only
+
 ## v0.2.6 (2025-08-12)
 
 ### Features
