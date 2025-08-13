@@ -8,7 +8,7 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -47,38 +47,4 @@ jobs:
         run: |
           make test
 
-  test-matrix:
-    strategy:
-      matrix:
-        os: [macos-latest]
-        go: ['1.24.4']
-    runs-on: ${{ matrix.os }}
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ matrix.go }}
-          
-      - name: Configure git for private modules
-        run: |
-          git config --global url."https://${{ secrets.GROVE_PAT }}@github.com/".insteadOf "https://github.com/"
-          go env -w GOPRIVATE=github.com/mattsolo1/*
-          go env -w GOPROXY=direct
-          
-      - name: Update dependencies
-        run: |
-          rm -f go.sum
-          go mod download
-          go mod tidy
-
-      - name: Build
-        run: |
-          make build
-
-      - name: Run tests
-        run: |
-          make test
 
