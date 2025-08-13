@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mattsolo1/grove-tend/pkg/fs"
+	"github.com/mattsolo1/grove-tend/pkg/project"
 )
 
 // Context carries state through a scenario execution
@@ -319,7 +320,7 @@ func (h *Harness) executeStep(ctx context.Context, testCtx *Context, step Step, 
 
 // resolveBinary finds the grove binary to test
 func (h *Harness) resolveBinary() string {
-	// Check options first
+	// Check options first (from --grove flag)
 	if h.opts.GroveBinary != "" {
 		return h.opts.GroveBinary
 	}
@@ -327,6 +328,16 @@ func (h *Harness) resolveBinary() string {
 	// Check environment variable
 	if bin := os.Getenv("GROVE_BINARY"); bin != "" {
 		return bin
+	}
+
+	// Try to find binary via grove.yml
+	rootDir := h.opts.RootDir
+	if rootDir == "" {
+		rootDir, _ = os.Getwd()
+	}
+	
+	if binaryPath, err := project.GetBinaryPath(rootDir); err == nil {
+		return binaryPath
 	}
 
 	// Default to looking for 'grove' in PATH
