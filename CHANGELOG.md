@@ -1,3 +1,17 @@
+## v0.2.8 (2025-08-15)
+
+### Continuous Integration
+
+* switch to Linux runners to reduce costs
+
+### Chores
+
+* bump deps
+
+### Bug Fixes
+
+* use full binary path from grove.yml in harness
+
 ## v0.2.7 (2025-08-13)
 
 ### Features
