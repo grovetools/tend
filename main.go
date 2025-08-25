@@ -5,13 +5,21 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/mattsolo1/grove-tend/pkg/harness"
 	"github.com/mattsolo1/grove-tend/pkg/app"
+	"github.com/mattsolo1/grove-tend/pkg/project"
 )
 
+const childProcessEnvVar = "TEND_IS_CHILD_PROCESS"
+
 func main() {
+	// Try to proxy to project-specific binary first
+	proxyToProjectBinary()
+
 	// Setup signal handling for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -32,6 +40,84 @@ func main() {
 	// Execute the application
 	if err := app.Execute(ctx, allScenarios); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func proxyToProjectBinary() {
+	// Check if we're already a child process to prevent recursion
+	if os.Getenv(childProcessEnvVar) == "true" {
+		return
+	}
+
+	// Get the path of the currently executing binary
+	currentBinary, err := os.Executable()
+	if err != nil {
+		// Can't determine current binary, continue without proxying
+		return
+	}
+
+	// Resolve any symlinks to get the real path
+	currentBinary, err = filepath.EvalSymlinks(currentBinary)
+	if err != nil {
+		return
+	}
+
+	// Get the current working directory
+	cwd, err := os.Getwd()
+	if err != nil {
+		return
+	}
+
+	// Try to find a project-specific tend binary
+	projectBinary, err := project.FindTendBinary(cwd)
+	if err != nil {
+		// No project tend binary found, continue with global binary
+		return
+	}
+
+	// Resolve symlinks for the project binary
+	projectBinary, err = filepath.EvalSymlinks(projectBinary)
+	if err != nil {
+		return
+	}
+
+	// Check if the binaries are different
+	if currentBinary == projectBinary {
+		// Same binary, no need to proxy
+		return
+	}
+
+	// Create a nice styled message about the proxying
+	style := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("2")).
+		Bold(true)
+	
+	arrow := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("4")).
+		Render("→")
+	
+	pathStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("8")).
+		Italic(true)
+	
+	message := fmt.Sprintf("%s %s %s",
+		arrow,
+		style.Render("Found project tend:"),
+		pathStyle.Render(projectBinary),
+	)
+	
+	fmt.Fprintln(os.Stderr, message)
+
+	// Prepare the environment with the child process marker
+	env := os.Environ()
+	env = append(env, fmt.Sprintf("%s=true", childProcessEnvVar))
+
+	// Replace the current process with the project binary
+	err = syscall.Exec(projectBinary, os.Args, env)
+	if err != nil {
+		// syscall.Exec should not return, but if it does, it's an error
+		fmt.Fprintf(os.Stderr, "Error executing project binary: %v\n", err)
 		os.Exit(1)
 	}
 }

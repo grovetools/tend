@@ -64,3 +64,73 @@ func findGroveYml(dir string) (string, error) {
 
 	return "", fmt.Errorf("grove.yml not found in or above %s", dir)
 }
+
+// FindTendBinary searches for a binary containing "tend" in its name within the project.
+// It first finds grove.yml, then looks in common binary locations relative to the project root.
+func FindTendBinary(startDir string) (string, error) {
+	configPath, err := findGroveYml(startDir)
+	if err != nil {
+		return "", err
+	}
+
+	projectRoot := filepath.Dir(configPath)
+	
+	// Common locations to search for binaries
+	searchPaths := []string{
+		"bin",
+		".",
+		"cmd",
+		"scripts",
+	}
+
+	// First pass: look for exact match "tend" or "tend.exe"
+	for _, searchPath := range searchPaths {
+		binDir := filepath.Join(projectRoot, searchPath)
+		
+		// Check for exact matches first
+		exactMatches := []string{"tend", "tend.exe"}
+		for _, exactName := range exactMatches {
+			fullPath := filepath.Join(binDir, exactName)
+			info, err := os.Stat(fullPath)
+			if err == nil && !info.IsDir() && info.Mode()&0111 != 0 {
+				return filepath.Abs(fullPath)
+			}
+		}
+	}
+
+	// Second pass: look for binaries starting with "tend-"
+	for _, searchPath := range searchPaths {
+		binDir := filepath.Join(projectRoot, searchPath)
+		
+		// Check if directory exists
+		if info, err := os.Stat(binDir); err != nil || !info.IsDir() {
+			continue
+		}
+
+		// Look for files starting with "tend-"
+		entries, err := os.ReadDir(binDir)
+		if err != nil {
+			continue
+		}
+
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+
+			name := entry.Name()
+			// Check if filename starts with "tend-"
+			if len(name) >= 5 && name[:5] == "tend-" {
+				fullPath := filepath.Join(binDir, name)
+				
+				// Check if it's executable
+				info, err := os.Stat(fullPath)
+				if err == nil && info.Mode()&0111 != 0 {
+					return filepath.Abs(fullPath)
+				}
+			}
+		}
+	}
+
+	return "", fmt.Errorf("no 'tend' binary found in project %s", projectRoot)
+}
