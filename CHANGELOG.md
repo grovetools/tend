@@ -1,3 +1,9 @@
+## v0.2.12 (2025-08-25)
+
+### Continuous Integration
+
+* add Git LFS disable to release workflow
+
 ## v0.2.11 (2025-08-25)
 
 ### Continuous Integration
