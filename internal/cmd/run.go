@@ -21,6 +21,9 @@ var (
 	outputFormat string
 	junitOutput  string
 	jsonOutput   string
+	tmuxSplit   bool
+	nvim        bool
+	debug       bool
 )
 
 // newRunCmd creates the run command with the provided scenarios
@@ -50,12 +53,29 @@ Examples:
 	runCmd.Flags().StringVar(&outputFormat, "format", "text", "Output format (text, json, junit)")
 	runCmd.Flags().StringVar(&junitOutput, "junit", "", "Write JUnit XML to file")
 	runCmd.Flags().StringVar(&jsonOutput, "json", "", "Write JSON report to file")
+	runCmd.Flags().BoolVar(&tmuxSplit, "tmux-split", false, "Split tmux window and cd to test directory")
+	runCmd.Flags().BoolVar(&nvim, "nvim", false, "Start nvim in the new tmux split (requires --tmux-split)")
+	runCmd.Flags().BoolVarP(&debug, "debug", "d", false, "Enable debug mode (shorthand for -i --no-cleanup --tmux-split --nvim --very-verbose)")
 	
 	return runCmd
 }
 
 func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Scenario) error {
 	ctx := cmd.Context()
+	
+	// Handle the debug flag shorthand
+	if debug {
+		interactive = true
+		noCleanup = true
+		tmuxSplit = true
+		nvim = true
+		veryVerbose = true
+		verbose = true // --very-verbose implies --verbose
+	}
+	
+	if nvim && !tmuxSplit {
+		return fmt.Errorf("--nvim can only be used with --tmux-split")
+	}
 	
 	// Create UI renderer
 	renderer := ui.NewRenderer(os.Stdout, verbose, 80)
@@ -87,6 +107,8 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 		RootDir:       rootDir,
 		MonitorDocker: monitorDocker,
 		DockerFilter:  dockerFilter,
+		TmuxSplit:     tmuxSplit,
+		Nvim:          nvim,
 	}
 	
 	// Configure for CI if needed

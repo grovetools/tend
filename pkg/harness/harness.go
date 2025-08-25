@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mattsolo1/grove-tend/pkg/command"
 	"github.com/mattsolo1/grove-tend/pkg/fs"
 	"github.com/mattsolo1/grove-tend/pkg/project"
 )
@@ -54,6 +55,8 @@ type Options struct {
 	RootDir         string        // Root directory for tests (optional)
 	MonitorDocker   bool          // Show live Docker container updates
 	DockerFilter    string        // Filter for Docker containers (e.g., "name=grove")
+	TmuxSplit       bool          // Split tmux window and cd to test directory
+	Nvim            bool          // Start nvim in the new tmux split
 }
 
 // Harness runs scenarios
@@ -159,6 +162,14 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 	
 	// Set the test ID in the UI for container filtering
 	ui.SetTestID(testID)
+
+	// Handle tmux split if requested
+	if h.opts.TmuxSplit {
+		if err := h.handleTmuxSplit(testCtx, ui); err != nil {
+			// This is a non-fatal error for the test itself, so we just show a warning.
+			ui.Error("tmux split failed", err)
+		}
+	}
 
 	// Execute steps
 	var stepResults []StepResult
@@ -343,5 +354,47 @@ func (h *Harness) resolveBinary() string {
 	// Default to looking for 'grove' in PATH
 	// This assumes gvm or proper PATH setup will make it available
 	return "grove"
+}
+
+// handleTmuxSplit attempts to split the tmux window and navigate to the test directory.
+func (h *Harness) handleTmuxSplit(ctx *Context, ui *UI) error {
+	if os.Getenv("TMUX") == "" {
+		return fmt.Errorf("not in a tmux session")
+	}
+
+	ui.Info("tmux", "Splitting window...")
+
+	// Build the command to send. Use single quotes to handle paths with spaces.
+	commandStr := fmt.Sprintf("cd '%s'", ctx.RootDir)
+	if h.opts.Nvim {
+		commandStr += " && nvim"
+	}
+
+	// Split the window and get the new pane's ID.
+	// -v: vertical split (creates horizontal panes stacked on top of each other)
+	// -P: don't make the new pane active
+	// -F '#{pane_id}': print the pane ID to stdout
+	splitCmd := command.New("tmux", "split-window", "-v", "-P", "-F", "#{pane_id}")
+	paneIDResult := splitCmd.Run()
+	if paneIDResult.Error != nil {
+		return fmt.Errorf("failed to split tmux window: %w\n%s", paneIDResult.Error, paneIDResult.Stderr)
+	}
+	paneID := strings.TrimSpace(paneIDResult.Stdout)
+
+	if paneID == "" {
+		return fmt.Errorf("could not get new tmux pane ID")
+	}
+
+	// Send the cd/nvim command to the new pane.
+	// C-m is the equivalent of pressing 'Enter'.
+	sendKeysCmd := command.New("tmux", "send-keys", "-t", paneID, commandStr, "C-m")
+	sendKeysResult := sendKeysCmd.Run()
+	if sendKeysResult.Error != nil {
+		// Try to kill the pane we just created to avoid leaving an empty pane.
+		command.New("tmux", "kill-pane", "-t", paneID).Run()
+		return fmt.Errorf("failed to send keys to new tmux pane: %w\n%s", sendKeysResult.Error, sendKeysResult.Stderr)
+	}
+
+	return nil
 }
 
