@@ -1,3 +1,9 @@
+## v0.2.10 (2025-08-25)
+
+### Features
+
+* auto-find project-specific tend binaries
+
 ## v0.2.9 (2025-08-25)
 
 ### Chores
