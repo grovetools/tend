@@ -1,3 +1,13 @@
+## v0.2.9 (2025-08-25)
+
+### Chores
+
+* bump dependencies
+
+### Features
+
+* add tmux integration for interactive debugging
+
 ## v0.2.8 (2025-08-15)
 
 ### Continuous Integration
