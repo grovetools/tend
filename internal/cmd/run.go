@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
 	"github.com/spf13/cobra"
 
 	"github.com/mattsolo1/grove-tend/pkg/harness"
@@ -165,17 +167,11 @@ func runScenariosSequential(ctx context.Context, h *harness.Harness, scenarios [
 	for i, scenario := range scenarios {
 		renderer.RenderProgress(i, len(scenarios))
 		
-		result, err := runSingleScenario(ctx, h, scenario, renderer)
-		if err != nil {
-			return results, err
-		}
+		result, _ := runSingleScenario(ctx, h, scenario, renderer)
+		// Ignore the error - we want to continue running all scenarios
+		// The result object contains the success/failure information
 		
 		results = append(results, result)
-		
-		// Stop on first failure in sequential mode if not in interactive mode
-		if !result.Success && !interactive {
-			break
-		}
 	}
 	
 	return results, nil
@@ -250,18 +246,59 @@ func renderFinalSummary(renderer *ui.Renderer, results []*harness.Result, succes
 		renderer.RenderError(fmt.Errorf("%d of %d scenario(s) failed", total-success, total))
 	}
 	
-	// Show individual results
+	// Create results table
+	fmt.Println()
+	
+	// Build table data
+	headers := []string{"STATUS", "SCENARIO", "DURATION", "DETAILS"}
+	var rows [][]string
+	
 	for _, result := range results {
-		status := "PASS"
+		status := "✅ PASS"
+		statusStyle := ui.SuccessStyle
 		if !result.Success {
-			status = "FAIL"
+			status = "❌ FAIL"
+			statusStyle = ui.ErrorStyle
 		}
 		
-		fmt.Printf("  %s %s (%v)\n", 
-			status, 
-			result.ScenarioName, 
-			result.Duration.Round(time.Millisecond))
+		details := "-"
+		if !result.Success && result.FailedStep != "" {
+			details = result.FailedStep
+		}
+		
+		row := []string{
+			statusStyle.Render(status),
+			result.ScenarioName,
+			result.Duration.Round(time.Millisecond).String(),
+			details,
+		}
+		rows = append(rows, row)
 	}
+	
+	// Create table renderer
+	re := lipgloss.NewRenderer(os.Stdout)
+	
+	// Define styles
+	baseStyle := re.NewStyle().Padding(0, 1)
+	headerStyle := baseStyle.Copy().Bold(true).Foreground(lipgloss.Color("#5FAFFF"))
+	
+	// Create the table
+	t := table.New().
+		Border(lipgloss.NormalBorder()).
+		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("#6C7086"))).
+		Headers(headers...).
+		Rows(rows...)
+	
+	// Apply styling
+	t.StyleFunc(func(row, col int) lipgloss.Style {
+		if row == 0 {
+			return headerStyle
+		}
+		// Apply base style to all cells
+		return baseStyle
+	})
+	
+	fmt.Println(t)
 }
 
 // writeReports writes test results in various formats
