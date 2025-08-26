@@ -1,133 +1,40 @@
-# Grove Tend Testing Framework
+# Grove Tend
 
-Grove Tend is a Go-based testing framework library for the Grove ecosystem. It provides a structured, maintainable solution for writing end-to-end tests, replacing ad-hoc bash scripts with proper error handling, cleanup, and beautiful output.
+[![CI](https://github.com/mattsolo1/grove-tend/actions/workflows/ci.yml/badge.svg)](https://github.com/mattsolo1/grove-tend/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/mattsolo1/grove-tend)](https://goreportcard.com/report/github.com/mattsolo1/grove-tend)
+[![Go Reference](https://pkg.go.dev/badge/github.com/mattsolo1/grove-tend.svg)](https://pkg.go.dev/github.com/mattsolo1/grove-tend)
 
-**Note:** Grove Tend is now a pure library. Test scenarios should be defined in the repositories they test (e.g., grove-sandbox defines its own agent tests).
+A Go library for creating powerful, scenario-based end-to-end testing frameworks.
 
-## Project Structure
+**Grove Tend** provides the building blocks to replace ad-hoc bash scripts with structured, maintainable, and debuggable Go code. It is designed as a pure library, allowing you to build a custom testing CLI tailored to your project's needs.
 
-```
-grove-tend/
-├── internal/
-│   ├── harness/       # Core test execution framework
-│   │   ├── harness.go # Core types and interfaces
-│   │   └── ...        # Other harness components
-│   └── cmd/           # CLI implementation
-│       ├── root.go    # Root command setup
-│       ├── run.go     # Run command
-│       ├── list.go    # List command
-│       └── validate.go# Validate command
-├── pkg/               # Public API - reusable helper packages
-│   ├── app/           # Application builder
-│   │   └── app.go     # Main entry point for custom binaries
-│   ├── fs/            # Filesystem utilities
-│   ├── git/           # Git operation helpers
-│   ├── command/       # Command execution helpers
-│   ├── ui/            # Terminal UI components
-│   └── ...            # Other helper packages
-├── examples/          # Example usage
-│   └── custom-tend/   # Example of using tend as a library
-│       └── main.go    # Complete example with all scenarios
-├── main.go            # Main binary (empty - for library demonstration)
-├── go.mod             # Go module definition
-└── Makefile           # Build automation
-```
+---
 
-## Implementation Status
+## Features
 
-### ✅ Completed (Sessions 01-05)
+-   **Library-First Design**: Import `grove-tend` to build your own test runner binary, keeping test definitions close to your code.
+-   **Scenario-Based Testing**: Structure tests logically with `Scenarios`, `Steps`, and a shared `Context`.
+-   **Rich Helper Packages**: Leverage built-in helpers for filesystem operations (`fs`), Git (`git`), command execution (`command`), Docker (`docker`), assertions (`assert`), and waiting (`wait`).
+-   **Interactive Debugging**: Step through scenarios one-by-one with interactive mode (`-i`) or use the powerful debug mode (`-d`) for tmux integration.
+-   **Beautiful Terminal UI**: Get clear, styled output with progress indicators, status updates, and command output boxes.
+-   **Project-Specific Binary Discovery**: The globally installed `tend` binary will automatically find and execute a project-specific test binary, ensuring you always run the correct tests.
+-   **CI-Friendly Reporting**: Generate JUnit, JSON, and GitHub Actions annotations for seamless CI/CD integration.
 
-1. **Core Abstractions** - Defined the foundational types and interfaces:
-   - `Context` - Carries state through scenario execution with thread-safe operations
-   - `Step` - Represents a single test action
-   - `Scenario` - Collection of steps defining a test
-   - `Harness` - Test execution engine with interactive and batch modes
-   - `Result` - Test outcome representation with detailed step results
+## Getting Started: Using Tend as a Library
 
-2. **Filesystem Helpers** - Robust filesystem utilities:
-   - Safe file/directory operations
-   - Temporary directory management with cleanup
-   - Grove configuration file generation
-   - Test data and project structure creation
+The primary way to use `tend` is to create a custom test binary within your own project.
 
-3. **Git Helpers** - Type-safe Git operations:
-   - Repository initialization and basic operations
-   - Worktree management for multi-branch testing
-   - Remote repository operations
-   - Test repository setup with sensible defaults
+### 1. Installation
 
-4. **Command Runner** - Execute shell commands with proper output capture:
-   - Command execution with timeout handling
-   - Streaming output support for long-running processes
-   - Grove-specific command helpers
-   - Docker container management utilities
-
-5. **Harness Implementation** - Complete test execution logic:
-   - Full scenario execution with step-by-step progress
-   - Interactive mode with user prompts
-   - Batch execution of multiple scenarios
-   - Context state management between steps
-   - Step builder utilities (retry, conditional, sequential)
-   - Comprehensive error handling and cleanup
-
-### 🔄 Next Steps (Sessions 06-10)
-
-6. **UI Components** - Beautiful terminal interface with lipgloss
-7. **Runner CLI** - Command-line interface with Cobra
-8. **First Scenario** - Convert agent isolation test from bash
-9. **CI Integration** - Reporting and GitHub Actions integration
-10. **Advanced Helpers** - Wait utilities and verification helpers
-
-## Usage Example
-
-```go
-// Define a test scenario
-scenario := &harness.Scenario{
-    Name:        "example-test",
-    Description: "An example test scenario",
-    Tags:        []string{"example", "demo"},
-    Steps: []harness.Step{
-        {
-            Name: "Setup test environment",
-            Func: func(ctx *harness.Context) error {
-                testDir := ctx.NewDir("test")
-                return fs.WriteBasicGroveConfig(testDir)
-            },
-        },
-    },
-}
-
-// Execute with harness
-h := harness.New(harness.Options{Verbose: true})
-result, err := h.Run(context.Background(), scenario)
-```
-
-## Testing
-
-Run the verification tests:
-
-```bash
-cd tend
-go test -v
-```
-
-This will test the core abstractions, filesystem helpers, and git helpers to ensure everything is working correctly.
-
-## Using Tend as a Library
-
-Grove Tend can be used as a library in other repositories to define custom test scenarios. This allows you to leverage the testing framework while keeping your test definitions close to your code.
-
-### Installation
-
-Add grove-tend to your Go module:
+Add `grove-tend` to your Go project:
 
 ```bash
 go get github.com/mattsolo1/grove-tend
 ```
 
-### Creating a Custom Test Binary
+### 2. Create Your Test Runner
 
-Create a new `main.go` file in your repository (e.g., `cmd/test/main.go`):
+Create a new `main.go` file for your test runner (e.g., in `cmd/tester/main.go`):
 
 ```go
 package main
@@ -138,41 +45,60 @@ import (
     "os"
     "os/signal"
     "syscall"
+    "time"
 
-    "github.com/mattsolo1/grove-tend/internal/harness"
     "github.com/mattsolo1/grove-tend/pkg/app"
+    "github.com/mattsolo1/grove-tend/pkg/command"
+    "github.com/mattsolo1/grove-tend/pkg/fs"
+    "github.com/mattsolo1/grove-tend/pkg/harness"
 )
 
-// Define your custom scenarios
-var MyScenario = &harness.Scenario{
-    Name:        "my-test-scenario",
-    Description: "Tests specific to my repository",
-    Tags:        []string{"integration"},
+// Define a scenario specific to your project
+var MyWebAppScenario = &harness.Scenario{
+    Name:        "webapp-smoke-test",
+    Description: "Performs a basic smoke test on the web application.",
+    Tags:        []string{"smoke", "webapp"},
     Steps: []harness.Step{
-        harness.NewStep("Setup environment", func(ctx *harness.Context) error {
-            // Your test logic here
-            return nil
+        // Use a step builder to create a step
+        harness.NewStep("Setup test directory", func(ctx *harness.Context) error {
+            // The context manages a temporary directory for the scenario
+            testDir := ctx.NewDir("webapp-test")
+            ctx.Set("test_dir", testDir) // Store values for later steps
+            return fs.WriteBasicGroveConfig(testDir)
         }),
-        // Add more steps...
+        {
+            Name: "Run a command",
+            Func: func(ctx *harness.Context) error {
+                cmd := command.New("echo", "Hello, Tend!").Dir(ctx.Dir("webapp-test"))
+                result := cmd.Run()
+                if result.Error != nil {
+                    return result.Error
+                }
+                // Display formatted command output in verbose mode
+                ctx.ShowCommandOutput(cmd.String(), result.Stdout, result.Stderr)
+                return nil
+            },
+        },
+        // Use a built-in delay step
+        harness.DelayStep("Wait for filesystem", 100*time.Millisecond),
     },
 }
 
 func main() {
-    // List all your scenarios
+    // Collect all scenarios for your test runner
     scenarios := []*harness.Scenario{
-        MyScenario,
-        // Add more scenarios...
+        MyWebAppScenario,
+        // Add more scenarios here...
     }
 
-    // Setup signal handling
+    // Setup signal handling for graceful shutdown
     ctx, cancel := context.WithCancel(context.Background())
     defer cancel()
-    
     sigChan := make(chan os.Signal, 1)
     signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
     go func() {
         <-sigChan
-        fmt.Println("\nReceived interrupt signal, shutting down...")
+        fmt.Println("\nReceived interrupt, shutting down...")
         cancel()
     }()
 
@@ -184,31 +110,65 @@ func main() {
 }
 ```
 
-### Building and Running
+### 3. Build and Run Your Tests
 
-Build your custom tend binary:
-
-```bash
-go build -o mytend ./cmd/test
-```
-
-Run your tests:
+Build your custom binary:
 
 ```bash
-./mytend list                    # List all custom scenarios
-./mytend run my-test-scenario    # Run specific scenario
-./mytend run --tags=integration  # Run by tags
+go build -o my-tests ./cmd/tester
 ```
 
-### Example
+Now you can use the CLI to run your scenarios:
 
-See the `examples/custom-tend` directory for a complete example of using tend as a library.
+```bash
+# List all available scenarios
+./my-tests list
 
-## Design Principles
+# Run a specific scenario
+./my-tests run webapp-smoke-test
 
-- **Type Safety** - Leverage Go's type system to prevent runtime errors
-- **Clear Error Messages** - Provide detailed context when things go wrong
-- **Composability** - Build complex tests from simple, reusable components
-- **Clean Architecture** - Separate concerns with clear interfaces
-- **Testability** - All components can be unit tested
-- **Resource Management** - Proper cleanup with defer statements
+# Run all scenarios tagged with 'smoke'
+./my-tests run --tags=smoke
+
+# Run interactively, stepping through each action
+./my-tests run -i webapp-smoke-test
+
+# Run in debug mode (implies interactive, no-cleanup, verbose, and tmux integration)
+./my-tests run -d webapp-smoke-test
+```
+
+## The `tend` CLI
+
+Your custom test binary is a full-featured CLI application with the following commands:
+
+-   `run [scenario...]`: Executes test scenarios. Can be filtered by name (with glob patterns) or tags.
+-   `list`: Lists all available scenarios in a table format, showing their names, descriptions, tags, and step counts.
+-   `validate`: Parses and validates all scenario definitions to catch errors early.
+-   `version`: Prints the version information of the test binary.
+
+## Core Concepts
+
+-   **`harness.Scenario`**: A collection of steps that defines a complete end-to-end test. It includes a name, description, and tags for organization and filtering.
+-   **`harness.Step`**: A single action within a scenario. It consists of a name and a function that receives a `Context`.
+-   **`harness.Context`**: A state container passed between steps in a scenario. It manages the temporary test directory and provides a key-value store for sharing data (e.g., file paths, command output) between steps.
+
+## Development
+
+To work on `grove-tend` itself:
+
+```bash
+# Build the main binary
+make build
+
+# Run all linters and tests
+make check
+
+# Clean build artifacts
+make clean
+```
+
+Tests for the framework can be found in the `tests/` directory.
+
+---
+
+Inspired by modern testing frameworks and built for the Grove ecosystem.
