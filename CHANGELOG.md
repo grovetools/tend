@@ -1,3 +1,10 @@
+## v0.2.13 (2025-08-26)
+
+### Features
+
+* **run:** execute all scenarios and display results in table format
+* **command:** add background process execution capability
+
 ## v0.2.12 (2025-08-25)
 
 ### Continuous Integration
