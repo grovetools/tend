@@ -166,3 +166,38 @@ func (c *Command) CombinedOutput() (string, error) {
 	}
 	return combined, nil
 }
+
+// start is the internal implementation of the Start method.
+func (c *Command) start() (*Process, error) {
+	// Setup environment
+	if len(c.env) > 0 {
+		c.cmd.Env = append(os.Environ(), c.env...)
+	}
+
+	// Setup I/O
+	c.cmd.Stdout = &c.stdout
+	c.cmd.Stderr = &c.stderr
+	if c.stdin != nil {
+		c.cmd.Stdin = c.stdin
+	}
+
+	// Start the command
+	if err := c.cmd.Start(); err != nil {
+		return nil, fmt.Errorf("failed to start command: %w", err)
+	}
+
+	process := &Process{
+		Cmd:      c.cmd,
+		PID:      c.cmd.Process.Pid,
+		stdout:   &c.stdout,
+		stderr:   &c.stderr,
+		finished: make(chan error, 1),
+	}
+
+	// Wait for completion in a goroutine
+	go func() {
+		process.finished <- c.cmd.Wait()
+	}()
+
+	return process, nil
+}

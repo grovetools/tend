@@ -67,3 +67,8 @@ func (c *Command) String() string {
 	parts = append(parts, c.cmd.Args[1:]...)
 	return strings.Join(parts, " ")
 }
+
+// Start executes the command in the background.
+func (c *Command) Start() (*Process, error) {
+	return c.start()
+}
