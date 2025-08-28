@@ -1,3 +1,9 @@
+## v0.2.15 (2025-08-28)
+
+### Chores
+
+* add Grove ecosystem files
+
 ## v0.2.14 (2025-08-27)
 
 ### Chores
