@@ -22,7 +22,14 @@ LDFLAGS = -ldflags="\
 -X '$(VERSION_PKG).Branch=$(GIT_BRANCH)' \
 -X '$(VERSION_PKG).BuildDate=$(BUILD_DATE)'"
 
-.PHONY: all build test clean fmt vet lint run check dev build-all help
+# --- Mocking ---
+# Example target for building mock binaries for tests.
+# In a real project, you would list your mock source directories here.
+MOCK_SRC_DIR=tests/mocks
+MOCK_BIN_DIR=bin
+MOCKS ?= $(shell find $(MOCK_SRC_DIR) -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
+
+.PHONY: all build test clean fmt vet lint run check dev build-all help build-mocks
 
 all: build
 
@@ -97,6 +104,19 @@ build-all:
 		GOOS=$$os GOARCH=$$arch go build $(LDFLAGS) -o $(DIST_DIR)/$${output_name} .; \
 	done
 
+# Build mock binaries
+build-mocks:
+	@if [ -d "$(MOCK_SRC_DIR)" ]; then \
+		echo "Building mocks: $(MOCKS)"; \
+		mkdir -p $(MOCK_BIN_DIR); \
+		for mock in $(MOCKS); do \
+			echo "  -> Building mock $$mock"; \
+			go build -o $(MOCK_BIN_DIR)/mock-$$mock $(MOCK_SRC_DIR)/$$mock; \
+		done; \
+	else \
+		echo "No mock directory found, skipping mock build."; \
+	fi
+
 # Show available targets
 help:
 	@echo "Available targets:"
@@ -112,3 +132,4 @@ help:
 	@echo "  make run-scenarios - Run agent-isolation scenario"
 	@echo "  make build-custom-example - Build custom tend example"
 	@echo "  make build-all   - Build for multiple platforms"
+	@echo "  make build-mocks - Build mock binaries for testing"

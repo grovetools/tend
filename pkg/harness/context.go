@@ -1,8 +1,12 @@
 package harness
 
 import (
+	"fmt"
+	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/mattsolo1/grove-tend/pkg/command"
 )
 
 // contextMutex protects concurrent access to context maps
@@ -111,4 +115,29 @@ func (c *Context) Keys() []string {
 		keys = append(keys, k)
 	}
 	return keys
+}
+
+// Command creates a new command with the test's mock-aware PATH.
+func (c *Context) Command(program string, args ...string) *command.Command {
+	// For non-absolute paths, we need to ensure mocks are found first
+	if binDir := c.GetString("test_bin_dir"); binDir != "" && !filepath.IsAbs(program) {
+		// Check if the program exists in our mock bin directory
+		mockPath := filepath.Join(binDir, program)
+		if _, err := os.Stat(mockPath); err == nil {
+			// Use the mock directly
+			cmd := command.New(mockPath, args...)
+			// Still set PATH for any subprocesses
+			currentPath := os.Getenv("PATH")
+			cmd.Env(fmt.Sprintf("PATH=%s:%s", binDir, currentPath))
+			return cmd
+		}
+	}
+	
+	// Fall back to normal command creation
+	cmd := command.New(program, args...)
+	if binDir := c.GetString("test_bin_dir"); binDir != "" {
+		currentPath := os.Getenv("PATH")
+		cmd.Env(fmt.Sprintf("PATH=%s:%s", binDir, currentPath))
+	}
+	return cmd
 }

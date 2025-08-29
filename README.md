@@ -19,6 +19,7 @@ A Go library for creating powerful, scenario-based end-to-end testing frameworks
 -   **Beautiful Terminal UI**: Get clear, styled output with progress indicators, status updates, and command output boxes.
 -   **Project-Specific Binary Discovery**: The globally installed `tend` binary will automatically find and execute a project-specific test binary, ensuring you always run the correct tests.
 -   **CI-Friendly Reporting**: Generate JUnit, JSON, and GitHub Actions annotations for seamless CI/CD integration.
+-   **First-Class Mocking Support**: Define mocks in Go, build them as binaries, and seamlessly swap between mocked and real dependencies.
 
 ## Getting Started: Using Tend as a Library
 
@@ -151,6 +152,109 @@ Your custom test binary is a full-featured CLI application with the following co
 -   **`harness.Scenario`**: A collection of steps that defines a complete end-to-end test. It includes a name, description, and tags for organization and filtering.
 -   **`harness.Step`**: A single action within a scenario. It consists of a name and a function that receives a `Context`.
 -   **`harness.Context`**: A state container passed between steps in a scenario. It manages the temporary test directory and provides a key-value store for sharing data (e.g., file paths, command output) between steps.
+
+## Mocking External Dependencies
+
+`tend` provides a first-class solution for mocking external dependencies like `git`, `docker`, or other CLIs, moving beyond brittle shell scripts.
+
+### Concept
+
+Instead of writing mock logic in shell scripts inside your tests, you can write them in Go, compile them into mock binaries, and have `tend` manage them during test execution. This makes your mocks more robust, maintainable, and easier to debug.
+
+### 1. Defining Mocks in Go
+
+Create a directory for your mocks, for example, `tests/mocks/`. For each command you want to mock, create a subdirectory with a `main.go` file.
+
+**Example: `tests/mocks/llm/main.go`**
+```go
+package main
+
+import (
+	"fmt"
+	"os"
+)
+
+// A simple mock for an 'llm' command.
+func main() {
+	// Mocks can be stateful by reading/writing to files.
+	// For this example, we just print a static response.
+	fmt.Println("This is a mocked LLM response.")
+	os.Exit(0)
+}
+```
+
+### 2. Building Mocks
+
+Add a target to your `Makefile` to automatically build your mock binaries and place them in your project's `./bin` directory, following the `mock-<name>` convention.
+
+**Example `Makefile` target:**
+```makefile
+MOCK_SRC_DIR=tests/mocks
+MOCK_BIN_DIR=bin
+MOCKS=$(shell find $(MOCK_SRC_DIR) -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
+
+build-mocks:
+    @echo "Building mocks: $(MOCKS)"
+    @mkdir -p $(MOCK_BIN_DIR)
+    @for mock in $(MOCKS); do \
+        echo "  -> Building mock $$mock"; \
+        go build -o $(MOCK_BIN_DIR)/mock-$$mock $(MOCK_SRC_DIR)/$$mock; \
+    done
+
+# Add it to your main build target
+build: build-mocks
+    # ... your main binary build ...
+```
+
+### 3. Using Mocks in Scenarios
+
+Use the `harness.SetupMocks` step builder to activate your mocks for a scenario. `tend` will create a temporary `bin` directory for the test run, symlink your mocks into it, and add it to the `PATH`.
+
+```go
+var MyScenario = &harness.Scenario{
+    Name: "my-feature-test",
+    Steps: []harness.Step{
+        // Setup mocks for 'git' and 'llm'.
+        // By convention, tend looks for ./bin/mock-git and ./bin/mock-llm.
+        harness.SetupMocks(
+            harness.Mock{CommandName: "git"},
+            harness.Mock{CommandName: "llm"},
+        ),
+        // You can also create simple mocks with inline scripts.
+        harness.SetupMocks(
+            harness.Mock{
+                CommandName: "kubectl",
+                Script:      "#!/bin/bash\necho '{\"status\":\"mocked\"}'",
+            },
+        ),
+        harness.NewStep("Run feature command", func(ctx *harness.Context) error {
+            // Use ctx.Command() to create commands that respect the mock PATH.
+            cmd := ctx.Command("./my-app-binary", "feature", "apply")
+            result := cmd.Run()
+            // ... assert on mock output ...
+            return result.Error
+        }),
+    },
+}
+```
+
+### 4. Swapping Mocks for Real Binaries (Integration Testing)
+
+For integration tests, you can swap mocks with their real counterparts from your Grove ecosystem using the `--use-real-deps` flag. `tend` uses `grove dev current <tool>` to find the correct path to the active binary.
+
+```bash
+# Run with all mocks enabled (default)
+./my-tests run my-feature-test
+
+# Swap the 'git' mock for the real binary
+./my-tests run my-feature-test --use-real-deps=git
+
+# Swap 'git' and 'llm'
+./my-tests run my-feature-test --use-real-deps=git,llm
+
+# Swap all available mocks for their real counterparts
+./my-tests run my-feature-test --use-real-deps=all
+```
 
 ## Development
 

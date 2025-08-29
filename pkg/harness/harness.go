@@ -17,12 +17,14 @@ import (
 type Context struct {
 	// Core paths
 	RootDir     string // Root temporary directory for the scenario
+	ProjectRoot string // Root of the project being tested
 	GroveBinary string // Path to the grove binary under test
 	TestID      string // Unique ID for this test run
 
 	// State management
-	dirs   map[string]string      // Named directories created during test
-	values map[string]interface{} // Generic key-value store for step communication
+	dirs        map[string]string      // Named directories created during test
+	values      map[string]interface{} // Generic key-value store for step communication
+	UseRealDeps map[string]bool        // Map of dependencies to use real binaries for
 	
 	// UI for displaying command output
 	ui *UI
@@ -57,6 +59,7 @@ type Options struct {
 	DockerFilter    string        // Filter for Docker containers (e.g., "name=grove")
 	TmuxSplit       bool          // Split tmux window and cd to test directory
 	Nvim            bool          // Start nvim in the new tmux split
+	UseRealDeps     []string      // List of dependencies to use real binaries for
 }
 
 // Harness runs scenarios
@@ -151,12 +154,28 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 	}
 	// Generate a unique test ID based on the temp directory
 	testID := filepath.Base(tempMgr.BaseDir())
+	
+	// Populate the map for real dependencies
+	realDepsMap := make(map[string]bool)
+	if len(h.opts.UseRealDeps) > 0 {
+		if len(h.opts.UseRealDeps) == 1 && h.opts.UseRealDeps[0] == "all" {
+			// A special value to swap all swappable mocks
+			realDepsMap["all"] = true
+		} else {
+			for _, dep := range h.opts.UseRealDeps {
+				realDepsMap[dep] = true
+			}
+		}
+	}
+
 	testCtx := &Context{
 		RootDir:     tempMgr.BaseDir(),
+		ProjectRoot: h.opts.RootDir, // Pass project root from harness options
 		GroveBinary: groveBinary,
 		TestID:      testID,
 		dirs:        make(map[string]string),
 		values:      make(map[string]interface{}),
+		UseRealDeps: realDepsMap,
 		ui:          ui,
 	}
 	

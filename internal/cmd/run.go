@@ -26,6 +26,7 @@ var (
 	tmuxSplit   bool
 	nvim        bool
 	debug       bool
+	useRealDeps []string
 )
 
 // newRunCmd creates the run command with the provided scenarios
@@ -58,6 +59,7 @@ Examples:
 	runCmd.Flags().BoolVar(&tmuxSplit, "tmux-split", false, "Split tmux window and cd to test directory")
 	runCmd.Flags().BoolVar(&nvim, "nvim", false, "Start nvim in the new tmux split (requires --tmux-split)")
 	runCmd.Flags().BoolVarP(&debug, "debug", "d", false, "Enable debug mode (shorthand for -i --no-cleanup --tmux-split --nvim --very-verbose)")
+	runCmd.Flags().StringSliceVar(&useRealDeps, "use-real-deps", []string{}, "A comma-separated list of dependencies to use real binaries for instead of mocks (e.g., flow,cx). Use 'all' to swap all.")
 	
 	return runCmd
 }
@@ -111,6 +113,7 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 		DockerFilter:  dockerFilter,
 		TmuxSplit:     tmuxSplit,
 		Nvim:          nvim,
+		UseRealDeps:   useRealDeps,
 	}
 	
 	// Configure for CI if needed
