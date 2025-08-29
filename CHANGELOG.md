@@ -1,3 +1,9 @@
+## v0.2.16 (2025-08-29)
+
+### Features
+
+* add first-class mocking support to grove-tend
+
 ## v0.2.15 (2025-08-28)
 
 ### Chores
