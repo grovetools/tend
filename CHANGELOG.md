@@ -1,3 +1,13 @@
+## v0.2.17 (2025-09-04)
+
+### Bug Fixes
+
+* prevent real grove-hooks from being called during E2E tests
+
+### Code Refactoring
+
+* improve grove-tend mocking framework
+
 ## v0.2.16 (2025-08-29)
 
 ### Features
