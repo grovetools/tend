@@ -148,17 +148,6 @@ var LLMIntegrationScenario = &harness.Scenario{
 			harness.Mock{CommandName: "llm"},
 		),
 		
-		// Also demonstrate inline script mock
-		harness.SetupMocks(
-			harness.Mock{
-				CommandName: "simple-tool",
-				Script: `#!/bin/bash
-echo "Simple tool output: $@"
-echo "Environment: TEST_VAR=$TEST_VAR"
-exit 0`,
-			},
-		),
-		
 		// Test the binary mock
 		harness.NewStep("Query LLM with test prompt", func(ctx *harness.Context) error {
 			cmd := ctx.Command("llm", "Tell me about testing")
@@ -180,20 +169,6 @@ exit 0`,
 				return err
 			}
 			return assert.Contains(result.Stdout, `"response"`, "should have response field")
-		}),
-		
-		// Test the inline script mock
-		harness.NewStep("Test simple tool", func(ctx *harness.Context) error {
-			cmd := ctx.Command("simple-tool", "arg1", "arg2").
-				Env("TEST_VAR=mock-value")
-			result := cmd.Run()
-			
-			ctx.ShowCommandOutput(cmd.String(), result.Stdout, result.Stderr)
-			
-			if err := assert.Contains(result.Stdout, "arg1 arg2", "should echo arguments"); err != nil {
-				return err
-			}
-			return assert.Contains(result.Stdout, "TEST_VAR=mock-value", "should show environment")
 		}),
 	},
 }

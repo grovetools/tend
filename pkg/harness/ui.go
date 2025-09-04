@@ -311,14 +311,24 @@ func (ui *UI) CommandOutput(command, stdout, stderr string) {
 	
 	// Show command as if typed in terminal (only in very verbose mode)
 	if command != "" && ui.veryVerbose {
-		fmt.Printf("  %s│%s %s$%s %s\n", cyan, reset, green, reset, command)
+		// Special handling for PATH logging to make it less noisy
+		if strings.HasPrefix(command, "PATH for") {
+			fmt.Printf("  %s│%s %sDebug:%s %s\n", cyan, reset, green, reset, command)
+		} else {
+			fmt.Printf("  %s│%s %s$%s %s\n", cyan, reset, green, reset, command)
+		}
 	}
 	
 	// Show stdout exactly as user would see it
 	if stdout != "" {
 		lines := strings.Split(strings.TrimSuffix(stdout, "\n"), "\n")
 		for _, line := range lines {
-			fmt.Printf("  %s│%s %s\n", cyan, reset, line)
+			// Special handling for PATH logging to make it less noisy
+			if strings.HasPrefix(command, "PATH for") {
+				fmt.Printf("  %s│%s   %s\n", cyan, reset, line)
+			} else {
+				fmt.Printf("  %s│%s %s\n", cyan, reset, line)
+			}
 		}
 	}
 	

@@ -119,25 +119,33 @@ func (c *Context) Keys() []string {
 
 // Command creates a new command with the test's mock-aware PATH.
 func (c *Context) Command(program string, args ...string) *command.Command {
+	binDir := c.GetString("test_bin_dir")
+	finalProgramPath := program
+	var constructedPath string
+
 	// For non-absolute paths, we need to ensure mocks are found first
-	if binDir := c.GetString("test_bin_dir"); binDir != "" && !filepath.IsAbs(program) {
+	if binDir != "" && !filepath.IsAbs(program) {
 		// Check if the program exists in our mock bin directory
 		mockPath := filepath.Join(binDir, program)
 		if _, err := os.Stat(mockPath); err == nil {
 			// Use the mock directly
-			cmd := command.New(mockPath, args...)
-			// Still set PATH for any subprocesses
-			currentPath := os.Getenv("PATH")
-			cmd.Env(fmt.Sprintf("PATH=%s:%s", binDir, currentPath))
-			return cmd
+			finalProgramPath = mockPath
 		}
 	}
 	
-	// Fall back to normal command creation
-	cmd := command.New(program, args...)
-	if binDir := c.GetString("test_bin_dir"); binDir != "" {
+	cmd := command.New(finalProgramPath, args...)
+	
+	// Construct and set the PATH environment variable
+	if binDir != "" {
 		currentPath := os.Getenv("PATH")
-		cmd.Env(fmt.Sprintf("PATH=%s:%s", binDir, currentPath))
+		constructedPath = fmt.Sprintf("PATH=%s:%s", binDir, currentPath)
+		cmd.Env(constructedPath)
+
+		// If in very verbose mode, log the path for debugging
+		if c.ui != nil {
+			c.ui.CommandOutput(fmt.Sprintf("PATH for '%s'", program), constructedPath, "")
+		}
 	}
+	
 	return cmd
 }
