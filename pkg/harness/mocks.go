@@ -52,6 +52,8 @@ func SetupMocks(mocks ...Mock) Step {
 				if ctx.ui != nil {
 					ctx.ui.Info("Mock Swap", fmt.Sprintf("Using real binary for '%s' -> %s", mock.CommandName, realBinaryPath))
 				}
+				// Store the real binary path in mock overrides (for consistent PATH handling)
+				ctx.mockOverrides[mock.CommandName] = targetPath
 				continue // Move to the next mock
 			}
 
@@ -90,6 +92,9 @@ func SetupMocks(mocks ...Mock) Step {
 			if err := os.Symlink(sourcePath, targetPath); err != nil {
 				return fmt.Errorf("failed to symlink mock for %s: %w", mock.CommandName, err)
 			}
+			
+			// Store the mock override path in the context
+			ctx.mockOverrides[mock.CommandName] = targetPath
 		}
 		return nil
 	})

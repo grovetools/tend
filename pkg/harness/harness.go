@@ -22,9 +22,10 @@ type Context struct {
 	TestID      string // Unique ID for this test run
 
 	// State management
-	dirs        map[string]string      // Named directories created during test
-	values      map[string]interface{} // Generic key-value store for step communication
-	UseRealDeps map[string]bool        // Map of dependencies to use real binaries for
+	dirs          map[string]string      // Named directories created during test
+	values        map[string]interface{} // Generic key-value store for step communication
+	UseRealDeps   map[string]bool        // Map of dependencies to use real binaries for
+	mockOverrides map[string]string      // Map of command name to its mock binary path
 	
 	// UI for displaying command output
 	ui *UI
@@ -169,14 +170,15 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 	}
 
 	testCtx := &Context{
-		RootDir:     tempMgr.BaseDir(),
-		ProjectRoot: h.opts.RootDir, // Pass project root from harness options
-		GroveBinary: groveBinary,
-		TestID:      testID,
-		dirs:        make(map[string]string),
-		values:      make(map[string]interface{}),
-		UseRealDeps: realDepsMap,
-		ui:          ui,
+		RootDir:       tempMgr.BaseDir(),
+		ProjectRoot:   h.opts.RootDir, // Pass project root from harness options
+		GroveBinary:   groveBinary,
+		TestID:        testID,
+		dirs:          make(map[string]string),
+		values:        make(map[string]interface{}),
+		UseRealDeps:   realDepsMap,
+		mockOverrides: make(map[string]string),
+		ui:            ui,
 	}
 	
 	// Set the test ID in the UI for container filtering

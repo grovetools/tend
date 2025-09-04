@@ -68,6 +68,11 @@ func (c *Command) String() string {
 	return strings.Join(parts, " ")
 }
 
+// Environment returns the environment variables set for this command
+func (c *Command) Environment() []string {
+	return c.env
+}
+
 // Start executes the command in the background.
 func (c *Command) Start() (*Process, error) {
 	return c.start()

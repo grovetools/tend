@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/mattsolo1/grove-tend/pkg/command"
@@ -147,5 +148,21 @@ func (c *Context) Command(program string, args ...string) *command.Command {
 		}
 	}
 	
+	// Inject mock override environment variables
+	for commandName, mockPath := range c.mockOverrides {
+		envVarName := getOverrideEnvVarName(commandName)
+		cmd.Env(fmt.Sprintf("%s=%s", envVarName, mockPath))
+	}
+	
 	return cmd
+}
+
+// getOverrideEnvVarName generates the environment variable name for a command override
+func getOverrideEnvVarName(commandName string) string {
+	// Special case for grove-hooks
+	if commandName == "grove-hooks" {
+		return "GROVE_HOOKS_BINARY"
+	}
+	// Generic pattern for others
+	return fmt.Sprintf("GROVE_%s_BINARY", strings.ToUpper(strings.ReplaceAll(commandName, "-", "_")))
 }
