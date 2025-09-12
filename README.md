@@ -1,4 +1,6 @@
-# Grove Tend
+# grove-tend
+
+<img src="https://github.com/user-attachments/assets/c6ca0fe6-38b5-4f55-b0e8-7e42d5940d48" width="60%" />
 
 [![CI](https://github.com/mattsolo1/grove-tend/actions/workflows/ci.yml/badge.svg)](https://github.com/mattsolo1/grove-tend/actions/workflows/ci.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/mattsolo1/grove-tend)](https://goreportcard.com/report/github.com/mattsolo1/grove-tend)
