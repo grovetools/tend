@@ -1,3 +1,9 @@
+## v0.2.18 (2025-09-12)
+
+### Chores
+
+* rm indirect deps
+
 ## v0.2.17 (2025-09-04)
 
 ### Bug Fixes
