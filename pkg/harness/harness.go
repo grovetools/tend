@@ -40,10 +40,12 @@ type Step struct {
 
 // Scenario is a collection of steps defining a test
 type Scenario struct {
-	Name        string
-	Description string
-	Tags        []string
-	Steps       []Step
+	Name         string
+	Description  string
+	Tags         []string
+	Steps        []Step
+	LocalOnly    bool // Skips in CI by default
+	ExplicitOnly bool // Skips in "run all"
 }
 
 // Options for harness execution

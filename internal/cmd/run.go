@@ -17,16 +17,18 @@ import (
 )
 
 var (
-	parallel    bool
-	timeout     time.Duration
-	noCleanup   bool
+	parallel     bool
+	timeout      time.Duration
+	noCleanup    bool
 	outputFormat string
 	junitOutput  string
 	jsonOutput   string
-	tmuxSplit   bool
-	nvim        bool
-	debug       bool
-	useRealDeps []string
+	tmuxSplit    bool
+	nvim         bool
+	debug        bool
+	useRealDeps  []string
+	includeLocal bool
+	explicitOnly bool
 )
 
 // newRunCmd creates the run command with the provided scenarios
@@ -60,6 +62,8 @@ Examples:
 	runCmd.Flags().BoolVar(&nvim, "nvim", false, "Start nvim in the new tmux split (requires --tmux-split)")
 	runCmd.Flags().BoolVarP(&debug, "debug", "d", false, "Enable debug mode (shorthand for -i --no-cleanup --tmux-split --nvim --very-verbose)")
 	runCmd.Flags().StringSliceVar(&useRealDeps, "use-real-deps", []string{}, "A comma-separated list of dependencies to use real binaries for instead of mocks (e.g., flow,cx). Use 'all' to swap all.")
+	runCmd.Flags().BoolVar(&includeLocal, "include-local", false, "Include local-only scenarios even when in a CI environment")
+	runCmd.Flags().BoolVar(&explicitOnly, "explicit", false, "Run only explicit-only scenarios (automatically enables --no-cleanup)")
 	
 	return runCmd
 }
@@ -77,6 +81,11 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 		verbose = true // --very-verbose implies --verbose
 	}
 	
+	// If running explicit-only scenarios, automatically enable no-cleanup
+	if explicitOnly {
+		noCleanup = true
+	}
+	
 	if nvim && !tmuxSplit {
 		return fmt.Errorf("--nvim can only be used with --tmux-split")
 	}
@@ -85,8 +94,58 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 	renderer := ui.NewRenderer(os.Stdout, verbose, 80)
 	
 	
-	// Filter scenarios
-	selectedScenarios := filterScenarios(allScenarios, args, tags)
+	// Filter scenarios based on --explicit flag
+	var selectedScenarios []*harness.Scenario
+	if explicitOnly {
+		// When --explicit is used, only select explicit-only scenarios
+		for _, scenario := range allScenarios {
+			if scenario.ExplicitOnly {
+				selectedScenarios = append(selectedScenarios, scenario)
+			}
+		}
+		if len(selectedScenarios) == 0 {
+			renderer.RenderInfo("No explicit-only scenarios found")
+			return nil
+		}
+		renderer.RenderInfo(fmt.Sprintf("Running %d explicit-only scenario(s) (--no-cleanup enabled)", len(selectedScenarios)))
+	} else {
+		// Normal filtering
+		selectedScenarios = filterScenarios(allScenarios, args, tags)
+		
+		// Filter ExplicitOnly scenarios when running all (and not using --explicit)
+		if len(args) == 0 && len(selectedScenarios) > 0 {
+			var filtered []*harness.Scenario
+			var explicitCount int
+			for _, scenario := range selectedScenarios {
+				if !scenario.ExplicitOnly {
+					filtered = append(filtered, scenario)
+				} else {
+					explicitCount++
+				}
+			}
+			if explicitCount > 0 {
+				renderer.RenderInfo(fmt.Sprintf("Skipped %d explicit-only scenario(s) (must be run by name or use --explicit)", explicitCount))
+			}
+			selectedScenarios = filtered
+		}
+	}
+	
+	// Filter LocalOnly scenarios in CI
+	if harness.IsCI() && !includeLocal && len(selectedScenarios) > 0 {
+		var filtered []*harness.Scenario
+		var localCount int
+		for _, scenario := range selectedScenarios {
+			if !scenario.LocalOnly {
+				filtered = append(filtered, scenario)
+			} else {
+				localCount++
+			}
+		}
+		if localCount > 0 {
+			renderer.RenderInfo(fmt.Sprintf("Skipped %d local-only scenario(s) in CI environment (use --include-local to override)", localCount))
+		}
+		selectedScenarios = filtered
+	}
 	
 	if len(selectedScenarios) == 0 {
 		renderer.RenderInfo("No scenarios match the specified criteria")

@@ -553,6 +553,107 @@ var CustomScenario = &harness.Scenario{
 	},
 }
 
+// LocalOnlyScenario demonstrates a scenario that should only run on dev machines
+func LocalOnlyScenario() *harness.Scenario {
+	return &harness.Scenario{
+		Name:        "local-only-example",
+		Description: "Tests that should be skipped in CI environments",
+		Tags:        []string{"local", "dev"},
+		LocalOnly:   true,
+		Steps: []harness.Step{
+			{
+				Name:        "Check local environment",
+				Description: "Performs checks that are only valid in a local dev environment",
+				Func: func(ctx *harness.Context) error {
+					fmt.Println("Running local-only test logic...")
+					fmt.Println("This test might access local resources not available in CI")
+					
+					// Example: Check for local development tools
+					homeDir := os.Getenv("HOME")
+					if homeDir == "" {
+						return fmt.Errorf("HOME directory not set")
+					}
+					
+					ctx.Set("local_test_ran", true)
+					return nil
+				},
+			},
+			{
+				Name:        "Test local file access",
+				Description: "Accesses files that might only exist locally",
+				Func: func(ctx *harness.Context) error {
+					// This is just an example - in real tests this might access
+					// local credentials, test data, or development resources
+					fmt.Println("Accessing local development resources...")
+					return nil
+				},
+			},
+		},
+	}
+}
+
+// ExplicitOnlyScenario demonstrates a scenario that must be run explicitly
+func ExplicitOnlyScenario() *harness.Scenario {
+	return &harness.Scenario{
+		Name:         "explicit-only-example",
+		Description:  "Tests that use real resources and must be run explicitly by name",
+		Tags:         []string{"integration", "expensive"},
+		ExplicitOnly: true,
+		Steps: []harness.Step{
+			{
+				Name:        "Simulate expensive operation",
+				Description: "Performs an operation that should not run automatically",
+				Func: func(ctx *harness.Context) error {
+					fmt.Println("⚠️  Running explicit-only test...")
+					fmt.Println("This test simulates using real cloud resources or external APIs")
+					fmt.Println("In a real scenario, this might:")
+					fmt.Println("  - Provision cloud resources")
+					fmt.Println("  - Make API calls to external services")
+					fmt.Println("  - Run performance benchmarks")
+					fmt.Println("  - Execute long-running integration tests")
+					
+					// Simulate some work
+					time.Sleep(500 * time.Millisecond)
+					
+					ctx.Set("expensive_operation_completed", true)
+					return nil
+				},
+			},
+			{
+				Name:        "Cleanup expensive resources",
+				Description: "Ensures any allocated resources are cleaned up",
+				Func: func(ctx *harness.Context) error {
+					fmt.Println("Cleaning up test resources...")
+					// In a real test, this would clean up any resources created
+					return nil
+				},
+			},
+		},
+	}
+}
+
+// ExplicitDatabaseTestScenario is another explicit-only scenario
+func ExplicitDatabaseTestScenario() *harness.Scenario {
+	return &harness.Scenario{
+		Name:         "explicit-database-test",
+		Description:  "Test that connects to a real database (explicit-only)",
+		Tags:         []string{"database", "integration"},
+		ExplicitOnly: true,
+		Steps: []harness.Step{
+			{
+				Name:        "Simulate database connection",
+				Description: "Would connect to a real test database",
+				Func: func(ctx *harness.Context) error {
+					fmt.Println("🗄️  Simulating database connection...")
+					fmt.Println("In a real test, this would connect to a test database")
+					time.Sleep(200 * time.Millisecond)
+					return nil
+				},
+			},
+		},
+	}
+}
+
 func main() {
 	// This example includes both the framework examples and custom scenarios
 	// In a real repository, you would only include your custom scenarios
@@ -566,6 +667,9 @@ func main() {
 		// Custom scenarios specific to this repository
 		CustomScenario,
 		TestKeywordFilteringScenario(),
+		LocalOnlyScenario(),
+		ExplicitOnlyScenario(),
+		ExplicitDatabaseTestScenario(),
 	}
 
 	// Setup signal handling

@@ -62,7 +62,7 @@ func listScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sc
 	fmt.Printf("Available scenarios (%d):\n\n", len(filteredScenarios))
 	
 	// Build table data
-	headers := []string{"NAME", "DESCRIPTION", "TAGS", "STEPS"}
+	headers := []string{"NAME", "DESCRIPTION", "LOCAL", "EXPLICIT", "TAGS", "STEPS"}
 	var rows [][]string
 	
 	for _, scenario := range filteredScenarios {
@@ -78,9 +78,22 @@ func listScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sc
 			description = description[:47] + "..."
 		}
 		
+		// Format local and explicit indicators
+		localIndicator := ""
+		if scenario.LocalOnly {
+			localIndicator = "✅"
+		}
+		
+		explicitIndicator := ""
+		if scenario.ExplicitOnly {
+			explicitIndicator = "✅"
+		}
+		
 		row := []string{
 			scenario.Name,
 			description,
+			localIndicator,
+			explicitIndicator,
 			tagStr,
 			fmt.Sprintf("%d", len(scenario.Steps)),
 		}
@@ -110,9 +123,11 @@ func listScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sc
 		switch col {
 		case 0: // Name column
 			return baseStyle.Copy().Foreground(lipgloss.Color("#00D4AA")).Bold(true)
-		case 2: // Tags column
+		case 2, 3: // Local and Explicit columns (centered)
+			return baseStyle.Copy().Align(lipgloss.Center)
+		case 4: // Tags column
 			return baseStyle.Copy().Foreground(lipgloss.Color("#5FAFFF"))
-		case 3: // Steps column
+		case 5: // Steps column
 			return baseStyle.Copy().Foreground(lipgloss.Color("#00D787"))
 		default:
 			return baseStyle
@@ -140,6 +155,18 @@ func displayScenarioDetails(renderer *ui.Renderer, scenario *harness.Scenario) {
 	
 	if scenario.Description != "" {
 		fmt.Printf("  %s\n", ui.MutedStyle.Render(scenario.Description))
+	}
+	
+	// Show LocalOnly warning
+	if scenario.LocalOnly {
+		fmt.Printf("  %s This scenario is marked as local-only and will be skipped in CI environments\n",
+			ui.WarningStyle.Render("⚠"))
+	}
+	
+	// Show ExplicitOnly warning
+	if scenario.ExplicitOnly {
+		fmt.Printf("  %s This scenario must be run explicitly by name (skipped during 'tend run')\n",
+			ui.WarningStyle.Render("⚠"))
 	}
 	
 	// Tags
