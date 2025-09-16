@@ -1,3 +1,9 @@
+## v0.2.20 (2025-09-16)
+
+### Features
+
+* add LocalOnly and ExplicitOnly scenario execution controls
+
 ## v0.2.19 (2025-09-13)
 
 ### Chores
