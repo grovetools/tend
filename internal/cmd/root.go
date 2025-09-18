@@ -73,6 +73,7 @@ Features:
 	rootCmd.AddCommand(newListCmd(allScenarios))
 	rootCmd.AddCommand(newValidateCmd(allScenarios))
 	rootCmd.AddCommand(newVersionCmd())
+	rootCmd.AddCommand(newDocsCmd())
 	
 	return rootCmd
 }

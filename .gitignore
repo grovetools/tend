@@ -36,6 +36,9 @@ Thumbs.db
 *.temp
 *.log
 
+# Temp context files
+*.tmp.context
+
 # Build artifacts
 dist/
 build/

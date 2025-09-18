@@ -1,0 +1,12 @@
+*
+
+# Canonical examples from grove-tend itself
+examples/custom-tend/main.go
+examples/mocking-demo/main.go
+examples/mocking-demo/tests/mocks/git/main.go
+
+# Real-world usage examples from other ecosystem projects
+../grove-context/tests/e2e/main.go
+../grove-context/tests/e2e/scenarios_*.go
+../grove-mcp/tests/e2e/main.go
+../grove-mcp/tests/e2e/scenarios_*.go

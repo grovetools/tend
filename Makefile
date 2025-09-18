@@ -29,7 +29,7 @@ MOCK_SRC_DIR=tests/mocks
 MOCK_BIN_DIR=bin
 MOCKS ?= $(shell find $(MOCK_SRC_DIR) -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
 
-.PHONY: all build test clean fmt vet lint run check dev build-all help build-mocks
+.PHONY: all build test clean fmt vet lint run check dev build-all help build-mocks generate-docs
 
 all: build
 
@@ -117,6 +117,11 @@ build-mocks:
 		echo "No mock directory found, skipping mock build."; \
 	fi
 
+# Generate the tend-examples.xml and TEND_GUIDE.md documentation files
+generate-docs:
+	@echo "Generating tend documentation..."
+	@go run ./cmd/generate-docs/main.go
+
 # Show available targets
 help:
 	@echo "Available targets:"
@@ -133,3 +138,4 @@ help:
 	@echo "  make build-custom-example - Build custom tend example"
 	@echo "  make build-all   - Build for multiple platforms"
 	@echo "  make build-mocks - Build mock binaries for testing"
+	@echo "  make generate-docs - Generate tend-examples.xml and TEND_GUIDE.md"
