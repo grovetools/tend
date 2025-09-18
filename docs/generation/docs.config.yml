@@ -5,9 +5,6 @@ settings:
   # "reference": Provide existing docs to the LLM for context.
   regeneration_mode: "reference"
   
-  # The path for the main combined guide.
-  output_markdown_combined: "docs/tend-guide.md"
-  
   # The structured JSON file that will be embedded in the binary.
   structured_output_file: "pkg/docs/tend-docs.json"
 
