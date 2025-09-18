@@ -65,14 +65,206 @@ type Practice struct {
 	Text  string `json:"text"`
 }
 
+const isolatedRunEnvVar = "TEND_DOCS_ISOLATED_RUN"
+
 func main() {
-	if err := run(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+	// If the isolation env var is set, we are in the child process.
+	// Run the generation logic directly.
+	if os.Getenv(isolatedRunEnvVar) == "true" {
+		if err := generateDocs(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error during isolated doc generation: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	// Otherwise, we are the parent process. Orchestrate the isolated run.
+	if err := orchestrateIsolatedRun(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error orchestrating documentation generation: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func run() error {
+// adjustRulesFileForIsolation modifies the rules file in the temp directory
+// to convert relative paths (../) to absolute paths from the original location
+func adjustRulesFileForIsolation(rulesPath, originalRepoRoot string) error {
+	// Read the rules file
+	content, err := os.ReadFile(rulesPath)
+	if err != nil {
+		return fmt.Errorf("failed to read rules file: %w", err)
+	}
+
+	// Process line by line to convert relative paths
+	lines := strings.Split(string(content), "\n")
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		// Check if line starts with ../
+		if strings.HasPrefix(trimmed, "../") {
+			// Convert to absolute path
+			// We need to find the grove-ecosystem root, handling both regular checkouts and worktrees
+			var groveEcosystemRoot string
+			
+			// Check if we're in a worktree by looking for .grove-worktrees in the path
+			if strings.Contains(originalRepoRoot, ".grove-worktrees") {
+				// Extract the path up to grove-tend (before .grove-worktrees)
+				parts := strings.Split(originalRepoRoot, ".grove-worktrees")
+				if len(parts) > 0 {
+					// parts[0] should be /path/to/grove-ecosystem/grove-tend/
+					// We want the parent of grove-tend
+					tendPath := strings.TrimSuffix(parts[0], "/")
+					groveEcosystemRoot = filepath.Dir(tendPath)
+				}
+			} else {
+				// Regular checkout - just get the parent directory
+				groveEcosystemRoot = filepath.Dir(originalRepoRoot)
+			}
+			
+			// Remove the leading ../ and resolve the absolute path
+			relativePart := strings.TrimPrefix(trimmed, "../")
+			absolutePath := filepath.Join(groveEcosystemRoot, relativePart)
+			
+			// Check if the path exists (check up to the last non-glob part)
+			// For example, grove-context/tests/**/*.go -> check grove-context/tests
+			pathParts := strings.Split(relativePart, "/")
+			var checkPath string
+			for j, part := range pathParts {
+				if strings.Contains(part, "*") || strings.Contains(part, "?") || strings.Contains(part, "[") {
+					// Found a glob pattern, use path up to previous part
+					if j > 0 {
+						checkPath = filepath.Join(groveEcosystemRoot, strings.Join(pathParts[:j], "/"))
+					}
+					break
+				}
+			}
+			// If no glob found, check the full path
+			if checkPath == "" && len(pathParts) > 0 {
+				checkPath = filepath.Join(groveEcosystemRoot, relativePart)
+			}
+			
+			if checkPath != "" {
+				if _, err := os.Stat(checkPath); os.IsNotExist(err) {
+					fmt.Printf("  -> Skipping %s (path doesn't exist: %s)\n", trimmed, checkPath)
+					lines[i] = "# " + line // Comment out the line
+					continue
+				}
+			}
+			
+			lines[i] = absolutePath
+			fmt.Printf("  -> Converted %s to %s\n", trimmed, absolutePath)
+		}
+	}
+
+	// Write the modified content back
+	modifiedContent := strings.Join(lines, "\n")
+	if err := os.WriteFile(rulesPath, []byte(modifiedContent), 0644); err != nil {
+		return fmt.Errorf("failed to write adjusted rules file: %w", err)
+	}
+
+	return nil
+}
+
+// orchestrateIsolatedRun sets up an isolated environment for documentation generation.
+// It clones the current repository to a temporary directory, runs the generator
+// within that clone, and copies the generated files back.
+func orchestrateIsolatedRun() error {
+	fmt.Println("Orchestrating isolated documentation generation...")
+
+	// 1. Get the original repository root
+	originalRepoRoot, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current working directory: %w", err)
+	}
+
+	// 2. Create a temporary directory for the clone
+	tempDir, err := os.MkdirTemp("", "tend-docs-gen-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temporary directory: %w", err)
+	}
+	defer func() {
+		fmt.Printf("Cleaning up temporary directory: %s\n", tempDir)
+		os.RemoveAll(tempDir)
+	}()
+	fmt.Printf("Created temporary directory: %s\n", tempDir)
+
+	// 3. Perform a local clone of the repository
+	fmt.Println("Cloning repository locally for isolation...")
+	cloneCmd := exec.Command("git", "clone", "--local", ".", tempDir)
+	cloneCmd.Stdout = os.Stdout
+	cloneCmd.Stderr = os.Stderr
+	if err := cloneCmd.Run(); err != nil {
+		return fmt.Errorf("failed to clone repository locally: %w", err)
+	}
+
+	// 3a. Fix relative paths in the rules file for the isolated environment
+	fmt.Println("Adjusting rules file for isolated environment...")
+	rulesPath := filepath.Join(tempDir, "docs", "generation", "examples.cx.rules")
+	if err := adjustRulesFileForIsolation(rulesPath, originalRepoRoot); err != nil {
+		return fmt.Errorf("failed to adjust rules file: %w", err)
+	}
+
+	// 4. Load the docs config to know which files to copy back
+	cfg, err := loadDocsConfig()
+	if err != nil {
+		return fmt.Errorf("failed to load docs config to identify generated files: %w", err)
+	}
+	var generatedFiles []string
+	if cfg.Settings.StructuredOutputFile != "" {
+		generatedFiles = append(generatedFiles, cfg.Settings.StructuredOutputFile)
+	}
+	if cfg.Settings.OutputMarkdownCombined != "" {
+		generatedFiles = append(generatedFiles, cfg.Settings.OutputMarkdownCombined)
+	}
+	for _, section := range cfg.Sections {
+		if section.OutputFile != "" {
+			generatedFiles = append(generatedFiles, section.OutputFile)
+		}
+	}
+
+	// 5. Run the generator in the isolated environment
+	fmt.Println("\nRunning generator in isolated environment...")
+	generatorCmd := exec.Command("go", "run", "./cmd/generate-docs/main.go")
+	generatorCmd.Dir = tempDir
+	generatorCmd.Env = append(os.Environ(), fmt.Sprintf("%s=true", isolatedRunEnvVar))
+	generatorCmd.Stdout = os.Stdout
+	generatorCmd.Stderr = os.Stderr
+
+	if err := generatorCmd.Run(); err != nil {
+		return fmt.Errorf("isolated documentation generation process failed: %w", err)
+	}
+
+	// 6. Copy generated files back to the original repository
+	fmt.Println("\nCopying generated files back to original repository...")
+	for _, fileRelPath := range generatedFiles {
+		sourcePath := filepath.Join(tempDir, fileRelPath)
+		destPath := filepath.Join(originalRepoRoot, fileRelPath)
+
+		// Check if the source file was actually created
+		if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "Warning: Expected generated file not found, skipping copy: %s\n", sourcePath)
+			continue
+		}
+
+		fmt.Printf("  -> Copying %s\n", fileRelPath)
+		// Ensure destination directory exists
+		if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+			return fmt.Errorf("failed to create destination directory for %s: %w", destPath, err)
+		}
+
+		// Read source and write to destination
+		content, err := os.ReadFile(sourcePath)
+		if err != nil {
+			return fmt.Errorf("failed to read generated file %s: %w", sourcePath, err)
+		}
+		if err := os.WriteFile(destPath, content, 0644); err != nil {
+			return fmt.Errorf("failed to write file to destination %s: %w", destPath, err)
+		}
+	}
+
+	fmt.Println("\nDocumentation generation complete.")
+	return nil
+}
+
+func generateDocs() error {
 	fmt.Println("1. Loading docs generation config from docs/generation/docs.config.yml...")
 	cfg, err := loadDocsConfig()
 	if err != nil {
@@ -119,7 +311,7 @@ func run() error {
 		return fmt.Errorf("failed to generate markdown outputs: %w", err)
 	}
 
-	fmt.Println("\nDocumentation generation complete.")
+	fmt.Println("\nIsolated documentation generation complete.")
 	return nil
 }
 
