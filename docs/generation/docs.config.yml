@@ -1,0 +1,34 @@
+# docs/generation/docs.config.yml
+
+settings:
+  # "scratch": Regenerate from scratch, ignoring existing docs.
+  # "reference": Provide existing docs to the LLM for context.
+  regeneration_mode: "reference"
+  
+  # The path for the main combined guide.
+  output_markdown_combined: "docs/tend-guide.md"
+  
+  # The structured JSON file that will be embedded in the binary.
+  structured_output_file: "pkg/docs/tend-docs.json"
+
+# Defines the sections of the documentation. Each is a separate LLM request.
+sections:
+  - name: "introduction"
+    prompt: "prompts/introduction.prompt.md"
+    json_key: "introduction" 
+    output_file: "docs/introduction.md"
+    
+  - name: "core-concepts"
+    prompt: "prompts/core-concepts.prompt.md"
+    json_key: "core_concepts"
+    output_file: "docs/core-concepts.md"
+
+  - name: "usage-patterns"
+    prompt: "prompts/usage-patterns.prompt.md"
+    json_key: "usage_patterns"
+    output_file: "docs/usage-patterns.md"
+    
+  - name: "best-practices"
+    prompt: "prompts/best-practices.prompt.md"
+    json_key: "best_practices"
+    output_file: "docs/best-practices.md"

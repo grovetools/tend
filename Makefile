@@ -117,7 +117,7 @@ build-mocks:
 		echo "No mock directory found, skipping mock build."; \
 	fi
 
-# Generate the tend-examples.xml and TEND_GUIDE.md documentation files
+# Generate the tend-docs.json and markdown documentation files
 generate-docs:
 	@echo "Generating tend documentation..."
 	@go run ./cmd/generate-docs/main.go
@@ -138,4 +138,4 @@ help:
 	@echo "  make build-custom-example - Build custom tend example"
 	@echo "  make build-all   - Build for multiple platforms"
 	@echo "  make build-mocks - Build mock binaries for testing"
-	@echo "  make generate-docs - Generate tend-examples.xml and TEND_GUIDE.md"
+	@echo "  make generate-docs - Generate tend-docs.json and markdown documentation"
