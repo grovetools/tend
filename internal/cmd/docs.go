@@ -80,7 +80,7 @@ If EDITOR is not set, it will try common editors (vim, vi, nano).`,
 				return fmt.Errorf("this command must be run from the grove-tend source directory")
 			}
 
-			rulesPath := filepath.Join("docs", "examples.cx.rules")
+			rulesPath := filepath.Join("docs", "generation", "examples.cx.rules")
 			
 			// Check if the rules file exists
 			if _, err := os.Stat(rulesPath); os.IsNotExist(err) {
@@ -123,7 +123,7 @@ func isInTendSourceDir() bool {
 	markers := []string{
 		"grove.yml",           // Should have grove.yml
 		"pkg/harness",         // Should have harness package
-		"docs/examples.cx.rules", // Should have the rules file
+		"docs/generation/examples.cx.rules", // Should have the rules file
 	}
 
 	// Additionally check grove.yml content

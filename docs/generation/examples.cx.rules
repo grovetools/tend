@@ -1,0 +1,24 @@
+# Include all files except generated docs and files that gemapi adds automatically
+*
+!docs/TEND_GUIDE.md
+!pkg/docs/tend-examples.xml
+!cmd/xml-to-md/
+!.docs.tmp.context
+!CLAUDE.md
+
+# Canonical examples from grove-tend itself
+examples/custom-tend/main.go
+examples/mocking-demo/main.go
+examples/mocking-demo/tests/mocks/git/main.go
+
+# Real-world usage examples from other ecosystem projects
+../grove-context/tests/**/*.go
+../grove-mcp/tests/e2e/**/*.go
+../grove-flow/tests/e2e/**/*.go
+../grove-meta/tests/**/*.go
+../grove-hooks/tests/**/*.go
+../grove-tmux/tests/**/*.go
+../grove-gemini/tests/**/*.go
+../grove-notebook/tests/**/*.go
+../grove-claude-logs/tests/**/*.go
+../grove-notifications/tests/**/*.go

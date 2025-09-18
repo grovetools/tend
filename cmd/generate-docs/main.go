@@ -10,104 +10,15 @@ import (
 	"github.com/mattsolo1/grove-core/config"
 )
 
-const llmPrompt = `You are an expert Go developer and technical writer specializing in testing frameworks. Your task is to create a comprehensive guide to the 'grove-tend' testing library based on the provided source code examples.
-
-The output MUST be a single XML file with the following structure:
-<tend_guide>
-  <introduction>
-    A brief, high-level overview of grove-tend, its purpose, and core philosophy. Synthesize this from the provided README.md.
-  </introduction>
-
-  <core_concepts>
-    <concept name="Scenario">
-      <description>Explain what a Scenario is.</description>
-      <example>
-        <![CDATA[
-        // Provide a minimal, canonical Go snippet for a Scenario definition.
-        ]]>
-      </example>
-    </concept>
-    <concept name="Step">
-      <description>Explain what a Step is and its role within a Scenario.</description>
-      <example>
-        <![CDATA[
-        // Provide a snippet showing a Step definition inside a Scenario.
-        ]]>
-      </example>
-    </concept>
-    <concept name="Context">
-      <description>Explain the purpose of the harness.Context for sharing state.</description>
-      <example>
-        <![CDATA[
-        // Snippet showing ctx.Set() in one step and ctx.Get() in another.
-        ]]>
-      </example>
-    </concept>
-  </core_concepts>
-
-  <usage_patterns>
-    <pattern name="Basic File Operations">
-      <description>Demonstrate common filesystem operations using the 'fs' helper package.</description>
-      <example>
-        <![CDATA[
-        // Snippet showing fs.WriteString, fs.CreateDir, fs.Exists, etc.
-        ]]>
-      </example>
-    </pattern>
-    <pattern name="Command Execution">
-      <description>Show how to run external commands using the 'command' helper package, including capturing output and checking for errors.</description>
-      <example>
-        <![CDATA[
-        // Snippet using command.New(...).Run() and checking result.Stdout/result.Error.
-        ]]>
-      </example>
-    </pattern>
-    <pattern name="Git Operations">
-      <description>Illustrate how to initialize a git repo, add files, and commit using the 'git' helper package.</description>
-      <example>
-        <![CDATA[
-        // Snippet showing git.Init(), git.Add(), and git.Commit().
-        ]]>
-      </example>
-    </pattern>
-    <pattern name="Mocking Dependencies">
-       <description>Explain the mocking framework, covering both binary mocks (Go programs) and the 'harness.SetupMocks' and 'ctx.Command' helpers.</description>
-      <example>
-        <![CDATA[
-        // Snippet showing harness.SetupMocks with a binary mock, followed by ctx.Command().
-        ]]>
-      </example>
-    </pattern>
-    <pattern name="Swapping Mocks for Real Dependencies">
-       <description>Explain the '--use-real-deps' flag for integration testing, and how 'tend' finds real binaries using 'grove dev current'.</description>
-      <example>
-        <![CDATA[
-# Provide the shell command examples for using --use-real-deps
-./my-tests run my-scenario --use-real-deps=git
-./my-tests run my-scenario --use-real-deps=all
-        ]]>
-      </example>
-    </pattern>
-    <pattern name="Interactive and Debug Modes">
-       <description>Describe the interactive ('-i') and debug ('-d') modes for stepping through and debugging scenarios.</description>
-       <example>
-        <![CDATA[
-# Shell commands for interactive and debug modes
-./my-tests run -i my-scenario
-./my-tests run -d my-scenario # Enables tmux integration
-        ]]>
-       </example>
-    </pattern>
-  </usage_patterns>
-
-  <best_practices>
-    <practice title="Project Setup">Describe the standard Makefile and directory structure for a project using grove-tend.</practice>
-    <practice title="Test Organization">Explain how to organize scenarios into different files and use tags for filtering.</practice>
-    <practice title="Writing Scenarios">Provide tips for writing focused, maintainable scenarios.</practice>
-  </best_practices>
-</tend_guide>
-
-Analyze all the provided files, which include READMEs, Makefiles, and Go source code for test scenarios from multiple projects ('grove-tend', 'grove-context', 'grove-mcp'). Identify unique and canonical usage patterns and synthesize them into the XML structure above. The examples should be clean, concise, and illustrative of the concept. Do not just copy-paste large blocks of code; distill them into perfect, minimal examples.`
+// loadPrompt reads the prompt from the file or returns a default
+func loadPrompt() (string, error) {
+	promptPath := "docs/generation/tend-docs.prompt.md"
+	content, err := os.ReadFile(promptPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read prompt file %s: %w", promptPath, err)
+	}
+	return string(content), nil
+}
 
 // FlowConfig defines the structure for the 'flow' section in grove.yml.
 type FlowConfig struct {
@@ -186,9 +97,9 @@ func buildContext() error {
 	}
 	
 	// Copy rules file to .grove/rules
-	rulesContent, err := os.ReadFile("docs/examples.cx.rules")
+	rulesContent, err := os.ReadFile("docs/generation/examples.cx.rules")
 	if err != nil {
-		return fmt.Errorf("failed to read docs/examples.cx.rules: %w", err)
+		return fmt.Errorf("failed to read docs/generation/examples.cx.rules: %w", err)
 	}
 	if err := os.WriteFile(".grove/rules", rulesContent, 0644); err != nil {
 		return fmt.Errorf("failed to write .grove/rules: %w", err)
@@ -198,16 +109,7 @@ func buildContext() error {
 	cmd := exec.Command("cx", "generate")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("cx generate failed: %w", err)
-	}
-	
-	// Copy the generated context to our temporary file
-	contextContent, err := os.ReadFile(".grove/context")
-	if err != nil {
-		return fmt.Errorf("failed to read generated context: %w", err)
-	}
-	return os.WriteFile(".docs.tmp.context", contextContent, 0644)
+	return cmd.Run()
 }
 
 func getLLMModel() (string, error) {
@@ -229,13 +131,19 @@ func getLLMModel() (string, error) {
 }
 
 func generateXML(model string) (string, error) {
+	// Load the prompt from file
+	promptContent, err := loadPrompt()
+	if err != nil {
+		return "", fmt.Errorf("failed to load prompt: %w", err)
+	}
+	
 	promptFile, err := os.CreateTemp("", "tend-docs-prompt-*.md")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp prompt file: %w", err)
 	}
 	defer os.Remove(promptFile.Name())
 
-	if _, err := promptFile.WriteString(llmPrompt); err != nil {
+	if _, err := promptFile.WriteString(promptContent); err != nil {
 		return "", fmt.Errorf("failed to write to temp prompt file: %w", err)
 	}
 	if err := promptFile.Close(); err != nil {
@@ -246,7 +154,6 @@ func generateXML(model string) (string, error) {
 		"request",
 		"--model", model,
 		"--file", promptFile.Name(),
-		"--context", ".docs.tmp.context",
 		"--yes",
 	}
 	cmd := exec.Command("gemapi", args...)
