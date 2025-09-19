@@ -103,7 +103,7 @@ test-headless: build-tmux-example
 # Run all TUI tests in verbose mode
 test-tui-verbose: build-tmux-example
 	@echo "Running TUI tests in verbose mode..."
-	@$(DIST_DIR)/tmux-tui-test run all --verbose
+	@$(DIST_DIR)/tmux-tui-test run --verbose
 
 # Run TUI tests in interactive debug mode
 test-tui-interactive: build-tmux-example

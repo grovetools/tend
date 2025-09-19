@@ -45,7 +45,7 @@ echo "  h - Show help"
 echo "  q - Quit"
 echo "  t - Run test"
 echo ""
-echo -n "> "
+printf "> "
 
 while true; do
     read -n 1 key
@@ -53,12 +53,12 @@ while true; do
     case $key in
         h)
             echo "Help: This is a simple test TUI"
-            echo -n "> "
+            printf "> "
             ;;
         t)
             echo "Running test..."
             echo "Test completed successfully!"
-            echo -n "> "
+            printf "> "
             ;;
         q)
             echo "Goodbye!"
@@ -66,7 +66,7 @@ while true; do
             ;;
         *)
             echo "Unknown command: $key"
-            echo -n "> "
+            printf "> "
             ;;
     esac
 done
@@ -105,21 +105,22 @@ done
 			},
 			{
 				Name:        "Wait for TUI to initialize",
-				Description: "Waits for the welcome message to appear",
+				Description: "Waits for the welcome message and prompt to appear",
 				Func: func(ctx *harness.Context) error {
 					session := ctx.Get("tui_session").(*tui.Session)
-					
-					// Wait for the welcome message
-					if err := session.WaitForText("Welcome to Test TUI", 3*time.Second); err != nil {
-						return fmt.Errorf("TUI did not initialize: %w", err)
+
+					// Wait for the prompt, which is the last thing to appear on init.
+					// This is more robust than checking for welcome text first.
+					if err := session.WaitForText(">", 5*time.Second); err != nil {
+						content, captureErr := session.Capture(tui.WithCleanedOutput())
+						if captureErr != nil {
+							content = fmt.Sprintf("failed to capture screen: %v", captureErr)
+						}
+						return fmt.Errorf("TUI prompt did not appear: %w\n\nLast screen content:\n---\n%s\n---", err, content)
 					}
 
-					// Verify the prompt is ready
-					if err := session.WaitForText("> ", 2*time.Second); err != nil {
-						return fmt.Errorf("prompt not ready: %w", err)
-					}
-
-					return nil
+					// Now that the UI has stabilized, assert that the initial welcome text is also visible.
+					return session.AssertContains("Welcome to Test TUI")
 				},
 			},
 			{
@@ -358,7 +359,7 @@ echo "=== Debug TUI ==="
 echo "State: $STATE"
 echo ""
 echo "Commands: [m]enu [e]dit [v]iew [q]uit"
-echo -n "> "
+printf "> "
 
 while true; do
     read -n 1 key
@@ -386,7 +387,7 @@ while true; do
             exit 0
             ;;
     esac
-    echo -n "> "
+    printf "> "
 done
 `
 					if err := fs.WriteString(scriptPath, scriptContent); err != nil {
