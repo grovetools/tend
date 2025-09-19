@@ -1,13 +1,19 @@
 package harness
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/mattsolo1/grove-core/pkg/tmux"
 	"github.com/mattsolo1/grove-tend/pkg/command"
+	"github.com/mattsolo1/grove-tend/pkg/teatest"
+	"github.com/mattsolo1/grove-tend/pkg/tui"
 )
 
 // contextMutex protects concurrent access to context maps
@@ -165,4 +171,46 @@ func getOverrideEnvVarName(commandName string) string {
 	}
 	// Generic pattern for others
 	return fmt.Sprintf("GROVE_%s_BINARY", strings.ToUpper(strings.ReplaceAll(commandName, "-", "_")))
+}
+
+// StartTUI launches a TUI application in a new, isolated tmux session.
+// It returns a Session handle for interaction and ensures the session is
+// cleaned up automatically at the end of the scenario.
+func (c *Context) StartTUI(binaryPath string, args ...string) (*tui.Session, error) {
+	tmuxClient, err := tmux.NewClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create tmux client for TUI session: %w", err)
+	}
+
+	// Generate a unique session name for test isolation
+	sessionName := fmt.Sprintf("tend-tui-%s-%d", filepath.Base(binaryPath), time.Now().UnixNano())
+
+	// Prepare the command to run within the tmux session
+	fullCommand := append([]string{binaryPath}, args...)
+	opts := tmux.LaunchOptions{
+		SessionName:      sessionName,
+		WorkingDirectory: c.RootDir, // TUI runs in the test's temp directory
+		Panes: []tmux.PaneOptions{
+			{
+				Command: strings.Join(fullCommand, " "),
+			},
+		},
+	}
+
+	// Launch the session in the background
+	if err := tmuxClient.Launch(context.Background(), opts); err != nil {
+		return nil, fmt.Errorf("failed to launch TUI in tmux session '%s': %w", sessionName, err)
+	}
+
+	// Register for cleanup (we need to track this in the Context)
+	c.Set("active_tui_session_name", sessionName)
+
+	// Return the session handle
+	return tui.NewSession(sessionName, tmuxClient), nil
+}
+
+// StartHeadless launches a BubbleTea model in a headless, non-tmux test runner.
+// This is ideal for testing model logic and view output without the overhead of a full TUI session.
+func (c *Context) StartHeadless(model tea.Model) *teatest.HeadlessSession {
+	return teatest.NewHeadlessSession(model)
 }

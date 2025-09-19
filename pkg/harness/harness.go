@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/mattsolo1/grove-core/pkg/tmux"
 	"github.com/mattsolo1/grove-tend/pkg/command"
 	"github.com/mattsolo1/grove-tend/pkg/fs"
 	"github.com/mattsolo1/grove-tend/pkg/project"
@@ -138,10 +140,22 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 		return result, result.Error
 	}
 
+	// Declare testCtx variable here so defer can reference it
+	var testCtx *Context
+	
 	// Setup cleanup
 	if !h.opts.NoCleanup {
 		defer func() {
 			ui.Cleanup()
+			// Clean up any TUI sessions if testCtx was initialized
+			if testCtx != nil {
+				if sessionName := testCtx.GetString("active_tui_session_name"); sessionName != "" {
+					tmuxClient, err := tmux.NewClient()
+					if err == nil {
+						_ = tmuxClient.KillSession(context.Background(), sessionName)
+					}
+				}
+			}
 			if cleanErr := tempMgr.Cleanup(); cleanErr != nil {
 				ui.Error("Cleanup failed", cleanErr)
 			}
@@ -171,7 +185,7 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 		}
 	}
 
-	testCtx := &Context{
+	testCtx = &Context{
 		RootDir:       tempMgr.BaseDir(),
 		ProjectRoot:   h.opts.RootDir, // Pass project root from harness options
 		GroveBinary:   groveBinary,
@@ -212,13 +226,40 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 
 		// Interactive pause
 		if h.opts.Interactive {
-			if !ui.WaitForUser() {
+			// First, display the TUI state if a session is active
+			if sessionName := testCtx.GetString("active_tui_session_name"); sessionName != "" {
+				tmuxClient, err := tmux.NewClient()
+				if err == nil {
+					if content, err := tmuxClient.CapturePane(context.Background(), sessionName); err == nil {
+						ui.RenderTUICapture(content)
+					}
+				}
+			}
+
+			action := ui.WaitForUser()
+			switch action {
+			case "quit":
 				result.Success = false
 				result.Error = fmt.Errorf("user cancelled at step: %s", step.Name)
 				result.EndTime = time.Now()
 				result.Duration = result.EndTime.Sub(result.StartTime)
 				result.StepResults = stepResults
 				return result, result.Error
+			case "attach":
+				if sessionName := testCtx.GetString("active_tui_session_name"); sessionName != "" {
+					ui.Info("Attach", fmt.Sprintf("Attaching to tmux session '%s'. Detach with 'Ctrl-b d' to continue test.", sessionName))
+					
+					// Temporarily suspend the runner to attach
+					cmd := exec.Command("tmux", "attach-session", "-t", sessionName)
+					cmd.Stdin = os.Stdin
+					cmd.Stdout = os.Stdout
+					cmd.Stderr = os.Stderr
+					_ = cmd.Run() // This will block until user detaches
+				} else {
+					ui.Error("Attach failed", fmt.Errorf("no active TUI session found"))
+				}
+			case "continue":
+				// Do nothing, proceed to step execution
 			}
 		}
 
