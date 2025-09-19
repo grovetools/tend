@@ -95,6 +95,46 @@ func (s *Session) WaitForText(text string, timeout time.Duration) error {
 	}, opts)
 }
 
+// WaitForUIStable polls the TUI screen until its content remains unchanged for a specified duration,
+// or until a timeout is reached. This is useful for waiting for animations or asynchronous updates to complete.
+func (s *Session) WaitForUIStable(timeout time.Duration, pollInterval time.Duration, stableDuration time.Duration) error {
+	var lastContent string
+	var stableSince time.Time
+	var initialized bool
+
+	opts := wait.Options{
+		Timeout:      timeout,
+		PollInterval: pollInterval,
+		Immediate:    true,
+	}
+
+	return wait.ForWithMessage(func() (bool, string, error) {
+		currentContent, err := s.Capture(WithCleanedOutput())
+		if err != nil {
+			return false, "failed to capture screen", err
+		}
+
+		if !initialized {
+			lastContent = currentContent
+			stableSince = time.Now()
+			initialized = true
+			return false, "initializing stability check", nil
+		}
+
+		if currentContent != lastContent {
+			lastContent = currentContent
+			stableSince = time.Now()
+			return false, "screen content changed", nil
+		}
+
+		if time.Since(stableSince) >= stableDuration {
+			return true, "screen has been stable", nil
+		}
+
+		return false, fmt.Sprintf("screen stable for %v, waiting for %v", time.Since(stableSince).Round(time.Millisecond), stableDuration), nil
+	}, opts)
+}
+
 // AssertContains immediately checks if the TUI's current content contains the specified text.
 func (s *Session) AssertContains(text string) error {
 	content, err := s.Capture()
@@ -111,6 +151,80 @@ func (s *Session) AssertNotContains(text string) error {
 		return fmt.Errorf("failed to capture pane for assertion: %w", err)
 	}
 	return assert.NotContains(content, text)
+}
+
+// GetCursorPosition returns the 1-based (row, col) of the cursor.
+func (s *Session) GetCursorPosition() (row, col int, err error) {
+	return s.client.GetCursorPosition(context.Background(), s.sessionName)
+}
+
+// FindTextLocation searches the screen for the given text and returns its 1-based (row, col) position if found.
+func (s *Session) FindTextLocation(text string) (row, col int, found bool, err error) {
+	content, err := s.Capture(WithCleanedOutput())
+	if err != nil {
+		return 0, 0, false, fmt.Errorf("failed to capture screen for text search: %w", err)
+	}
+
+	lines := strings.Split(content, "\n")
+	for r, line := range lines {
+		if c := strings.Index(line, text); c != -1 {
+			// Return 1-based coordinates
+			return r + 1, c + 1, true, nil
+		}
+	}
+
+	return 0, 0, false, nil
+}
+
+// NavigateToText moves the cursor from its current position to the location of the specified text.
+// It calculates the required up/down/left/right key presses.
+func (s *Session) NavigateToText(text string) error {
+	targetRow, targetCol, found, err := s.FindTextLocation(text)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return fmt.Errorf("text '%s' not found on screen", text)
+	}
+
+	currentRow, currentCol, err := s.GetCursorPosition()
+	if err != nil {
+		return fmt.Errorf("failed to get current cursor position: %w", err)
+	}
+
+	// Calculate vertical movement
+	rowDiff := targetRow - currentRow
+	if rowDiff > 0 {
+		for i := 0; i < rowDiff; i++ {
+			if err := s.SendKeys("Down"); err != nil {
+				return err
+			}
+		}
+	} else if rowDiff < 0 {
+		for i := 0; i < -rowDiff; i++ {
+			if err := s.SendKeys("Up"); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Calculate horizontal movement
+	colDiff := targetCol - currentCol
+	if colDiff > 0 {
+		for i := 0; i < colDiff; i++ {
+			if err := s.SendKeys("Right"); err != nil {
+				return err
+			}
+		}
+	} else if colDiff < 0 {
+		for i := 0; i < -colDiff; i++ {
+			if err := s.SendKeys("Left"); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 // Close terminates the tmux session associated with the TUI.

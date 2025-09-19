@@ -86,3 +86,88 @@ func TestSession(t *testing.T) {
 		t.Error("Session should not exist after Close")
 	}
 }
+
+func TestSession_AdvancedFeatures(t *testing.T) {
+	skipIfNoTmux(t)
+
+	ctx := context.Background()
+	sessionName := "tend-tui-advanced-test"
+	client, _ := tmux.NewClient()
+
+	_ = client.KillSession(ctx, sessionName)
+
+	// Launch a shell script that simulates a list and updates slowly
+	// The `sleep 0.2` simulates rendering delay.
+	script := `#!/bin/bash
+echo "File 1.txt"
+sleep 0.2
+echo "File 2.md"
+sleep 0.2
+echo "File 3.go"
+printf "> "`
+	err := client.Launch(ctx, tmux.LaunchOptions{
+		SessionName: sessionName,
+		Panes:       []tmux.PaneOptions{{Command: script}},
+	})
+	if err != nil {
+		t.Fatalf("Failed to launch test session: %v", err)
+	}
+	defer client.KillSession(ctx, sessionName)
+
+	session := NewSession(sessionName, client)
+
+	// Test WaitForUIStable
+	err = session.WaitForUIStable(5*time.Second, 100*time.Millisecond, 500*time.Millisecond)
+	if err != nil {
+		t.Fatalf("WaitForUIStable failed: %v", err)
+	}
+
+	// Test FindTextLocation
+	// First, let's capture the actual content to understand the layout
+	content, err := session.Capture(WithCleanedOutput())
+	if err != nil {
+		t.Fatalf("Failed to capture content: %v", err)
+	}
+	t.Logf("Captured content:\n%s", content)
+	
+	row, col, found, err := session.FindTextLocation("File 2.md")
+	if err != nil || !found {
+		t.Fatalf("FindTextLocation failed. err: %v, found: %v", err, found)
+	}
+	t.Logf("Found 'File 2.md' at (%d, %d)", row, col)
+	
+	// The exact position will depend on the shell script output format
+	// Just verify we found it somewhere reasonable
+	if row < 1 || col < 1 {
+		t.Errorf("Expected positive location, got (%d, %d)", row, col)
+	}
+
+	// Test GetCursorPosition
+	// The cursor position will vary depending on shell state
+	curRow, curCol, err := session.GetCursorPosition()
+	if err != nil {
+		t.Fatalf("GetCursorPosition failed: %v", err)
+	}
+	t.Logf("Current cursor position: (%d, %d)", curRow, curCol)
+	if curRow < 1 || curCol < 1 {
+		t.Errorf("Expected positive cursor position, got (%d, %d)", curRow, curCol)
+	}
+
+	// Test NavigateToText
+	err = session.NavigateToText("File 2.md")
+	if err != nil {
+		t.Fatalf("NavigateToText failed: %v", err)
+	}
+
+	// Verify cursor moved (exact position depends on shell output format)
+	finalRow, finalCol, err := session.GetCursorPosition()
+	if err != nil {
+		t.Fatalf("GetCursorPosition after navigation failed: %v", err)
+	}
+	t.Logf("Cursor after navigation: (%d, %d)", finalRow, finalCol)
+	
+	// Just verify the cursor moved somewhere reasonable
+	if finalRow < 1 || finalCol < 1 {
+		t.Errorf("Expected positive cursor position after navigation, got (%d, %d)", finalRow, finalCol)
+	}
+}

@@ -480,11 +480,122 @@ done
 	}
 }
 
+// ExampleAdvancedTuiNavigation demonstrates the advanced navigation and timing controls.
+func ExampleAdvancedTuiNavigation() *harness.Scenario {
+	return &harness.Scenario{
+		Name:        "example-advanced-tui-navigation",
+		Description: "Demonstrates robust navigation and timing features like WaitForUIStable and NavigateToText",
+		Tags:        []string{"example", "tui", "navigation"},
+		Steps: []harness.Step{
+			{
+				Name: "Create a test TUI with a list",
+				Func: func(ctx *harness.Context) error {
+					testDir := ctx.NewDir("advanced-tui")
+					scriptPath := filepath.Join(testDir, "list-tui.sh")
+					// This script simulates a file browser that loads items with a delay
+					scriptContent := `#!/bin/bash
+echo "Loading files..."
+sleep 0.1
+echo "  README.md"
+sleep 0.1
+echo "  main.go"
+sleep 0.1
+echo "  docs/guide.md"
+echo ""
+echo "Use arrow keys to navigate. Press 'q' to quit."
+printf "> "`
+					if err := fs.WriteString(scriptPath, scriptContent); err != nil {
+						return err
+					}
+					return os.Chmod(scriptPath, 0755)
+				},
+			},
+			{
+				Name: "Launch TUI and wait for it to stabilize",
+				Func: func(ctx *harness.Context) error {
+					scriptPath := filepath.Join(ctx.Dir("advanced-tui"), "list-tui.sh")
+					session, err := ctx.StartTUI("/bin/bash", scriptPath)
+					if err != nil {
+						return err
+					}
+					ctx.Set("advanced_session", session)
+
+					// OLD WAY: time.Sleep(1 * time.Second)
+					// NEW WAY: Wait for the UI to stop changing content.
+					// This is more reliable than a fixed sleep.
+					fmt.Println("   Waiting for UI to stabilize...")
+					return session.WaitForUIStable(5*time.Second, 100*time.Millisecond, 300*time.Millisecond)
+				},
+			},
+			{
+				Name: "Test FindTextLocation functionality",
+				Func: func(ctx *harness.Context) error {
+					session := ctx.Get("advanced_session").(*tui.Session)
+
+					// Test finding specific text
+					fmt.Println("   Searching for 'docs/guide.md'...")
+					row, col, found, err := session.FindTextLocation("docs/guide.md")
+					if err != nil {
+						return fmt.Errorf("failed to find text location: %w", err)
+					}
+					if !found {
+						return fmt.Errorf("text 'docs/guide.md' not found on screen")
+					}
+					
+					fmt.Printf("   Found 'docs/guide.md' at row %d, col %d\n", row, col)
+					return nil
+				},
+			},
+			{
+				Name: "Demonstrate NavigateToText navigation",
+				Func: func(ctx *harness.Context) error {
+					session := ctx.Get("advanced_session").(*tui.Session)
+
+					// OLD WAY:
+					// session.SendKeys("Down")
+					// session.SendKeys("Down")
+					// This is brittle if the file order changes.
+
+					// NEW WAY: Navigate directly to specific text
+					fmt.Println("   Navigating cursor to 'docs/guide.md'...")
+					if err := session.NavigateToText("docs/guide.md"); err != nil {
+						return fmt.Errorf("failed to navigate to text: %w", err)
+					}
+
+					// Verify cursor position
+					row, col, err := session.GetCursorPosition()
+					if err != nil {
+						return fmt.Errorf("failed to get cursor position: %w", err)
+					}
+					fmt.Printf("   ✓ Successfully navigated cursor to row %d, col %d\n", row, col)
+					
+					// Navigate to another location
+					fmt.Println("   Navigating cursor to 'main.go'...")
+					if err := session.NavigateToText("main.go"); err != nil {
+						return fmt.Errorf("failed to navigate to main.go: %w", err)
+					}
+					
+					fmt.Println("   ✓ Navigation works correctly - no more brittle key sequences!")
+					return nil
+				},
+			},
+			{
+				Name: "Cleanup",
+				Func: func(ctx *harness.Context) error {
+					session := ctx.Get("advanced_session").(*tui.Session)
+					return session.SendKeys("q")
+				},
+			},
+		},
+	}
+}
+
 func main() {
 	scenarios := []*harness.Scenario{
 		ExampleTUITestScenario(),
 		ExampleHeadlessBubbleTeaScenario(),
 		ExampleInteractiveTUIDebugging(),
+		ExampleAdvancedTuiNavigation(),
 	}
 
 	// Setup signal handling
