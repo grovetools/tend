@@ -17,6 +17,7 @@ import (
 type Session struct {
 	sessionName string
 	client      *tmux.Client
+	recording   *SessionRecording // For recording and debugging
 }
 
 // NewSession creates a new TUI session handle. It is intended for internal use by the harness.
@@ -31,7 +32,20 @@ func NewSession(sessionName string, client *tmux.Client) *Session {
 // Special keys can be sent (e.g., "Enter", "Esc", "Ctrl+c").
 func (s *Session) SendKeys(keys ...string) error {
 	// Tmux's send-keys sends all arguments as a single sequence.
-	return s.client.SendKeys(context.Background(), s.sessionName, keys...)
+	err := s.client.SendKeys(context.Background(), s.sessionName, keys...)
+	
+	// Record the event if recording is enabled
+	s.recordEvent("key", map[string]interface{}{"keys": keys}, "", err)
+	
+	// Auto-capture screen after sending keys (async)
+	if s.recording != nil && s.recording.enabled {
+		go func() {
+			time.Sleep(100 * time.Millisecond) // Small delay for UI update
+			s.captureForRecording()
+		}()
+	}
+	
+	return err
 }
 
 // captureConfig holds configuration for capture options
@@ -83,7 +97,7 @@ func (s *Session) WaitForText(text string, timeout time.Duration) error {
 	opts := wait.DefaultOptions()
 	opts.Timeout = timeout
 
-	return wait.ForWithMessage(func() (bool, string, error) {
+	err := wait.ForWithMessage(func() (bool, string, error) {
 		content, err := s.Capture()
 		if err != nil {
 			return false, "failed to capture pane", err
@@ -93,6 +107,16 @@ func (s *Session) WaitForText(text string, timeout time.Duration) error {
 		}
 		return false, fmt.Sprintf("text '%s' not found", text), nil
 	}, opts)
+	
+	// Record the wait event
+	data := map[string]interface{}{"text": text, "timeout": timeout.String()}
+	result := ""
+	if err == nil {
+		result = fmt.Sprintf("found text '%s'", text)
+	}
+	s.recordEvent("wait", data, result, err)
+	
+	return err
 }
 
 // WaitForUIStable polls the TUI screen until its content remains unchanged for a specified duration,
@@ -184,12 +208,16 @@ func (s *Session) NavigateToText(text string) error {
 		return err
 	}
 	if !found {
-		return fmt.Errorf("text '%s' not found on screen", text)
+		err := fmt.Errorf("text '%s' not found on screen", text)
+		s.recordEvent("navigate", map[string]interface{}{"text": text}, "", err)
+		return err
 	}
 
 	currentRow, currentCol, err := s.GetCursorPosition()
 	if err != nil {
-		return fmt.Errorf("failed to get current cursor position: %w", err)
+		err := fmt.Errorf("failed to get current cursor position: %w", err)
+		s.recordEvent("navigate", map[string]interface{}{"text": text}, "", err)
+		return err
 	}
 
 	// Calculate vertical movement
@@ -224,7 +252,142 @@ func (s *Session) NavigateToText(text string) error {
 		}
 	}
 
+	// Record successful navigation
+	s.recordEvent("navigate", map[string]interface{}{
+		"text": text,
+		"from": fmt.Sprintf("(%d,%d)", currentRow, currentCol),
+		"to":   fmt.Sprintf("(%d,%d)", targetRow, targetCol),
+	}, fmt.Sprintf("navigated to '%s'", text), nil)
+
 	return nil
+}
+
+// WaitForAnyText waits for any of the specified texts to appear on screen.
+// Returns the first matching text found, or an error if timeout is reached.
+func (s *Session) WaitForAnyText(texts []string, timeout time.Duration) (string, error) {
+	opts := wait.Options{
+		Timeout:      timeout,
+		PollInterval: 100 * time.Millisecond,
+		Immediate:    true,
+	}
+
+	var foundText string
+	err := wait.ForWithMessage(func() (bool, string, error) {
+		content, err := s.Capture(WithCleanedOutput())
+		if err != nil {
+			return false, "failed to capture", err
+		}
+
+		for _, text := range texts {
+			if strings.Contains(content, text) {
+				foundText = text
+				return true, fmt.Sprintf("found '%s'", text), nil
+			}
+		}
+
+		return false, fmt.Sprintf("waiting for any of: %v", texts), nil
+	}, opts)
+
+	return foundText, err
+}
+
+// WaitForTextPattern waits for text matching the regex pattern to appear.
+// Returns the matched text, or an error if timeout is reached.
+func (s *Session) WaitForTextPattern(pattern *regexp.Regexp, timeout time.Duration) (string, error) {
+	opts := wait.Options{
+		Timeout:      timeout,
+		PollInterval: 100 * time.Millisecond,
+		Immediate:    true,
+	}
+
+	var matched string
+	err := wait.ForWithMessage(func() (bool, string, error) {
+		content, err := s.Capture(WithCleanedOutput())
+		if err != nil {
+			return false, "failed to capture", err
+		}
+
+		if match := pattern.FindString(content); match != "" {
+			matched = match
+			return true, fmt.Sprintf("found pattern match: %s", match), nil
+		}
+
+		return false, fmt.Sprintf("waiting for pattern: %s", pattern.String()), nil
+	}, opts)
+
+	return matched, err
+}
+
+// AssertContainsPattern checks if the current screen content matches the regex pattern.
+func (s *Session) AssertContainsPattern(pattern *regexp.Regexp) error {
+	content, err := s.Capture(WithCleanedOutput())
+	if err != nil {
+		return fmt.Errorf("failed to capture for assertion: %w", err)
+	}
+
+	if !pattern.MatchString(content) {
+		return fmt.Errorf("pattern '%s' not found in content", pattern.String())
+	}
+
+	return nil
+}
+
+// GetVisibleLines returns the current screen content as a slice of lines.
+func (s *Session) GetVisibleLines() ([]string, error) {
+	content, err := s.Capture(WithCleanedOutput())
+	if err != nil {
+		return nil, err
+	}
+	return strings.Split(content, "\n"), nil
+}
+
+// SelectItem navigates to and selects an item matching the predicate.
+// It searches visible lines and moves the cursor to the first match, then presses Enter.
+func (s *Session) SelectItem(predicate func(line string) bool) error {
+	return s.SelectItemWithKey(predicate, "Enter")
+}
+
+// SelectItemWithKey navigates to an item matching the predicate and presses the specified key.
+func (s *Session) SelectItemWithKey(predicate func(line string) bool, key string) error {
+	lines, err := s.GetVisibleLines()
+	if err != nil {
+		return fmt.Errorf("failed to get visible lines: %w", err)
+	}
+
+	// Find the first matching line
+	for i, line := range lines {
+		if predicate(line) {
+			// Get current cursor position
+			currentRow, _, err := s.GetCursorPosition()
+			if err != nil {
+				return fmt.Errorf("failed to get cursor position: %w", err)
+			}
+
+			// Navigate to the target line (1-based indexing)
+			targetRow := i + 1
+			rowDiff := targetRow - currentRow
+
+			// Move cursor vertically
+			if rowDiff > 0 {
+				for j := 0; j < rowDiff; j++ {
+					if err := s.SendKeys("Down"); err != nil {
+						return err
+					}
+				}
+			} else if rowDiff < 0 {
+				for j := 0; j < -rowDiff; j++ {
+					if err := s.SendKeys("Up"); err != nil {
+						return err
+					}
+				}
+			}
+
+			// Press the selection key
+			return s.SendKeys(key)
+		}
+	}
+
+	return fmt.Errorf("no item matching predicate found")
 }
 
 // Close terminates the tmux session associated with the TUI.

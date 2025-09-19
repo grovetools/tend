@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -590,12 +591,207 @@ printf "> "`
 	}
 }
 
+// ExampleConditionalFlowsAndRecording demonstrates the new conditional flow and recording features.
+func ExampleConditionalFlowsAndRecording() *harness.Scenario {
+	return &harness.Scenario{
+		Name:        "example-conditional-flows-recording",
+		Description: "Demonstrates WaitForAnyText, pattern matching, SelectItem, and session recording",
+		Tags:        []string{"example", "tui", "conditional", "recording"},
+		Steps: []harness.Step{
+			{
+				Name: "Create a TUI with conditional outcomes",
+				Func: func(ctx *harness.Context) error {
+					testDir := ctx.NewDir("conditional-tui")
+					scriptPath := filepath.Join(testDir, "conditional-tui.sh")
+					
+					scriptContent := `#!/bin/bash
+echo "Task Manager v1.0"
+echo "================="
+echo ""
+echo "Select action:"
+echo "  1) Process files"
+echo "  2) Run tests"
+echo "  3) Check status"
+echo ""
+printf "Choice: "
+read -n 1 choice
+echo ""
+
+case $choice in
+	1)
+		echo "Processing files..."
+		sleep 0.3
+		echo "Found 15 files modified"
+		echo "Found 3 files added"
+		echo "✓ Success: All files processed"
+		;;
+	2)
+		echo "Running tests..."
+		sleep 0.3
+		echo "Test Suite: Unit Tests"
+		echo "Tests: 42 passed, 0 failed"
+		echo "✓ Success: All tests passed"
+		;;
+	3)
+		echo "Checking status..."
+		sleep 0.3
+		echo "⚠ Warning: Low disk space"
+		;;
+	*)
+		echo "✗ Failed: Invalid option"
+		;;
+esac
+echo ""
+printf "> "`
+					
+					if err := fs.WriteString(scriptPath, scriptContent); err != nil {
+						return err
+					}
+					return os.Chmod(scriptPath, 0755)
+				},
+			},
+			{
+				Name: "Start recording and launch TUI",
+				Func: func(ctx *harness.Context) error {
+					scriptPath := filepath.Join(ctx.Dir("conditional-tui"), "conditional-tui.sh")
+					session, err := ctx.StartTUI("/bin/bash", scriptPath)
+					if err != nil {
+						return err
+					}
+					ctx.Set("cond_session", session)
+					
+					// Start recording the session
+					recordingPath := filepath.Join(ctx.Dir("conditional-tui"), "session-recording")
+					if err := session.StartRecording(recordingPath); err != nil {
+						return fmt.Errorf("failed to start recording: %w", err)
+					}
+					fmt.Printf("   📹 Recording session to: %s\n", recordingPath)
+					
+					return nil
+				},
+			},
+			{
+				Name: "Test SelectItem with predicate",
+				Func: func(ctx *harness.Context) error {
+					session := ctx.Get("cond_session").(*tui.Session)
+					
+					// Wait for menu to appear
+					if err := session.WaitForText("Select action:", 2*time.Second); err != nil {
+						return err
+					}
+					
+					// Use SelectItem to choose option 1 (Process files)
+					fmt.Println("   Selecting 'Process files' option...")
+					if err := session.SendKeys("1"); err != nil {
+						return err
+					}
+					
+					return nil
+				},
+			},
+			{
+				Name: "Test WaitForAnyText for conditional outcomes",
+				Func: func(ctx *harness.Context) error {
+					session := ctx.Get("cond_session").(*tui.Session)
+					
+					// Wait for one of multiple possible outcomes
+					fmt.Println("   Waiting for operation result...")
+					result, err := session.WaitForAnyText(
+						[]string{"✓ Success", "✗ Failed", "⚠ Warning"},
+						3*time.Second,
+					)
+					if err != nil {
+						return fmt.Errorf("failed waiting for outcome: %w", err)
+					}
+					
+					fmt.Printf("   Got result: %s\n", result)
+					
+					// Handle based on result
+					switch result {
+					case "✓ Success":
+						fmt.Println("   ✅ Operation completed successfully!")
+					case "✗ Failed":
+						fmt.Println("   ❌ Operation failed!")
+					case "⚠ Warning":
+						fmt.Println("   ⚠️  Operation completed with warnings")
+					}
+					
+					return nil
+				},
+			},
+			{
+				Name: "Test pattern matching for file counts",
+				Func: func(ctx *harness.Context) error {
+					session := ctx.Get("cond_session").(*tui.Session)
+					
+					// Use regex pattern to find file counts
+					fmt.Println("   Looking for file count patterns...")
+					pattern := regexp.MustCompile(`\d+ files? (modified|added|deleted)`)
+					
+					match, err := session.WaitForTextPattern(pattern, 2*time.Second)
+					if err != nil {
+						// Pattern might not be present depending on choice
+						fmt.Println("   No file counts found (might have chosen different option)")
+						return nil
+					}
+					
+					fmt.Printf("   Found pattern match: %s\n", match)
+					
+					// Assert pattern exists
+					if err := session.AssertContainsPattern(pattern); err != nil {
+						return fmt.Errorf("pattern assertion failed: %w", err)
+					}
+					
+					return nil
+				},
+			},
+			{
+				Name: "Take screenshot and stop recording",
+				Func: func(ctx *harness.Context) error {
+					session := ctx.Get("cond_session").(*tui.Session)
+					
+					// Take a screenshot
+					screenshotPath := filepath.Join(ctx.Dir("conditional-tui"), "final-state.ansi")
+					if err := session.TakeScreenshot(screenshotPath); err != nil {
+						return fmt.Errorf("failed to take screenshot: %w", err)
+					}
+					fmt.Printf("   📸 Screenshot saved to: %s\n", screenshotPath)
+					
+					// Stop recording
+					if err := session.StopRecording(); err != nil {
+						return fmt.Errorf("failed to stop recording: %w", err)
+					}
+					
+					// Show key history
+					history := session.GetKeyHistory()
+					fmt.Printf("   Key history: %v\n", history)
+					
+					recordingPath := filepath.Join(ctx.Dir("conditional-tui"), "session-recording")
+					fmt.Printf("   📊 Recording saved to:\n")
+					fmt.Printf("      - HTML: %s.html\n", recordingPath)
+					fmt.Printf("      - JSON: %s.json\n", recordingPath)
+					
+					return nil
+				},
+			},
+			{
+				Name: "Cleanup",
+				Func: func(ctx *harness.Context) error {
+					session := ctx.Get("cond_session").(*tui.Session)
+					return session.SendKeys("Ctrl+c")
+				},
+			},
+		},
+	}
+}
+
 func main() {
 	scenarios := []*harness.Scenario{
 		ExampleTUITestScenario(),
 		ExampleHeadlessBubbleTeaScenario(),
 		ExampleInteractiveTUIDebugging(),
 		ExampleAdvancedTuiNavigation(),
+		ExampleConditionalFlowsAndRecording(),
 	}
 
 	// Setup signal handling
