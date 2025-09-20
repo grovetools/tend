@@ -4,10 +4,10 @@ import (
 	_ "embed"
 )
 
-//go:embed tend-docs.json
-var TendDocsJSON []byte
+//go:embed docs.json
+var DocsJSON []byte
 
-// GetTendDocs returns the content of the embedded tend-docs.json file.
-func GetTendDocs() []byte {
-	return TendDocsJSON
+// GetDocsJSON returns the content of the embedded docs.json file.
+func GetDocsJSON() []byte {
+	return DocsJSON
 }

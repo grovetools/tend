@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/mattsolo1/grove-core/cli"
+	"github.com/mattsolo1/grove-tend/pkg/docs"
 	"github.com/mattsolo1/grove-tend/pkg/harness"
 	"github.com/spf13/cobra"
 )
@@ -73,6 +74,7 @@ Features:
 	rootCmd.AddCommand(newListCmd(allScenarios))
 	rootCmd.AddCommand(newValidateCmd(allScenarios))
 	rootCmd.AddCommand(newVersionCmd())
+	rootCmd.AddCommand(cli.NewDocsCommand(docs.DocsJSON))
 	
 	return rootCmd
 }

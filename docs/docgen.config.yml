@@ -6,7 +6,7 @@ settings:
   model: "gemini-2.5-pro"
   regeneration_mode: "scratch"
   rules_file: "docs.rules"
-  structured_output_file: "pkg/docs/tend-docs.json"
+  structured_output_file: "pkg/docs/docs.json"
   system_prompt: "default"  # Use built-in tone guidelines
 sections:
   - name: "introduction"
