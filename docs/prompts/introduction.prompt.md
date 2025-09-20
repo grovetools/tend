@@ -9,13 +9,4 @@ You are an expert Go developer and technical writer. Your task is to write the i
 - Focus on the unique value proposition and key differentiators.
 
 ## Output Format
-The output MUST be a single JSON object containing only the introduction text. Do not include any other explanatory text or markdown formatting outside the JSON.
-
-The introduction text itself should be written in Markdown format within the JSON string.
-
-Example:
-```json
-{
-  "introduction": "# Introduction\n\nGrove-tend is a Go library for creating powerful, scenario-based end-to-end testing frameworks..."
-}
-```
+Please provide the output as a Markdown document. Start with a clear heading and write engaging, informative content that introduces grove-tend to new users. The output should be ready to use as documentation without any JSON wrapping or escaping.

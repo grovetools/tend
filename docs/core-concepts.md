@@ -106,4 +106,3 @@ harness.NewStep("Work with isolated resources", func(ctx *harness.Context) error
     return nil
 })
 ```
-

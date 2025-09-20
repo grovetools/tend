@@ -1,7 +1,9 @@
 # Include all files except generated docs and files that gemapi adds automatically
 *
+!docs/dist/*
 !docs/TEND_GUIDE.md
 !pkg/docs/tend-examples.xml
+!pkg/docs/tend-docs.json
 !cmd/xml-to-md/
 !.docs.tmp.context
 !CLAUDE.md

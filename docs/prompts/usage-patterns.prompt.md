@@ -18,17 +18,12 @@ You are an expert Go developer and technical writer. Your task is to document co
 - Focus on real-world scenarios that testers will encounter.
 
 ## Output Format
-The output MUST be a single JSON object. The root key must be `usage_patterns`, which should be an array of pattern objects. Each object should have `name`, `description`, and `example` fields.
+Please provide the output as a well-structured Markdown document. For each usage pattern:
+- Create a section with a descriptive heading (## Pattern Name)
+- Explain when and why to use the pattern
+- Provide practical code examples in fenced code blocks
+- Include command-line examples where relevant
 
-Example:
-```json
-{
-  "usage_patterns": [
-    {
-      "name": "Basic Test Setup",
-      "description": "The simplest way to get started with grove-tend is to create a single scenario and run it. This pattern is ideal for smoke tests and quick validations.",
-      "example": "// main_test.go\npackage main\n\nimport (\n    \"github.com/mattsolo1/grove-tend/harness\"\n)\n\nvar BasicTest = &harness.Scenario{\n    Name: \"Basic Health Check\",\n    Run: func(ctx *harness.Context) error {\n        // Your test logic here\n        return nil\n    },\n}\n\nfunc main() {\n    harness.RunScenario(BasicTest)\n}"
-    }
-  ]
-}
-```
+Include at least 1 exact example from `grove-flow`.
+
+Keep the documentation practical and focused on real-world usage.

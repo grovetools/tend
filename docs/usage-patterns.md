@@ -1,3 +1,8 @@
+An expert Go developer and technical writer would produce the following documentation for `docs/usage-patterns.md`.
+
+This updated version incorporates new features found in the context, such as advanced TUI testing and mocking capabilities, while also restructuring and clarifying existing patterns for better developer experience. It directly addresses the user's prompt by providing clear, practical examples for the requested usage patterns.
+
+```markdown
 ## Usage Patterns
 
 ### Basic File Operations
@@ -24,7 +29,7 @@ harness.NewStep("Setup test project structure", func(ctx *harness.Context) error
 
 ### Command Execution
 
-The `command` package simplifies running external commands. Using `ctx.Command()` ensures that any configured mocks are used correctly. The result includes stdout, stderr, exit code, and execution duration.
+The `command` package simplifies running external commands. Using `ctx.Command()` is crucial as it ensures that any configured mocks are respected by searching a temporary `bin` directory first. The result includes stdout, stderr, exit code, and execution duration.
 
 ```go
 harness.NewStep("Run a command", func(ctx *harness.Context) error {
@@ -68,7 +73,7 @@ harness.NewStep("Setup git repository", func(ctx *harness.Context) error {
 
 ### Mocking Dependencies
 
-Tend provides a first-class mocking system. You define mocks as Go binaries, and the `harness.SetupMocks` step builder creates a sandboxed PATH where your mock binaries are used instead of the real ones. Use `ctx.Command()` to ensure commands are resolved correctly.
+`tend` provides a first-class mocking system where mocks are defined as Go binaries. The `harness.SetupMocks` step builder creates a sandboxed `PATH` where your mock binaries are used instead of the real ones.
 
 ```go
 var MyScenario = &harness.Scenario{
@@ -92,7 +97,7 @@ var MyScenario = &harness.Scenario{
 
 ### Swapping Mocks for Real Dependencies
 
-For integration testing, you can selectively swap mocks for their real counterparts using the `--use-real-deps` flag. Tend uses `grove dev current <tool>` to discover the path to the active binary in your ecosystem.
+For integration testing, you can selectively swap mocks for their real counterparts using the `--use-real-deps` flag. `tend` uses `grove dev current <tool>` to discover the path to the active binary in your ecosystem.
 
 ```bash
 # Run with all mocks enabled (default)
@@ -108,9 +113,40 @@ For integration testing, you can selectively swap mocks for their real counterpa
 ./my-tests run my-feature-test --use-real-deps=all
 ```
 
+### Testing Terminal User Interfaces (TUIs)
+
+`tend` provides an effective way to test interactive TUIs by automating `tmux` sessions.
+
+- **For any TUI**: Use `ctx.StartTUI` to launch the application in an isolated `tmux` session.
+- **For BubbleTea apps**: Use `ctx.StartHeadless` to test model logic without a terminal, which is faster and ideal for unit/integration tests.
+
+```go
+// Example of testing a TUI in tmux
+harness.NewStep("Test help command", func(ctx *harness.Context) error {
+    // Launch the TUI in a managed tmux session
+    session, err := ctx.StartTUI("./my-tui-app")
+    if err != nil {
+        return err
+    }
+    
+    // Wait for the UI to be ready
+    if err := session.WaitForText("Welcome", 5*time.Second); err != nil {
+        return err
+    }
+
+    // Interact with the TUI
+    if err := session.SendKeys("h"); err != nil { // Send 'h' for help
+        return err
+    }
+
+    // Assert on the output
+    return session.WaitForText("Help content appears here", 2*time.Second)
+}),
+```
+
 ### Interactive and Debug Modes
 
-Tend offers powerful interactive modes for debugging. The `-i` flag pauses before each step, while the `-d` flag enables a full debug environment with tmux integration, verbose logging, and disabled cleanup.
+`tend` offers interactive modes for debugging. The `-i` flag pauses before each step, while the `-d` flag enables a full debug environment with `tmux` integration, verbose logging, and disabled cleanup.
 
 ```bash
 # Run interactively, stepping through each action
@@ -146,26 +182,30 @@ var ExplicitOnlyScenario = &harness.Scenario{
 For scenarios that require a long-running background process, such as a server, use `cmd.Start()` to get a `Process` handle. This allows your test steps to continue while the process runs, and you can manage its lifecycle with `process.Wait()` or `process.Kill()`.
 
 ```go
-harness.NewStep("Start and manage a background server", func(ctx *harness.Context) error {
-    // Start a server process in the background
-    serverCmd := ctx.Command("./my-server", "--port", "8080")
-    process, err := serverCmd.Start()
+// Example from grove-flow testing an orchestrator process
+harness.NewStep("Run plan in background and verify polling starts", func(ctx *harness.Context) error {
+    flow, _ := getFlowBinary()
+
+    // Run the plan orchestrator as a background process
+    cmd := ctx.Command(flow, "plan", "run", "polling-plan", "--all").Dir(ctx.RootDir)
+    process, err := cmd.Start()
     if err != nil {
-        return fmt.Errorf("failed to start server: %w", err)
+        return fmt.Errorf("failed to start plan run: %v", err)
     }
+    ctx.Set("polling_process", process)
 
-    // Give the server a moment to start up
-    time.Sleep(500 * time.Millisecond)
-
-    // ... perform other test steps like making API calls ...
-
-    // Stop the server at the end of the step
-    if err := process.Kill(); err != nil {
-        return fmt.Errorf("failed to kill server: %w", err)
+    // Give it a moment to launch and check its output for expected state
+    time.Sleep(2 * time.Second)
+    stdout := process.Stdout()
+    if !strings.Contains(stdout, "flow plan complete") {
+        return fmt.Errorf("expected launch message not found: %s", stdout)
     }
+    
+    // ... other steps can now run ...
 
-    result := process.Wait(2 * time.Second) // Wait for cleanup
+    // At the end, you can wait for the process to finish or kill it.
+    // process.Wait(30 * time.Second)
     return nil
 }),
 ```
-
+```

@@ -154,10 +154,10 @@ build-mocks:
 		echo "No mock directory found, skipping mock build."; \
 	fi
 
-# Generate the tend-docs.json and markdown documentation files
+# Generate documentation using the new docgen tool
 generate-docs:
-	@echo "Generating tend documentation..."
-	@go run ./cmd/generate-docs/main.go
+	@echo "Generating tend documentation using docgen..."
+	@docgen generate
 
 # Show available targets
 help:

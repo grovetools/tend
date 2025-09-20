@@ -19,16 +19,9 @@ You are an expert Go developer and technical writer. Your task is to document be
 - Focus on practical advice that improves test quality and developer experience.
 
 ## Output Format
-The output MUST be a single JSON object. The root key must be `best_practices`, which should be an array of practice objects. Each object should have `title` and `text` fields.
-
-Example:
-```json
-{
-  "best_practices": [
-    {
-      "title": "Use Descriptive Scenario Names",
-      "text": "Scenario names should clearly describe what is being tested and the expected outcome. Good names make test failures immediately understandable.\n\n**Good**: `TestUserLoginWithValidCredentials`\n**Bad**: `Test1` or `LoginTest`\n\nConsider including the test context, action, and expected result in the name."
-    }
-  ]
-}
-```
+Please provide the output as a well-structured Markdown document. For each best practice:
+- Use a clear heading (## Practice Name)
+- Explain the rationale and importance
+- Provide do's and don'ts where applicable
+- Include code examples to illustrate the practice
+- Keep advice practical and actionable

@@ -17,17 +17,13 @@ You are an expert Go developer and technical writer. Your task is to document th
 - Focus on practical usage and best practices.
 
 ## Output Format
-The output MUST be a single JSON object. The root key must be `core_concepts`, which should be an array of concept objects. Each object should have `name`, `description`, and `example` fields.
+Please provide the output as a well-structured Markdown document with the following format:
 
-Example:
-```json
-{
-  "core_concepts": [
-    {
-      "name": "Scenario",
-      "description": "A Scenario is the fundamental unit of a test in grove-tend. It represents a complete test case with setup, execution, and teardown phases.",
-      "example": "// Define a basic scenario\nvar MyScenario = &harness.Scenario{\n    Name: \"Test User Login\",\n    Tags: []string{\"auth\", \"smoke\"},\n    Run: func(ctx *harness.Context) error {\n        // Test implementation\n        return nil\n    },\n}"
-    }
-  ]
-}
-```
+# Core Concepts
+
+For each concept, create a section with:
+- A clear heading (## Concept Name)
+- A description paragraph explaining the concept
+- A code example in a fenced code block
+
+Keep the output clean, readable, and focused on practical understanding.

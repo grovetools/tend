@@ -1,0 +1,33 @@
+enabled: true
+title: "Grove Tend"
+description: "A Go library for creating powerful, scenario-based end-to-end testing frameworks."
+category: "Core Libraries"
+settings:
+  model: "gemini-2.5-pro"
+  regeneration_mode: "scratch"
+  rules_file: "docs.rules"
+  structured_output_file: "pkg/docs/tend-docs.json"
+  system_prompt: "default"  # Use built-in tone guidelines
+sections:
+  - name: "introduction"
+    title: "Introduction"
+    order: 1
+    prompt: "prompts/introduction.prompt.md"
+    output: "introduction.md"
+    json_key: "introduction"
+  - name: "core-concepts"
+    title: "Core Concepts"
+    order: 2
+    prompt: "prompts/core-concepts.prompt.md"
+    output: "core-concepts.md"
+    json_key: "core_concepts"
+  - name: "usage-patterns"
+    title: "Usage Patterns"
+    order: 3
+    prompt: "prompts/usage-patterns.prompt.md"
+    output: "usage-patterns.md"
+  - name: "best-practices"
+    title: "Best Practices"
+    order: 4
+    prompt: "prompts/best-practices.prompt.md"
+    output: "best-practices.md"
