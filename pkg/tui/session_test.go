@@ -42,7 +42,7 @@ func TestSession(t *testing.T) {
 	}
 	defer client.KillSession(ctx, sessionName)
 
-	session := NewSession(sessionName, client)
+	session := NewSession(sessionName, client, t.TempDir())
 
 	// Test WaitForText
 	err = session.WaitForText("Hello TUI", 2*time.Second)
@@ -117,7 +117,7 @@ printf "> "`
 	}
 	defer client.KillSession(ctx, sessionName)
 
-	session := NewSession(sessionName, client)
+	session := NewSession(sessionName, client, t.TempDir())
 
 	// Test WaitForUIStable
 	err = session.WaitForUIStable(5*time.Second, 100*time.Millisecond, 500*time.Millisecond)
@@ -205,7 +205,7 @@ fi`
 	}
 	defer client.KillSession(ctx, sessionName)
 
-	session := NewSession(sessionName, client)
+	session := NewSession(sessionName, client, t.TempDir())
 
 	// Test WaitForAnyText
 	result, err := session.WaitForAnyText([]string{"✓ Success", "✗ Failed", "⚠ Warning"}, 2*time.Second)
@@ -247,7 +247,7 @@ echo "Processing complete"`
 	}
 	defer client.KillSession(ctx, sessionName)
 
-	session := NewSession(sessionName, client)
+	session := NewSession(sessionName, client, t.TempDir())
 
 	// Test WaitForTextPattern
 	pattern := regexp.MustCompile(`\d+ files? (modified|added|deleted)`)
@@ -294,7 +294,7 @@ printf "> "`
 	}
 	defer client.KillSession(ctx, sessionName)
 
-	session := NewSession(sessionName, client)
+	session := NewSession(sessionName, client, t.TempDir())
 	
 	// Wait for menu to appear
 	time.Sleep(500 * time.Millisecond)
@@ -343,7 +343,7 @@ func TestSession_Recording(t *testing.T) {
 	}
 	defer client.KillSession(ctx, sessionName)
 
-	session := NewSession(sessionName, client)
+	session := NewSession(sessionName, client, t.TempDir())
 	
 	// Start recording
 	tempDir := t.TempDir()

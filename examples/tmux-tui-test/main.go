@@ -420,7 +420,7 @@ done
 					// 1. Display the current TUI state
 					// 2. Offer options to continue, attach, or quit
 					fmt.Println("\n   💡 TIP: In interactive mode, you can press 'a' to attach to this tmux session")
-					fmt.Println("   Once attached, use 'Ctrl-b d' to detach and continue the test\n")
+					fmt.Println("   Once attached, use 'Ctrl-b d' to detach and continue the test")
 					
 					return nil
 				},
@@ -785,6 +785,86 @@ printf "> "`
 	}
 }
 
+// ExampleFilesystemInteractionScenario demonstrates testing a TUI that interacts with the filesystem
+func ExampleFilesystemInteractionScenario() *harness.Scenario {
+	return &harness.Scenario{
+		Name:        "example-tui-filesystem",
+		Description: "Tests a TUI that writes to the filesystem",
+		Tags:        []string{"example", "tui", "filesystem"},
+		Steps: []harness.Step{
+			{
+				Name: "Create TUI script that writes to a file",
+				Func: func(ctx *harness.Context) error {
+					scriptPath := filepath.Join(ctx.RootDir, "save-script.sh")
+					scriptContent := `#!/bin/bash
+echo "Press 's' to save a file."
+printf "> "
+
+while true; do
+    read -n 1 key
+    echo ""
+    if [ "$key" == "s" ]; then
+        echo "Saving file..."
+        echo "saved at $(date)" > output.txt
+        echo "File saved to output.txt"
+        printf "> "
+    elif [ "$key" == "q" ]; then
+        echo "Quitting."
+        exit 0
+    fi
+done`
+					if err := fs.WriteString(scriptPath, scriptContent); err != nil {
+						return err
+					}
+					return os.Chmod(scriptPath, 0755)
+				},
+			},
+			{
+				Name: "Launch TUI and wait for it to be ready",
+				Func: func(ctx *harness.Context) error {
+					scriptPath := filepath.Join(ctx.RootDir, "save-script.sh")
+					session, err := ctx.StartTUI("/bin/bash", scriptPath)
+					if err != nil {
+						return err
+					}
+					ctx.Set("fs_session", session)
+					return session.WaitForText("Press 's' to save a file.", 5*time.Second)
+				},
+			},
+			{
+				Name: "Send 's' key and wait for UI change",
+				Func: func(ctx *harness.Context) error {
+					session := ctx.Get("fs_session").(*tui.Session)
+					return session.SendKeysAndWaitForChange(2*time.Second, "s")
+				},
+			},
+			{
+				Name: "Verify file was created",
+				Func: func(ctx *harness.Context) error {
+					session := ctx.Get("fs_session").(*tui.Session)
+					// Verify the file was created and is visible to the session
+					return session.WaitForFile("output.txt", 5*time.Second)
+				},
+			},
+			{
+				Name: "Verify file content",
+				Func: func(ctx *harness.Context) error {
+					session := ctx.Get("fs_session").(*tui.Session)
+					// Assert the file contains the expected content
+					return session.AssertFileContains("output.txt", "saved at")
+				},
+			},
+			{
+				Name: "Cleanup",
+				Func: func(ctx *harness.Context) error {
+					session := ctx.Get("fs_session").(*tui.Session)
+					return session.SendKeys("q")
+				},
+			},
+		},
+	}
+}
+
 func main() {
 	scenarios := []*harness.Scenario{
 		ExampleTUITestScenario(),
@@ -792,6 +872,7 @@ func main() {
 		ExampleInteractiveTUIDebugging(),
 		ExampleAdvancedTuiNavigation(),
 		ExampleConditionalFlowsAndRecording(),
+		ExampleFilesystemInteractionScenario(),
 	}
 
 	// Setup signal handling

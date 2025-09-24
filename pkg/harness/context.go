@@ -206,7 +206,7 @@ func (c *Context) StartTUI(binaryPath string, args ...string) (*tui.Session, err
 	c.Set("active_tui_session_name", sessionName)
 
 	// Return the session handle
-	return tui.NewSession(sessionName, tmuxClient), nil
+	return tui.NewSession(sessionName, tmuxClient, c.RootDir), nil
 }
 
 // StartHeadless launches a BubbleTea model in a headless, non-tmux test runner.

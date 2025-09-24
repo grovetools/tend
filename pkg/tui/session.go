@@ -3,12 +3,15 @@ package tui
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/mattsolo1/grove-core/pkg/tmux"
 	"github.com/mattsolo1/grove-tend/pkg/assert"
+	"github.com/mattsolo1/grove-tend/pkg/fs"
 	"github.com/mattsolo1/grove-tend/pkg/wait"
 )
 
@@ -18,13 +21,15 @@ type Session struct {
 	sessionName string
 	client      *tmux.Client
 	recording   *SessionRecording // For recording and debugging
+	rootDir     string
 }
 
 // NewSession creates a new TUI session handle. It is intended for internal use by the harness.
-func NewSession(sessionName string, client *tmux.Client) *Session {
+func NewSession(sessionName string, client *tmux.Client, rootDir string) *Session {
 	return &Session{
 		sessionName: sessionName,
 		client:      client,
+		rootDir:     rootDir,
 	}
 }
 
@@ -388,6 +393,77 @@ func (s *Session) SelectItemWithKey(predicate func(line string) bool, key string
 	}
 
 	return fmt.Errorf("no item matching predicate found")
+}
+
+// WaitForFile waits for a file to exist within the scenario's temporary directory.
+func (s *Session) WaitForFile(relPath string, timeout time.Duration) error {
+	if s.rootDir == "" {
+		return fmt.Errorf("session is not aware of test root directory")
+	}
+	fullPath := filepath.Join(s.rootDir, relPath)
+
+	opts := wait.DefaultOptions()
+	opts.Timeout = timeout
+
+	return wait.For(func() (bool, error) {
+		_, err := os.Stat(fullPath)
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return err == nil, err
+	}, opts)
+}
+
+// AssertFileExists asserts that a file exists within the scenario's temporary directory.
+func (s *Session) AssertFileExists(relPath string) error {
+	if s.rootDir == "" {
+		return fmt.Errorf("session is not aware of test root directory")
+	}
+	fullPath := filepath.Join(s.rootDir, relPath)
+
+	if !fs.Exists(fullPath) {
+		return fmt.Errorf("file does not exist: %s", fullPath)
+	}
+	return nil
+}
+
+// AssertFileContains asserts that a file within the scenario's temporary directory contains specific content.
+func (s *Session) AssertFileContains(relPath string, content string) error {
+	if s.rootDir == "" {
+		return fmt.Errorf("session is not aware of test root directory")
+	}
+	fullPath := filepath.Join(s.rootDir, relPath)
+
+	fileContent, err := fs.ReadString(fullPath)
+	if err != nil {
+		return fmt.Errorf("failed to read file %s: %w", fullPath, err)
+	}
+
+	return assert.Contains(fileContent, content)
+}
+
+// SendKeysAndWaitForChange sends keys and waits for the screen to change.
+func (s *Session) SendKeysAndWaitForChange(timeout time.Duration, keys ...string) error {
+	initialContent, err := s.Capture(WithCleanedOutput())
+	if err != nil {
+		return fmt.Errorf("failed to capture initial screen state: %w", err)
+	}
+
+	if err := s.SendKeys(keys...); err != nil {
+		return fmt.Errorf("failed to send keys: %w", err)
+	}
+
+	opts := wait.DefaultOptions()
+	opts.Timeout = timeout
+
+	return wait.For(func() (bool, error) {
+		currentContent, err := s.Capture(WithCleanedOutput())
+		if err != nil {
+			// Don't fail the wait, just try again
+			return false, nil
+		}
+		return currentContent != initialContent, nil
+	}, opts)
 }
 
 // Close terminates the tmux session associated with the TUI.
