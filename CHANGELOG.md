@@ -1,3 +1,9 @@
+## v0.3.1 (2025-09-26)
+
+### Bug Fixes
+
+* add changelog parsing to release
+
 ## v0.3.0 (2025-09-26)
 
 A powerful new TUI testing framework, nicknamed "Playwright for Terminals," has been introduced (ac7c7ab). This framework enables robust testing of interactive command-line applications by automating tmux sessions. Initial enhancements focused on stability, replacing brittle `sleep` calls with intelligent waiting (df9e493) and resolving race conditions (50a9eb5). Subsequent updates added advanced features including conditional flow control, predicate-based navigation, and comprehensive session recording with HTML/JSON export for unparalleled debugging (4fb1276). The framework was further improved with direct filesystem verification helpers, allowing tests to reliably interact with and assert on file creation and content (e92984a).
