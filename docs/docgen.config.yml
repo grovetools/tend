@@ -9,12 +9,12 @@ settings:
   structured_output_file: "pkg/docs/docs.json"
   system_prompt: "default"  # Use built-in tone guidelines
 sections:
-  - name: "introduction"
-    title: "Introduction"
+  - name: "overview"
+    title: "Overview"
     order: 1
-    prompt: "prompts/introduction.prompt.md"
-    output: "01-introduction.md"
-    json_key: "introduction"
+    prompt: "prompts/overview.prompt.md"
+    output: "01-overview.md"
+    json_key: "overview"
   - name: "core-concepts"
     title: "Core Concepts"
     order: 2

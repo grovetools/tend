@@ -1,8 +1,16 @@
-# Grove Tend: A Go Library for E2E Testing
+# Grove-Tend: End-to-End Testing Framework
 
-Grove Tend is a Go library for creating powerful, scenario-based end-to-end testing frameworks. It provides the essential building blocks to replace fragile, ad-hoc bash scripts with structured, maintainable, and easily debuggable Go code.
+The `grove-tend` repository provides a Go library for creating powerful, scenario-based end-to-end testing frameworks. It offers essential building blocks to replace fragile, ad-hoc bash scripts with structured, maintainable, and easily debuggable Go code.
 
-Designed with a **library-first philosophy**, Grove Tend empowers you to build a custom testing CLI tailored specifically to your project's needs. This approach keeps your test definitions and logic directly within your Go codebase, improving discoverability and maintainability while leveraging the full power of the Go language.
+## Core Philosophy: Library-First Testing Framework
+
+Grove-Tend is built on a library-first philosophy that empowers you to build custom testing CLIs tailored specifically to your project's needs. Instead of providing a one-size-fits-all testing tool, it gives you the components to create testing frameworks that integrate naturally with your codebase and development workflow.
+
+The framework serves developers who need sophisticated end-to-end testing capabilities while maintaining the flexibility and power of Go for complex testing scenarios.
+
+## Dual Role: Testing Library and Development Tool
+
+The `grove-tend` framework serves as both a comprehensive testing library providing essential testing primitives and a development tool that transforms end-to-end testing from a chore into a core part of your workflow.
 
 The framework offers a comprehensive suite of features to streamline the entire E2E testing lifecycle:
 
