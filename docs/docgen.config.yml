@@ -13,21 +13,21 @@ sections:
     title: "Introduction"
     order: 1
     prompt: "prompts/introduction.prompt.md"
-    output: "introduction.md"
+    output: "01-introduction.md"
     json_key: "introduction"
   - name: "core-concepts"
     title: "Core Concepts"
     order: 2
     prompt: "prompts/core-concepts.prompt.md"
-    output: "core-concepts.md"
+    output: "02-core-concepts.md"
     json_key: "core_concepts"
   - name: "usage-patterns"
     title: "Usage Patterns"
     order: 3
     prompt: "prompts/usage-patterns.prompt.md"
-    output: "usage-patterns.md"
+    output: "03-usage-patterns.md"
   - name: "best-practices"
     title: "Best Practices"
     order: 4
     prompt: "prompts/best-practices.prompt.md"
-    output: "best-practices.md"
+    output: "04-best-practices.md"
