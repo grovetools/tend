@@ -6,28 +6,20 @@ settings:
   model: "gemini-2.5-pro"
   regeneration_mode: "scratch"
   rules_file: "docs.rules"
-  structured_output_file: "pkg/docs/docs.json"
-  system_prompt: "default"  # Use built-in tone guidelines
+  system_prompt: "default"
 sections:
   - name: "overview"
     title: "Overview"
     order: 1
-    prompt: "prompts/overview.prompt.md"
+    prompt: "prompts/01-overview.md"
     output: "01-overview.md"
-    json_key: "overview"
-  - name: "core-concepts"
-    title: "Core Concepts"
+  - name: "examples"
+    title: "Examples"
     order: 2
-    prompt: "prompts/core-concepts.prompt.md"
-    output: "02-core-concepts.md"
-    json_key: "core_concepts"
-  - name: "usage-patterns"
-    title: "Usage Patterns"
+    prompt: "prompts/02-examples.md"
+    output: "02-examples.md"
+  - name: "conventions"
+    title: "Conventions"
     order: 3
-    prompt: "prompts/usage-patterns.prompt.md"
-    output: "03-usage-patterns.md"
-  - name: "best-practices"
-    title: "Best Practices"
-    order: 4
-    prompt: "prompts/best-practices.prompt.md"
-    output: "04-best-practices.md"
+    prompt: "prompts/03-conventions.md"
+    output: "03-conventions.md"
