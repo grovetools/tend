@@ -71,12 +71,11 @@ See the [Grove Installation Guide](https://github.com/mattsolo1/grove-meta/blob/
 
 <!-- DOCGEN:OVERVIEW:END -->
 
-
 <!-- DOCGEN:TOC:START -->
 
 See the [documentation](docs/) for detailed usage instructions:
-- [Overview](docs/01-overview.md) - <img src="./images/grove-tend-readme.svg" width="60%" />
-- [Examples](docs/02-examples.md) - This example demonstrates how to test a standard command-line tool that inter...
-- [Conventions](docs/03-conventions.md) - This document outlines the standard conventions for setting up, running, and ...
+- [Overview](docs/01-overview.md)
+- [Examples](docs/02-examples.md)
+- [Conventions](docs/03-conventions.md)
 
 <!-- DOCGEN:TOC:END -->
