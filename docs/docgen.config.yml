@@ -5,6 +5,12 @@ category: "Core Libraries"
 settings:
   rules_file: "docs.rules"
   system_prompt: "default"
+readme:
+  generate_toc: true
+  template: docs/README.md.tpl
+  output: README.md
+  source_section: overview
+  strip_lines: 2
 sections:
   - name: "overview"
     title: "Overview"

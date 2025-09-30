@@ -1,5 +1,7 @@
 # Grove Tend Overview
 
+<img src="./images/grove-tend-readme.svg" width="60%" />
+
 Grove Tend is a Go library for creating scenario-based end-to-end testing frameworks. It is designed with a library-first philosophy, allowing developers to build a custom test runner binary tailored to their project's needs. This approach replaces ad-hoc shell scripts with structured, maintainable, and debuggable Go code, keeping test definitions and logic directly within the project's codebase.
 
 <!-- placeholder for animated gif -->

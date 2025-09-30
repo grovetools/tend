@@ -1,280 +1,82 @@
-# grove-tend
+<!-- DOCGEN:OVERVIEW:START -->
 
-<img src="https://github.com/user-attachments/assets/c6ca0fe6-38b5-4f55-b0e8-7e42d5940d48" width="60%" />
+<img src="docs/images/grove-tend-readme.svg" width="60%" />
 
-[![CI](https://github.com/mattsolo1/grove-tend/actions/workflows/ci.yml/badge.svg)](https://github.com/mattsolo1/grove-tend/actions/workflows/ci.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/mattsolo1/grove-tend)](https://goreportcard.com/report/github.com/mattsolo1/grove-tend)
-[![Go Reference](https://pkg.go.dev/badge/github.com/mattsolo1/grove-tend.svg)](https://pkg.go.dev/github.com/mattsolo1/grove-tend)
+Grove Tend is a Go library for creating scenario-based end-to-end testing frameworks. It is designed with a library-first philosophy, allowing developers to build a custom test runner binary tailored to their project's needs. This approach replaces ad-hoc shell scripts with structured, maintainable, and debuggable Go code, keeping test definitions and logic directly within the project's codebase.
 
-A Go library for creating powerful, scenario-based end-to-end testing frameworks.
+<!-- placeholder for animated gif -->
 
-**Grove Tend** provides the building blocks to replace ad-hoc bash scripts with structured, maintainable, and debuggable Go code. It is designed as a pure library, allowing you to build a custom testing CLI tailored to your project's needs.
+## Key Features
+
+-   **Scenario-Based Testing**: Organizes tests into logical `Scenario`s composed of sequential `Step`s that share a common `Context`, making complex test flows easy to read and manage.
+-   **Helper Packages**: Provides a set of built-in helpers for common testing operations, including filesystem interactions (`fs`), Git repository management (`git`), command execution (`command`), and assertions (`assert`).
+-   **First-Class Mocking**: Supports defining mocks as Go binaries, which can be compiled and managed by the test harness. This allows for seamless swapping between mocked and real dependencies for different stages of testing.
+-   **Advanced TUI Testing**: Offers a "Playwright for the Terminal" experience by enabling the testing of interactive Terminal User Interfaces (TUIs). It automates `tmux` sessions to launch, interact with, and assert on the state of TUI applications.
+-   **Interactive Debugging**: Includes interactive (`-i`) and debug (`-d`) modes to facilitate troubleshooting. These modes allow developers to step through test execution, inspect state, and manually interact with TUI sessions.
+
+## Ideal For
+
+-   **CLI Tool Testing**: Validating commands with file I/O, environment variables, and exit codes.
+-   **Integration Testing**: Orchestrating and testing tools that depend on other CLI programs like `git`, `docker`, or `kubectl`.
+-   **TUI Applications**: Automating tests for interactive terminal UIs with complex navigation.
+-   **Workflow Validation**: Verifying multi-step processes that require state to be maintained across actions.
+-   **LLM-Generated Test Suites**: The framework's structure is optimized for AI generation and maintenance, enabling the creation of comprehensive test suites.
+
+## How It Works
+
+The core of Grove Tend is a test `Harness` that executes scenarios. The typical workflow is as follows:
+
+1.  **Test Runner Creation**: A developer creates a main entry point for their tests (e.g., `tests/e2e/main.go`). This program imports the `grove-tend` library.
+2.  **Scenario Definition**: Test cases are defined as `harness.Scenario` structs. Each scenario consists of one or more `harness.Step`s.
+3.  **Step Execution**: The harness runs each step sequentially. Each step function receives a `harness.Context` object, which manages a temporary directory for the test run and provides a key-value store for passing state between steps.
+4.  **Command Execution**: The `Context` provides a mock-aware `Command()` factory. When mocks are enabled, this factory ensures that calls to external tools (like `git` or `docker`) are routed to the mock binaries.
+5.  **Cleanup**: After a scenario completes, the harness automatically cleans up all temporary resources, such as directories and `tmux` sessions, unless explicitly disabled for debugging.
+6.  **CLI Interface**: The test runner, when compiled, becomes a command-line application that can list, run, and validate scenarios, offering filtering by name or tags.
+
+## Role in the Grove Ecosystem
+
+Grove Tend serves as the standard for end-to-end testing across all command-line tools within the Grove ecosystem. By providing a consistent framework, it ensures that all projects adhere to the same testing patterns, making it easier to write, understand, and maintain tests for any tool in the ecosystem. This standardization is critical for validating complex cross-tool interactions and maintaining a high level of quality and reliability. It helps agents build their own tools with reduced input from the developer, and serves as reference implementations.
+
+## LLM-First Design Philosophy
+
+While Grove Tend tests can be written by hand, their structure is intentionally designed to be generated and maintained by Large Language Models (LLMs). The tests may appear verbose compared to traditional unit tests, but this explicitness makes them easy for an LLM to comprehend, modify, and extend. This design choice enables the creation of comprehensive E2E test suites that cover complex user workflows, which would often be impractical to write and maintain manually. The tests serve as living, machine-readable documentation of the system's expected behavior.
+
+## Interactive Debugging
+
+The framework includes features designed to simplify the debugging of complex E2E test failures.
+
+-   The interactive (`-i`) flag pauses execution before each step, prompting the user to continue, skip, or quit. For TUI tests, it adds an option to attach to the live `tmux` session for manual interaction.
+-   The debug (`-d`) flag is a shorthand for a complete debugging environment. It enables interactive mode, disables cleanup of temporary files, and automatically splits the current `tmux` window, opening a new pane in the test's temporary directory. This allows developers to watch the test run on one side while inspecting files and logs on the other.
 
 ---
 
-## Features
+### Installation
 
--   **Library-First Design**: Import `grove-tend` to build your own test runner binary, keeping test definitions close to your code.
--   **Scenario-Based Testing**: Structure tests logically with `Scenarios`, `Steps`, and a shared `Context`.
--   **Rich Helper Packages**: Leverage built-in helpers for filesystem operations (`fs`), Git (`git`), command execution (`command`), Docker (`docker`), assertions (`assert`), and waiting (`wait`).
--   **Interactive Debugging**: Step through scenarios one-by-one with interactive mode (`-i`) or use the powerful debug mode (`-d`) for tmux integration.
--   **Beautiful Terminal UI**: Get clear, styled output with progress indicators, status updates, and command output boxes.
--   **Project-Specific Binary Discovery**: The globally installed `tend` binary will automatically find and execute a project-specific test binary, ensuring you always run the correct tests.
--   **CI-Friendly Reporting**: Generate JUnit, JSON, and GitHub Actions annotations for seamless CI/CD integration.
--   **First-Class Mocking Support**: Define mocks in Go, build them as binaries, and seamlessly swap between mocked and real dependencies.
-
-## Getting Started: Using Tend as a Library
-
-The primary way to use `tend` is to create a custom test binary within your own project.
-
-### 1. Installation
-
-Add `grove-tend` to your Go project:
-
+Grove-tend is a Go library. Add it to your project:
 ```bash
 go get github.com/mattsolo1/grove-tend
 ```
 
-### 2. Create Your Test Runner
-
-Create a new `main.go` file for your test runner (e.g., in `cmd/tester/main.go`):
-
-```go
-package main
-
-import (
-    "context"
-    "fmt"
-    "os"
-    "os/signal"
-    "syscall"
-    "time"
-
-    "github.com/mattsolo1/grove-tend/pkg/app"
-    "github.com/mattsolo1/grove-tend/pkg/command"
-    "github.com/mattsolo1/grove-tend/pkg/fs"
-    "github.com/mattsolo1/grove-tend/pkg/harness"
-)
-
-// Define a scenario specific to your project
-var MyWebAppScenario = &harness.Scenario{
-    Name:        "webapp-smoke-test",
-    Description: "Performs a basic smoke test on the web application.",
-    Tags:        []string{"smoke", "webapp"},
-    Steps: []harness.Step{
-        // Use a step builder to create a step
-        harness.NewStep("Setup test directory", func(ctx *harness.Context) error {
-            // The context manages a temporary directory for the scenario
-            testDir := ctx.NewDir("webapp-test")
-            ctx.Set("test_dir", testDir) // Store values for later steps
-            return fs.WriteBasicGroveConfig(testDir)
-        }),
-        {
-            Name: "Run a command",
-            Func: func(ctx *harness.Context) error {
-                cmd := command.New("echo", "Hello, Tend!").Dir(ctx.Dir("webapp-test"))
-                result := cmd.Run()
-                if result.Error != nil {
-                    return result.Error
-                }
-                // Display formatted command output in verbose mode
-                ctx.ShowCommandOutput(cmd.String(), result.Stdout, result.Stderr)
-                return nil
-            },
-        },
-        // Use a built-in delay step
-        harness.DelayStep("Wait for filesystem", 100*time.Millisecond),
-    },
-}
-
-func main() {
-    // Collect all scenarios for your test runner
-    scenarios := []*harness.Scenario{
-        MyWebAppScenario,
-        // Add more scenarios here...
-    }
-
-    // Setup signal handling for graceful shutdown
-    ctx, cancel := context.WithCancel(context.Background())
-    defer cancel()
-    sigChan := make(chan os.Signal, 1)
-    signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-    go func() {
-        <-sigChan
-        fmt.Println("\nReceived interrupt, shutting down...")
-        cancel()
-    }()
-
-    // Execute the tend application with your scenarios
-    if err := app.Execute(ctx, scenarios); err != nil {
-        fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-        os.Exit(1)
-    }
-}
-```
-
-### 3. Build and Run Your Tests
-
-Build your custom binary:
-
+For CLI usage, install via Grove meta-CLI:
 ```bash
-go build -o my-tests ./cmd/tester
+grove install tend
 ```
 
-Now you can use the CLI to run your scenarios:
-
+Verify CLI installation:
 ```bash
-# List all available scenarios
-./my-tests list
-
-# Run a specific scenario
-./my-tests run webapp-smoke-test
-
-# Run all scenarios tagged with 'smoke'
-./my-tests run --tags=smoke
-
-# Run interactively, stepping through each action
-./my-tests run -i webapp-smoke-test
-
-# Run in debug mode (implies interactive, no-cleanup, verbose, and tmux integration)
-./my-tests run -d webapp-smoke-test
+tend version
 ```
 
-## The `tend` CLI
+See the [Grove Installation Guide](https://github.com/mattsolo1/grove-meta/blob/main/docs/02-installation.md) for setup.
 
-Your custom test binary is a full-featured CLI application with the following commands:
+<!-- DOCGEN:OVERVIEW:END -->
 
--   `run [scenario...]`: Executes test scenarios. Can be filtered by name (with glob patterns) or tags.
--   `list`: Lists all available scenarios in a table format, showing their names, descriptions, tags, and step counts.
--   `validate`: Parses and validates all scenario definitions to catch errors early.
--   `version`: Prints the version information of the test binary.
 
-## Core Concepts
+<!-- DOCGEN:TOC:START -->
 
--   **`harness.Scenario`**: A collection of steps that defines a complete end-to-end test. It includes a name, description, and tags for organization and filtering.
--   **`harness.Step`**: A single action within a scenario. It consists of a name and a function that receives a `Context`.
--   **`harness.Context`**: A state container passed between steps in a scenario. It manages the temporary test directory and provides a key-value store for sharing data (e.g., file paths, command output) between steps.
+See the [documentation](docs/) for detailed usage instructions:
+- [Overview](docs/01-overview.md) - <img src="./images/grove-tend-readme.svg" width="60%" />
+- [Examples](docs/02-examples.md) - This example demonstrates how to test a standard command-line tool that inter...
+- [Conventions](docs/03-conventions.md) - This document outlines the standard conventions for setting up, running, and ...
 
-## Mocking External Dependencies
-
-`tend` provides a first-class solution for mocking external dependencies like `git`, `docker`, or other CLIs, moving beyond brittle shell scripts.
-
-### Concept
-
-Instead of writing mock logic in shell scripts inside your tests, you can write them in Go, compile them into mock binaries, and have `tend` manage them during test execution. This makes your mocks more robust, maintainable, and easier to debug.
-
-### 1. Defining Mocks in Go
-
-Create a directory for your mocks, for example, `tests/mocks/`. For each command you want to mock, create a subdirectory with a `main.go` file.
-
-**Example: `tests/mocks/llm/main.go`**
-```go
-package main
-
-import (
-	"fmt"
-	"os"
-)
-
-// A simple mock for an 'llm' command.
-func main() {
-	// Mocks can be stateful by reading/writing to files.
-	// For this example, we just print a static response.
-	fmt.Println("This is a mocked LLM response.")
-	os.Exit(0)
-}
-```
-
-### 2. Building Mocks
-
-Add a target to your `Makefile` to automatically build your mock binaries and place them in your project's `./bin` directory, following the `mock-<name>` convention.
-
-**Example `Makefile` target:**
-```makefile
-MOCK_SRC_DIR=tests/mocks
-MOCK_BIN_DIR=bin
-MOCKS=$(shell find $(MOCK_SRC_DIR) -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
-
-build-mocks:
-    @echo "Building mocks: $(MOCKS)"
-    @mkdir -p $(MOCK_BIN_DIR)
-    @for mock in $(MOCKS); do \
-        echo "  -> Building mock $$mock"; \
-        go build -o $(MOCK_BIN_DIR)/mock-$$mock $(MOCK_SRC_DIR)/$$mock; \
-    done
-
-# Add it to your main build target
-build: build-mocks
-    # ... your main binary build ...
-```
-
-### 3. Using Mocks in Scenarios
-
-Use the `harness.SetupMocks` step builder to activate your mocks for a scenario. `tend` will create a temporary `bin` directory for the test run, symlink your mocks into it, and add it to the `PATH`.
-
-```go
-var MyScenario = &harness.Scenario{
-    Name: "my-feature-test",
-    Steps: []harness.Step{
-        // Setup mocks for 'git' and 'llm'.
-        // By convention, tend looks for ./bin/mock-git and ./bin/mock-llm.
-        harness.SetupMocks(
-            harness.Mock{CommandName: "git"},
-            harness.Mock{CommandName: "llm"},
-        ),
-        // You can also create simple mocks with inline scripts.
-        harness.SetupMocks(
-            harness.Mock{
-                CommandName: "kubectl",
-                Script:      "#!/bin/bash\necho '{\"status\":\"mocked\"}'",
-            },
-        ),
-        harness.NewStep("Run feature command", func(ctx *harness.Context) error {
-            // Use ctx.Command() to create commands that respect the mock PATH.
-            cmd := ctx.Command("./my-app-binary", "feature", "apply")
-            result := cmd.Run()
-            // ... assert on mock output ...
-            return result.Error
-        }),
-    },
-}
-```
-
-### 4. Swapping Mocks for Real Binaries (Integration Testing)
-
-For integration tests, you can swap mocks with their real counterparts from your Grove ecosystem using the `--use-real-deps` flag. `tend` uses `grove dev current <tool>` to find the correct path to the active binary.
-
-```bash
-# Run with all mocks enabled (default)
-./my-tests run my-feature-test
-
-# Swap the 'git' mock for the real binary
-./my-tests run my-feature-test --use-real-deps=git
-
-# Swap 'git' and 'llm'
-./my-tests run my-feature-test --use-real-deps=git,llm
-
-# Swap all available mocks for their real counterparts
-./my-tests run my-feature-test --use-real-deps=all
-```
-
-## Development
-
-To work on `grove-tend` itself:
-
-```bash
-# Build the main binary
-make build
-
-# Run all linters and tests
-make check
-
-# Clean build artifacts
-make clean
-```
-
-Tests for the framework can be found in the `tests/` directory.
-
----
-
-Inspired by modern testing frameworks and built for the Grove ecosystem.
+<!-- DOCGEN:TOC:END -->
