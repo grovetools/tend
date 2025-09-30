@@ -3,8 +3,6 @@ title: "Grove Tend"
 description: "A Go library for creating powerful, scenario-based end-to-end testing frameworks."
 category: "Core Libraries"
 settings:
-  model: "gemini-2.5-pro"
-  regeneration_mode: "scratch"
   rules_file: "docs.rules"
   system_prompt: "default"
 sections:
