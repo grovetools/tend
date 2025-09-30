@@ -2,11 +2,10 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/lipgloss/table"
+	"github.com/mattsolo1/grove-core/tui/components/table"
 	"github.com/spf13/cobra"
 
 	"github.com/mattsolo1/grove-tend/pkg/harness"
@@ -101,36 +100,28 @@ func listScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sc
 	}
 	
 	// Create table renderer
-	re := lipgloss.NewRenderer(os.Stdout)
-	
-	// Define styles
-	baseStyle := re.NewStyle().Padding(0, 1)
-	headerStyle := baseStyle.Copy().Bold(true).Foreground(lipgloss.Color("#5FAFFF"))
-	
-	// Create the table
-	t := table.New().
-		Border(lipgloss.NormalBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("#6C7086"))).
+	t := table.NewStyledTable().
 		Headers(headers...).
 		Rows(rows...)
-	
-	// Apply styling
+
+	// Apply column-specific styling
 	t.StyleFunc(func(row, col int) lipgloss.Style {
 		if row == 0 {
-			return headerStyle
+			// Header style is already applied by NewStyledTable
+			return lipgloss.NewStyle()
 		}
 		// Style based on column
 		switch col {
 		case 0: // Name column
-			return baseStyle.Copy().Foreground(lipgloss.Color("#00D4AA")).Bold(true)
+			return ui.TitleStyle.Copy().Bold(true)
 		case 2, 3: // Local and Explicit columns (centered)
-			return baseStyle.Copy().Align(lipgloss.Center)
+			return lipgloss.NewStyle().Padding(0, 1).Align(lipgloss.Center)
 		case 4: // Tags column
-			return baseStyle.Copy().Foreground(lipgloss.Color("#5FAFFF"))
+			return ui.InfoStyle.Copy().Padding(0, 1)
 		case 5: // Steps column
-			return baseStyle.Copy().Foreground(lipgloss.Color("#00D787"))
+			return ui.SuccessStyle.Copy().Padding(0, 1)
 		default:
-			return baseStyle
+			return lipgloss.NewStyle().Padding(0, 1)
 		}
 	})
 	
