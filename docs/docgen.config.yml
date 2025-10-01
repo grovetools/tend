@@ -1,10 +1,14 @@
-enabled: true
 title: "Grove Tend"
 description: "A Go library for creating powerful, scenario-based end-to-end testing frameworks."
 category: "Core Libraries"
+enabled: true
 settings:
-  rules_file: "docs.rules"
-  system_prompt: "default"
+  output_dir: docs
+  rules_file: docs.rules
+  structured_output_file: pkg/docs/docs.json
+  system_prompt: default
+  model: gemini-2.5-pro
+  regeneration_mode: reference
 readme:
   generate_toc: true
   template: docs/README.md.tpl
