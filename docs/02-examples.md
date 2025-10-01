@@ -1,12 +1,12 @@
-# Grove Tend Examples
+# Examples
 
 ## Example 1: Basic CLI Testing
 
-This example demonstrates how to test a standard command-line tool that interacts with the filesystem. We will use a simplified scenario from the `grove-claude-logs` project, which tests the `clogs list` command.
+This example demonstrates how to test a command-line tool that interacts with the filesystem. The scenario tests a `clogs list` command that reads files from a directory and outputs JSON.
 
 ### Overview
 
-The goal of this test is to verify that the `clogs list` command correctly reads session files from a mock `~/.claude` directory, parses them, and displays the output in both table and JSON formats. The test creates a temporary, isolated filesystem structure, runs the command against it, and asserts that the output is correct.
+The test verifies that `clogs list --json` correctly reads files from a mock `~/.claude` directory, parses their content, and displays the output in JSON format. The test creates a temporary, isolated filesystem, runs the command against it, and asserts that the command's output is correct.
 
 ### Code Example
 
@@ -98,11 +98,11 @@ func ClogsListScenario() *harness.Scenario {
 
 ## Example 2: Integration Testing with Mocks
 
-This example shows how to test a tool that depends on other command-line programs, such as `git` or `docker`. The `tend` framework provides a first-class mocking system that uses compiled Go binaries.
+This example shows how to test a tool that depends on other command-line programs, such as `git` or `docker`. The `tend` framework provides a mocking system that uses compiled Go binaries.
 
 ### Overview
 
-The test simulates a common Git workflow (`init`, `status`, `add`, `commit`) to verify that a tool interacts with `git` correctly. Instead of using the actual `git` binary, the test uses a mock implementation written in Go. This allows for fast, predictable, and isolated testing without requiring `git` to be installed or interacting with a real repository.
+The test simulates a Git workflow (`init`, `status`, `add`, `commit`) to verify that a tool interacts with `git` correctly. Instead of using the actual `git` binary, the test uses a mock implementation written in Go. This allows for fast, predictable, and isolated testing without requiring `git` to be installed or interacting with a real repository.
 
 ### Code Example
 
@@ -121,6 +121,7 @@ var GitWorkflowScenario = &harness.Scenario{
 
         harness.NewStep("Initialize git repository", func(ctx *harness.Context) error {
             repoDir := ctx.NewDir("repo")
+            ctx.Set("repo_dir", repoDir)
             
             // ctx.Command ensures the command runs with the mock-aware PATH.
             cmd := ctx.Command("git", "init").Dir(repoDir)
@@ -154,16 +155,16 @@ var GitWorkflowScenario = &harness.Scenario{
 
 ### Key Concepts
 
-*   **`harness.SetupMocks`**: This is a special step builder that prepares the test environment for mocking. For each `harness.Mock{CommandName: "git"}`, it finds a pre-compiled mock binary (e.g., `bin/mock-git`) and creates a symlink named `git` inside a temporary `bin` directory. This directory is then prepended to the `PATH` for the duration of the scenario.
-*   **Go-based Mocks**: The mock for `git` is not a shell script but a complete Go program (e.g., `tests/mocks/git/main.go`). This allows for more complex and stateful mock behavior, making tests more realistic and maintainable.
-*   **`ctx.Command(...)`**: This is the mock-aware factory for creating commands. When you use `ctx.Command("git", "init")`, `tend` ensures that the `git` executable resolves to the mock binary symlinked in the temporary `bin` directory, rather than the real `git` on the system `PATH`.
-*   **`--use-real-deps` Flag**: `tend` allows for swapping mocks with real binaries for integration testing. Running the test with `./my-tests run git-workflow --use-real-deps=git` would instruct the `SetupMocks` step to symlink the actual `git` binary (found via `grove dev current git`) instead of the mock. This provides a seamless way to escalate from unit-like component tests to full integration tests.
+*   **`harness.SetupMocks`**: This is a step builder that prepares the test environment for mocking. For each `harness.Mock{CommandName: "git"}`, it finds a pre-compiled mock binary (e.g., `bin/mock-git`) and creates a symlink named `git` inside a temporary `bin` directory. This directory is then prepended to the `PATH` for the duration of the scenario.
+*   **Go-based Mocks**: The mock for `git` is a Go program (e.g., `tests/mocks/git/main.go`). This allows for more complex and stateful mock behavior than shell scripts.
+*   **`ctx.Command(...)`**: This is a mock-aware factory for creating commands. When `ctx.Command("git", "init")` is used, `tend` ensures that the `git` executable resolves to the mock binary symlinked in the temporary `bin` directory, rather than the real `git` on the system `PATH`.
+*   **`--use-real-deps` Flag**: `tend` allows for swapping mocks with real binaries for integration testing. Running the test with `./my-tests run git-workflow --use-real-deps=git` instructs the `SetupMocks` step to symlink the actual `git` binary (found via `grove dev current git`) instead of the mock. This provides a way to switch from component tests to full integration tests.
 
 ## Example 3: TUI Testing (Experimental)
 
 > **Warning:** TUI testing is an experimental feature. Its API and behavior may change.
 
-The `tend` framework includes capabilities for testing interactive Terminal User Interfaces (TUIs), providing a "Playwright for the Terminal" experience. It automates `tmux` sessions to run a TUI in an isolated environment, allowing the test to send keystrokes and assert on the screen content.
+The `tend` framework includes capabilities for testing interactive Terminal User Interfaces (TUIs). It automates `tmux` sessions to run a TUI in an isolated environment, allowing the test to send keystrokes and assert on the screen content.
 
 ### Overview
 
@@ -202,7 +203,7 @@ func TUIViewScenario() *harness.Scenario {
                 session := ctx.Get("view_session").(*tui.Session)
                 
                 // Wait for the UI to stop changing, which is more reliable than a fixed sleep.
-                if err := session.WaitForUIStable(5*time.Second, 100*ms, 300*ms); err != nil {
+                if err := session.WaitForUIStable(5*time.Second, 100*time.Millisecond, 300*time.Millisecond); err != nil {
                     return fmt.Errorf("TUI did not stabilize: %w", err)
                 }
 
@@ -240,12 +241,12 @@ func TUIViewScenario() *harness.Scenario {
 ### Key Concepts
 
 *   **`ctx.StartTUI`**: This function launches the specified command in a new, isolated `tmux` session. It returns a `*tui.Session` object, which is the primary handle for interacting with the TUI. The harness automatically manages the lifecycle of this `tmux` session.
-*   **`tui.Session`**: This object provides a high-level API for TUI interaction.
+*   **`tui.Session`**: This object provides an API for TUI interaction.
     *   `SendKeys(...)`: Sends keystrokes to the TUI (e.g., `"h"`, `"q"`, `"Enter"`, `"Down"`).
     *   `WaitForText(...)`: Polls the screen content until a specific string appears.
-    *   `WaitForUIStable(...)`: A smart wait that polls the screen until the content stops changing for a specified duration, useful for waiting out animations or asynchronous loading.
-    *   `WaitForAnyText(...)`: Waits for one of several possible text strings to appear, useful for handling conditional UI outcomes.
+    *   `WaitForUIStable(...)`: Waits until the screen content stops changing for a specified duration, useful for animations or asynchronous loading.
+    *   `WaitForAnyText(...)`: Waits for one of several possible text strings to appear, useful for conditional UI outcomes.
     *   `AssertContains(...)`: Immediately checks if the screen content includes a specific string.
-    *   `SelectItem(...)`: A high-level navigation helper that finds a line matching a predicate, moves the cursor to it, and presses `Enter`.
-    *   `NavigateToText(...)`: Moves the cursor from its current position to a target string on the screen by calculating and sending the necessary arrow key presses.
-*   **Interactive Debugging (`-d` flag)**: When a TUI test is run with the `-d` flag, the test runner pauses before each step and offers an `(a)ttach` option. This allows the developer to attach directly to the `tmux` session, manually interact with the TUI to inspect its state, and then detach (`Ctrl-b d`) to resume the automated test. This provides an invaluable workflow for debugging complex TUI interactions.
+    *   `SelectItem(...)`: Finds a line matching a predicate, moves the cursor to it, and presses `Enter`.
+    *   `NavigateToText(...)`: Moves the cursor from its current position to a target string on the screen by sending the necessary arrow key presses.
+*   **Interactive Debugging (`-d` flag)**: When a TUI test is run with the `-d` flag, the test runner pauses before each step and offers an `(a)ttach` option. This allows the developer to attach directly to the `tmux` session, manually interact with the TUI to inspect its state, and then detach (`Ctrl-b d`) to resume the automated test. This provides a workflow for debugging TUI interactions.

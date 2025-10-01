@@ -21,6 +21,7 @@ sections:
     order: 1
     prompt: "prompts/01-overview.md"
     output: "01-overview.md"
+    agg_strip_lines: 2
   - name: "examples"
     title: "Examples"
     order: 2

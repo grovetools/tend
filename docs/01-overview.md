@@ -1,52 +1,52 @@
-# Grove Tend Overview
+# Grove Tend 
 
 <img src="./images/grove-tend-readme.svg" width="60%" />
 
-Grove Tend is a Go library for creating scenario-based end-to-end testing frameworks. It is designed with a library-first philosophy, allowing developers to build a custom test runner binary tailored to their project's needs. This approach replaces ad-hoc shell scripts with structured, maintainable, and debuggable Go code, keeping test definitions and logic directly within the project's codebase.
+Grove Tend is a Go library for creating scenario-based end-to-end testing frameworks. It is designed with a library-first philosophy, allowing developers to build a custom test runner binary tailored to their project's needs. This approach uses Go code for test definitions and logic, keeping them within the project's codebase.
 
 <!-- placeholder for animated gif -->
 
 ## Key Features
 
--   **Scenario-Based Testing**: Organizes tests into logical `Scenario`s composed of sequential `Step`s that share a common `Context`, making complex test flows easy to read and manage.
--   **Helper Packages**: Provides a set of built-in helpers for common testing operations, including filesystem interactions (`fs`), Git repository management (`git`), command execution (`command`), and assertions (`assert`).
--   **First-Class Mocking**: Supports defining mocks as Go binaries, which can be compiled and managed by the test harness. This allows for seamless swapping between mocked and real dependencies for different stages of testing.
--   **Advanced TUI Testing**: Offers a "Playwright for the Terminal" experience by enabling the testing of interactive Terminal User Interfaces (TUIs). It automates `tmux` sessions to launch, interact with, and assert on the state of TUI applications.
--   **Interactive Debugging**: Includes interactive (`-i`) and debug (`-d`) modes to facilitate troubleshooting. These modes allow developers to step through test execution, inspect state, and manually interact with TUI sessions.
+-   **Scenario-Based Testing**: Organizes tests into `Scenario` structs composed of sequential `Step`s that share a `Context` object.
+-   **Helper Packages**: Provides packages for filesystem interactions (`fs`), Git repository management (`git`), command execution (`command`), and assertions (`assert`).
+-   **Mocking**: Supports defining mocks as Go binaries. The test harness can be configured to substitute these binaries for real dependencies during test execution.
+-   **TUI Testing**: Automates `tmux` sessions to launch, send keystrokes to, and assert on the state of Terminal User Interface (TUI) applications.
+-   **Interactive Debugging**: Includes interactive (`-i`) and debug (`-d`) modes. These modes pause execution before each step and allow developers to inspect state or manually interact with TUI sessions.
 
-## Ideal For
+## Use Cases
 
 -   **CLI Tool Testing**: Validating commands with file I/O, environment variables, and exit codes.
 -   **Integration Testing**: Orchestrating and testing tools that depend on other CLI programs like `git`, `docker`, or `kubectl`.
--   **TUI Applications**: Automating tests for interactive terminal UIs with complex navigation.
+-   **TUI Applications**: Automating tests for terminal UIs.
 -   **Workflow Validation**: Verifying multi-step processes that require state to be maintained across actions.
--   **LLM-Generated Test Suites**: The framework's structure is optimized for AI generation and maintenance, enabling the creation of comprehensive test suites.
+-   **LLM-Generated Test Suites**: The framework's structure is intended for generation and maintenance by language models.
 
 ## How It Works
 
-The core of Grove Tend is a test `Harness` that executes scenarios. The typical workflow is as follows:
+The core of Grove Tend is a test `Harness` that executes scenarios. The workflow is as follows:
 
-1.  **Test Runner Creation**: A developer creates a main entry point for their tests (e.g., `tests/e2e/main.go`). This program imports the `grove-tend` library.
-2.  **Scenario Definition**: Test cases are defined as `harness.Scenario` structs. Each scenario consists of one or more `harness.Step`s.
-3.  **Step Execution**: The harness runs each step sequentially. Each step function receives a `harness.Context` object, which manages a temporary directory for the test run and provides a key-value store for passing state between steps.
-4.  **Command Execution**: The `Context` provides a mock-aware `Command()` factory. When mocks are enabled, this factory ensures that calls to external tools (like `git` or `docker`) are routed to the mock binaries.
-5.  **Cleanup**: After a scenario completes, the harness automatically cleans up all temporary resources, such as directories and `tmux` sessions, unless explicitly disabled for debugging.
-6.  **CLI Interface**: The test runner, when compiled, becomes a command-line application that can list, run, and validate scenarios, offering filtering by name or tags.
+1.  **Test Runner Creation**: A developer creates a main entry point for tests (e.g., `tests/e2e/main.go`) that imports the `grove-tend` library.
+2.  **Scenario Definition**: Test cases are defined as `harness.Scenario` structs, each containing one or more `harness.Step`s.
+3.  **Step Execution**: The harness runs each step sequentially. Each step function receives a `harness.Context` object, which manages a temporary directory for the test and provides a key-value store for passing state between steps.
+4.  **Command Execution**: The `Context` provides a `Command()` factory. When mocks are enabled, this factory ensures that calls to external tools are routed to the specified mock binaries.
+5.  **Cleanup**: After a scenario completes, the harness cleans up temporary resources, such as directories and `tmux` sessions, unless disabled for debugging.
+6.  **CLI Interface**: The compiled test runner is a command-line application that can list and run scenarios, with filtering by name or tags.
 
 ## Role in the Grove Ecosystem
 
-Grove Tend serves as the standard for end-to-end testing across all command-line tools within the Grove ecosystem. By providing a consistent framework, it ensures that all projects adhere to the same testing patterns, making it easier to write, understand, and maintain tests for any tool in the ecosystem. This standardization is critical for validating complex cross-tool interactions and maintaining a high level of quality and reliability. It helps agents build their own tools with reduced input from the developer, and serves as reference implementations.
+Grove Tend is used for end-to-end testing across command-line tools within the Grove ecosystem. This provides a consistent framework for writing and maintaining tests for any tool in the ecosystem, which is used for validating cross-tool interactions.
 
-## LLM-First Design Philosophy
+## LLM-Oriented Design
 
-While Grove Tend tests can be written by hand, their structure is intentionally designed to be generated and maintained by Large Language Models (LLMs). The tests may appear verbose compared to traditional unit tests, but this explicitness makes them easy for an LLM to comprehend, modify, and extend. This design choice enables the creation of comprehensive E2E test suites that cover complex user workflows, which would often be impractical to write and maintain manually. The tests serve as living, machine-readable documentation of the system's expected behavior.
+The structure of Grove Tend tests is intentionally verbose to be generated and maintained by Large Language Models (LLMs). This explicitness is designed to make the tests machine-readable for an LLM to comprehend, modify, and extend. This design choice facilitates the creation of E2E test suites that cover user workflows that may be impractical to write and maintain manually. The tests serve as machine-readable documentation of the system's behavior.
 
 ## Interactive Debugging
 
-The framework includes features designed to simplify the debugging of complex E2E test failures.
+The framework includes features to assist in debugging E2E test failures.
 
 -   The interactive (`-i`) flag pauses execution before each step, prompting the user to continue, skip, or quit. For TUI tests, it adds an option to attach to the live `tmux` session for manual interaction.
--   The debug (`-d`) flag is a shorthand for a complete debugging environment. It enables interactive mode, disables cleanup of temporary files, and automatically splits the current `tmux` window, opening a new pane in the test's temporary directory. This allows developers to watch the test run on one side while inspecting files and logs on the other.
+-   The debug (`-d`) flag is a shorthand that enables interactive mode, disables cleanup of temporary files, and splits the current `tmux` window, opening a new pane in the test's temporary directory. This allows developers to watch the test run on one side while inspecting files on the other.
 
 ---
 
