@@ -1,3 +1,66 @@
+## v0.4.0 (2025-10-01)
+
+The test harness UI has been unified with the Grove ecosystem's core theme system (9202aca). This change replaces custom color palettes and table components with centralized, theme-aware elements, ensuring that the output of `tend` commands has a consistent look and feel with other tools in the ecosystem.
+
+The documentation system has undergone a major overhaul to improve clarity and maintainability. The structure has been refactored into three distinct sections: Overview, Examples, and Conventions, with content updated to be more direct and align with an LLM-first design philosophy (4e2fcc3, fa57331). The documentation generator now supports automatic Table of Contents generation for the README (ae63f47, 59fc924) and a `strip_lines` setting for more concise generated content (a784516). Configuration and file naming conventions have also been standardized (3352846, 491e74b).
+
+The CI workflow configuration has been updated to use `branches: [ none ]` to correctly disable automatic execution while maintaining valid syntax (fde50eb).
+
+### Features
+
+- Unify test harness UI with core theme system (9202aca)
+- Add automated Table of Contents generation for documentation (ae63f47)
+- Add `strip_lines` configuration to docgen for more succinct output (a784516)
+
+### Bug Fixes
+
+- Update CI workflow to use 'none' branches to correctly disable execution (fde50eb)
+
+### Code Refactoring
+
+- Standardize docgen.config.yml key order and settings (3352846)
+
+### Documentation
+
+- Refactor documentation structure into Overview, Examples, and Conventions (4e2fcc3)
+- Update docgen configuration and README templates for TOC generation (59fc924)
+- Rename Introduction sections to Overview for clarity (fa57331)
+- Remove unused exclude_patterns from docgen config (df3a301)
+
+### Chores
+
+- Standardize documentation filenames to DD-name.md convention (491e74b)
+- Temporarily disable CI workflow (63184b5)
+
+### File Changes
+
+```
+ .github/workflows/ci.yml              |    4 +-
+ README.md                             |  295 ++------
+ docs/01-overview.md                   |   70 ++
+ docs/02-examples.md                   |  252 +++++++
+ docs/03-conventions.md                |  114 ++++
+ docs/README.md.tpl                    |    5 +
+ docs/best-practices.md                |   58 --
+ docs/core-concepts.md                 |  108 ---
+ docs/docgen.config.yml                |   51 +-
+ docs/docs.rules                       |   27 +-
+ docs/images/grove-tend-readme.svg     | 1192 +++++++++++++++++++++++++++++++++
+ docs/introduction.md                  |   15 -
+ docs/prompts/01-overview.md           |   58 ++
+ docs/prompts/02-examples.md           |   39 ++
+ docs/prompts/03-conventions.md        |   48 ++
+ docs/prompts/best-practices.prompt.md |   27 -
+ docs/prompts/core-concepts.prompt.md  |   29 -
+ docs/prompts/introduction.prompt.md   |   12 -
+ docs/prompts/usage-patterns.prompt.md |   29 -
+ docs/usage-patterns.md                |  211 ------
+ internal/cmd/list.go                  |   31 +-
+ pkg/docs/docs.json                    |  106 ++-
+ pkg/ui/styles.go                      |  111 ++-
+ 23 files changed, 1980 insertions(+), 912 deletions(-)
+```
+
 ## v0.3.1 (2025-09-26)
 
 ### Bug Fixes
