@@ -160,6 +160,31 @@ var GitWorkflowScenario = &harness.Scenario{
 *   **`ctx.Command(...)`**: This is a mock-aware factory for creating commands. When `ctx.Command("git", "init")` is used, `tend` ensures that the `git` executable resolves to the mock binary symlinked in the temporary `bin` directory, rather than the real `git` on the system `PATH`.
 *   **`--use-real-deps` Flag**: `tend` allows for swapping mocks with real binaries for integration testing. Running the test with `./my-tests run git-workflow --use-real-deps=git` instructs the `SetupMocks` step to symlink the actual `git` binary (found via `grove dev current git`) instead of the mock. This provides a way to switch from component tests to full integration tests.
 
+### Automatic PATH Handling for TUI Sessions
+
+When testing TUI applications that call external commands, the framework automatically handles PATH manipulation for mock binaries. Simply set the `test_bin_dir` context key with your mock directory:
+
+```go
+// Create mocks
+mockDir := ctx.NewDir("mocks")
+mockGitPath := filepath.Join(mockDir, "git")
+fs.WriteString(mockGitPath, mockGitScript)
+os.Chmod(mockGitPath, 0755)
+
+// Set the convention key - StartTUI will automatically prepend this to PATH
+ctx.Set("test_bin_dir", mockDir)
+
+// Launch TUI - PATH is automatically configured!
+session, err := ctx.StartTUI(myBinary, []string{"arg1", "arg2"})
+```
+
+This eliminates the need for wrapper scripts or manual PATH manipulation. The framework automatically:
+- Detects the `test_bin_dir` context key
+- Prepends it to PATH when launching TUI sessions
+- Merges with any user-provided environment variables via `tui.WithEnv()`
+
+See `examples/auto-path-mocks` for a complete demonstration.
+
 ## Example 3: TUI Testing (Experimental)
 
 > **Warning:** TUI testing is an experimental feature. Its API and behavior may change.

@@ -183,6 +183,32 @@ func (c *Context) StartTUI(binaryPath string, args []string, opts ...tui.StartOp
 		opt(config)
 	}
 
+	// Convert relative paths to absolute paths
+	if !filepath.IsAbs(binaryPath) {
+		if absPath, err := filepath.Abs(binaryPath); err == nil {
+			binaryPath = absPath
+		}
+	}
+
+	// Automatically prepend mock binary directory to PATH if it exists.
+	if binDir := c.GetString("test_bin_dir"); binDir != "" {
+		pathVarFound := false
+		// Search for and modify an existing PATH variable from user options.
+		for i, envVar := range config.Env {
+			if strings.HasPrefix(envVar, "PATH=") {
+				// Prepend our mock dir to the user's custom PATH.
+				config.Env[i] = "PATH=" + binDir + ":" + strings.TrimPrefix(envVar, "PATH=")
+				pathVarFound = true
+				break
+			}
+		}
+		// If no PATH was provided by the user, create one based on the current process's PATH.
+		if !pathVarFound {
+			newPath := fmt.Sprintf("PATH=%s:%s", binDir, os.Getenv("PATH"))
+			config.Env = append(config.Env, newPath)
+		}
+	}
+
 	tmuxClient, err := tmux.NewClient()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tmux client for TUI session: %w", err)
