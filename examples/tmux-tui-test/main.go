@@ -95,7 +95,7 @@ done
 					}
 
 					// Launch the TUI in a tmux session
-					session, err := ctx.StartTUI("/bin/bash", scriptPath)
+					session, err := ctx.StartTUI("/bin/bash", []string{scriptPath})
 					if err != nil {
 						return fmt.Errorf("failed to start TUI: %w", err)
 					}
@@ -408,8 +408,8 @@ done
 				Description: "Starts the TUI in tmux (can be attached to manually)",
 				Func: func(ctx *harness.Context) error {
 					scriptPath := ctx.GetString("debug_script")
-					
-					session, err := ctx.StartTUI("/bin/bash", scriptPath)
+
+					session, err := ctx.StartTUI("/bin/bash", []string{scriptPath})
 					if err != nil {
 						return fmt.Errorf("failed to start debug TUI: %w", err)
 					}
@@ -515,7 +515,7 @@ printf "> "`
 				Name: "Launch TUI and wait for it to stabilize",
 				Func: func(ctx *harness.Context) error {
 					scriptPath := filepath.Join(ctx.Dir("advanced-tui"), "list-tui.sh")
-					session, err := ctx.StartTUI("/bin/bash", scriptPath)
+					session, err := ctx.StartTUI("/bin/bash", []string{scriptPath})
 					if err != nil {
 						return err
 					}
@@ -654,7 +654,7 @@ printf "> "`
 				Name: "Start recording and launch TUI",
 				Func: func(ctx *harness.Context) error {
 					scriptPath := filepath.Join(ctx.Dir("conditional-tui"), "conditional-tui.sh")
-					session, err := ctx.StartTUI("/bin/bash", scriptPath)
+					session, err := ctx.StartTUI("/bin/bash", []string{scriptPath})
 					if err != nil {
 						return err
 					}
@@ -823,7 +823,7 @@ done`
 				Name: "Launch TUI and wait for it to be ready",
 				Func: func(ctx *harness.Context) error {
 					scriptPath := filepath.Join(ctx.RootDir, "save-script.sh")
-					session, err := ctx.StartTUI("/bin/bash", scriptPath)
+					session, err := ctx.StartTUI("/bin/bash", []string{scriptPath})
 					if err != nil {
 						return err
 					}

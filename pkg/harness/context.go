@@ -176,7 +176,13 @@ func getOverrideEnvVarName(commandName string) string {
 // StartTUI launches a TUI application in a new, isolated tmux session.
 // It returns a Session handle for interaction and ensures the session is
 // cleaned up automatically at the end of the scenario.
-func (c *Context) StartTUI(binaryPath string, args ...string) (*tui.Session, error) {
+func (c *Context) StartTUI(binaryPath string, args []string, opts ...tui.StartOption) (*tui.Session, error) {
+	// Process start options
+	config := &tui.StartConfig{}
+	for _, opt := range opts {
+		opt(config)
+	}
+
 	tmuxClient, err := tmux.NewClient()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tmux client for TUI session: %w", err)
@@ -185,20 +191,33 @@ func (c *Context) StartTUI(binaryPath string, args ...string) (*tui.Session, err
 	// Generate a unique session name for test isolation
 	sessionName := fmt.Sprintf("tend-tui-%s-%d", filepath.Base(binaryPath), time.Now().UnixNano())
 
-	// Prepare the command to run within the tmux session
-	fullCommand := append([]string{binaryPath}, args...)
-	opts := tmux.LaunchOptions{
+	// Build the command string with environment variables
+	// Environment variables are prepended directly (not wrapped in sh -c)
+	// because tmux send-keys will execute them in the pane's shell
+	var cmdBuilder strings.Builder
+	if len(config.Env) > 0 {
+		// Prepend environment variables to the command
+		cmdBuilder.WriteString(strings.Join(config.Env, " "))
+		cmdBuilder.WriteString(" ")
+	}
+	cmdBuilder.WriteString(binaryPath)
+	if len(args) > 0 {
+		cmdBuilder.WriteString(" ")
+		cmdBuilder.WriteString(strings.Join(args, " "))
+	}
+
+	launchOpts := tmux.LaunchOptions{
 		SessionName:      sessionName,
 		WorkingDirectory: c.RootDir, // TUI runs in the test's temp directory
 		Panes: []tmux.PaneOptions{
 			{
-				Command: strings.Join(fullCommand, " "),
+				Command: cmdBuilder.String(),
 			},
 		},
 	}
 
 	// Launch the session in the background
-	if err := tmuxClient.Launch(context.Background(), opts); err != nil {
+	if err := tmuxClient.Launch(context.Background(), launchOpts); err != nil {
 		return nil, fmt.Errorf("failed to launch TUI in tmux session '%s': %w", sessionName, err)
 	}
 
