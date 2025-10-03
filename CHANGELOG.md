@@ -1,3 +1,5 @@
+## v0.4.1-nightly.9652d8b (2025-10-03)
+
 ## v0.4.0 (2025-10-01)
 
 The test harness UI has been unified with the Grove ecosystem's core theme system (9202aca). This change replaces custom color palettes and table components with centralized, theme-aware elements, ensuring that the output of `tend` commands has a consistent look and feel with other tools in the ecosystem.
