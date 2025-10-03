@@ -5,7 +5,7 @@ go 1.24.4
 require (
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.0
-	github.com/mattsolo1/grove-core v0.4.0
+	github.com/mattsolo1/grove-core v0.4.1-nightly.8d7daf2
 	github.com/spf13/cobra v1.9.1
 	gopkg.in/yaml.v3 v3.0.1
 )
