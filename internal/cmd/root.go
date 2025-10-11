@@ -75,6 +75,7 @@ Features:
 	rootCmd.AddCommand(newValidateCmd(allScenarios))
 	rootCmd.AddCommand(newVersionCmd())
 	rootCmd.AddCommand(cli.NewDocsCommand(docs.DocsJSON))
-	
+	rootCmd.AddCommand(newEcosystemCmd())
+
 	return rootCmd
 }
