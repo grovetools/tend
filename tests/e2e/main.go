@@ -30,6 +30,7 @@ func main() {
 		LLMIntegrationScenario,
 		FlowMockScenario,
 		MixedDependenciesScenario,
+		EnvironmentSandboxingScenario(),
 	}
 
 	// Setup signal handling for graceful shutdown.

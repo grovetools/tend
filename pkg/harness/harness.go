@@ -23,6 +23,12 @@ type Context struct {
 	GroveBinary string // Path to the grove binary under test
 	TestID      string // Unique ID for this test run
 
+	// Sandboxed home environment
+	homeDir   string
+	configDir string
+	dataDir   string
+	cacheDir  string
+
 	// State management
 	dirs          map[string]string      // Named directories created during test
 	values        map[string]interface{} // Generic key-value store for step communication
@@ -140,6 +146,22 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 		return result, result.Error
 	}
 
+	// Setup sandboxed home directory structure
+	sandboxedHome := filepath.Join(tempMgr.BaseDir(), "home")
+	sandboxedConfig := filepath.Join(sandboxedHome, ".config")
+	sandboxedData := filepath.Join(sandboxedHome, ".local", "share")
+	sandboxedCache := filepath.Join(sandboxedHome, ".cache")
+
+	for _, dir := range []string{sandboxedHome, sandboxedConfig, sandboxedData, sandboxedCache} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			result.Success = false
+			result.Error = fmt.Errorf("creating sandboxed home directory structure: %w", err)
+			result.EndTime = time.Now()
+			result.Duration = result.EndTime.Sub(result.StartTime)
+			return result, result.Error
+		}
+	}
+
 	// Declare testCtx variable here so defer can reference it
 	var testCtx *Context
 	
@@ -190,6 +212,10 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 		ProjectRoot:   h.opts.RootDir, // Pass project root from harness options
 		GroveBinary:   groveBinary,
 		TestID:        testID,
+		homeDir:       sandboxedHome,
+		configDir:     sandboxedConfig,
+		dataDir:       sandboxedData,
+		cacheDir:      sandboxedCache,
 		dirs:          make(map[string]string),
 		values:        make(map[string]interface{}),
 		UseRealDeps:   realDepsMap,

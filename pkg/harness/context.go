@@ -124,6 +124,26 @@ func (c *Context) Keys() []string {
 	return keys
 }
 
+// HomeDir returns the path to the sandboxed home directory for the test.
+func (c *Context) HomeDir() string {
+	return c.homeDir
+}
+
+// ConfigDir returns the path to the sandboxed XDG_CONFIG_HOME directory.
+func (c *Context) ConfigDir() string {
+	return c.configDir
+}
+
+// DataDir returns the path to the sandboxed XDG_DATA_HOME directory.
+func (c *Context) DataDir() string {
+	return c.dataDir
+}
+
+// CacheDir returns the path to the sandboxed XDG_CACHE_HOME directory.
+func (c *Context) CacheDir() string {
+	return c.cacheDir
+}
+
 // Command creates a new command with the test's mock-aware PATH.
 func (c *Context) Command(program string, args ...string) *command.Command {
 	binDir := c.GetString("test_bin_dir")
@@ -159,7 +179,15 @@ func (c *Context) Command(program string, args ...string) *command.Command {
 		envVarName := getOverrideEnvVarName(commandName)
 		cmd.Env(fmt.Sprintf("%s=%s", envVarName, mockPath))
 	}
-	
+
+	// Inject sandboxed home environment
+	cmd.Env(
+		fmt.Sprintf("HOME=%s", c.homeDir),
+		fmt.Sprintf("XDG_CONFIG_HOME=%s", c.configDir),
+		fmt.Sprintf("XDG_DATA_HOME=%s", c.dataDir),
+		fmt.Sprintf("XDG_CACHE_HOME=%s", c.cacheDir),
+	)
+
 	return cmd
 }
 
