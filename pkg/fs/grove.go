@@ -2,36 +2,16 @@ package fs
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
+	"github.com/mattsolo1/grove-core/config"
 	"gopkg.in/yaml.v3"
 )
 
-// GroveConfig represents a simplified grove.yml structure for testing
-type GroveConfig struct {
-	WorkspaceRoot string                 `yaml:"workspace_root,omitempty"`
-	Services      map[string]ServiceSpec `yaml:"services,omitempty"`
-	Agent         *AgentConfig           `yaml:"agent,omitempty"`
-}
-
-// ServiceSpec represents a service definition
-type ServiceSpec struct {
-	Image   string            `yaml:"image,omitempty"`
-	Port    int               `yaml:"port,omitempty"`
-	Command []string          `yaml:"command,omitempty"`
-	Env     map[string]string `yaml:"env,omitempty"`
-}
-
-// AgentConfig represents agent configuration
-type AgentConfig struct {
-	Enabled bool   `yaml:"enabled,omitempty"`
-	Port    int    `yaml:"port,omitempty"`
-	Image   string `yaml:"image,omitempty"`
-}
-
 // WriteGroveConfig writes a grove.yml file to the specified directory
-func WriteGroveConfig(dir string, config *GroveConfig) error {
-	data, err := yaml.Marshal(config)
+func WriteGroveConfig(dir string, cfg *config.Config) error {
+	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		return fmt.Errorf("marshaling config: %w", err)
 	}
@@ -44,18 +24,34 @@ func WriteGroveConfig(dir string, config *GroveConfig) error {
 	return nil
 }
 
-// WriteBasicGroveConfig writes a minimal grove.yml for testing
+// WriteBasicGroveConfig writes a minimal, valid grove.yml for testing a project.
 func WriteBasicGroveConfig(dir string) error {
-	config := &GroveConfig{
-		WorkspaceRoot: ".",
-		Services: map[string]ServiceSpec{
-			"test-service": {
-				Image:   "alpine:latest",
-				Port:    8080,
-				Command: []string{"sleep", "infinity"},
+	projectName := filepath.Base(dir)
+	cfg := &config.Config{
+		Name:    projectName,
+		Version: "1.0",
+		Extensions: map[string]interface{}{
+			"description": "A test project for tend scenarios",
+			"settings": map[string]interface{}{
+				"project_name": projectName,
 			},
 		},
 	}
+	return WriteGroveConfig(dir, cfg)
+}
 
-	return WriteGroveConfig(dir, config)
+// WriteGlobalGroveConfig writes a global grove.yml with search paths into a sandboxed home directory.
+// This is useful for testing workspace discovery scenarios.
+func WriteGlobalGroveConfig(homeDir string, searchPaths map[string]config.SearchPathConfig) error {
+	configDir := filepath.Join(homeDir, ".config", "grove")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return fmt.Errorf("creating global config dir: %w", err)
+	}
+
+	cfg := &config.Config{
+		Version:     "1.0",
+		SearchPaths: searchPaths,
+	}
+
+	return WriteGroveConfig(configDir, cfg)
 }
