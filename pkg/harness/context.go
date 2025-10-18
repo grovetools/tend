@@ -188,6 +188,32 @@ func (c *Context) Command(program string, args ...string) *command.Command {
 		fmt.Sprintf("XDG_CACHE_HOME=%s", c.cacheDir),
 	)
 
+	// Preserve or detect DOCKER_HOST to ensure Docker client can connect
+	// even when HOME is sandboxed (which would make socket paths too long)
+	dockerHost := os.Getenv("DOCKER_HOST")
+	if dockerHost == "" {
+		// DOCKER_HOST not set, try to detect the real Docker socket
+		// Use the real (unsandboxed) home directory for detection
+		if realHome, err := os.UserHomeDir(); err == nil {
+			// Try common Docker socket locations (Colima first, as it's most common on macOS)
+			possibleSockets := []string{
+				filepath.Join(realHome, ".colima/default/docker.sock"),
+				filepath.Join(realHome, ".config/colima/default/docker.sock"),
+				filepath.Join(realHome, ".docker/run/docker.sock"),
+				"/var/run/docker.sock",
+			}
+			for _, socketPath := range possibleSockets {
+				if _, err := os.Stat(socketPath); err == nil {
+					dockerHost = fmt.Sprintf("unix://%s", socketPath)
+					break
+				}
+			}
+		}
+	}
+	if dockerHost != "" {
+		cmd.Env(fmt.Sprintf("DOCKER_HOST=%s", dockerHost))
+	}
+
 	return cmd
 }
 
