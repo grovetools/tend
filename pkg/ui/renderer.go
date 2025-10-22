@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/mattsolo1/grove-core/tui/theme"
 	"github.com/mattsolo1/grove-tend/pkg/harness"
 )
 
@@ -30,14 +31,14 @@ func NewRenderer(writer io.Writer, verbose bool, width int) *Renderer {
 // RenderScenarioStart renders the start of a scenario
 func (r *Renderer) RenderScenarioStart(scenario *harness.Scenario) {
 	output := Header(scenario.Name, scenario.Description)
-	
+
 	if len(scenario.Tags) > 0 {
 		tags := "Tags: " + strings.Join(scenario.Tags, ", ")
-		output += "\n" + MutedStyle.Render(tags)
+		output += "\n" + theme.DefaultTheme.Muted.Render(tags)
 	}
-	
+
 	output += "\n" + strings.Repeat("─", r.width) + "\n"
-	
+
 	r.write(output)
 }
 
@@ -90,16 +91,16 @@ func (r *Renderer) RenderProgress(current, total int) {
 // RenderInteractivePrompt renders a prompt for interactive mode
 func (r *Renderer) RenderInteractivePrompt(stepNumber int, step harness.Step) {
 	prompt := fmt.Sprintf("\n%s Ready to execute step %d: %s",
-		InfoStyle.Render(IconInfo),
+		theme.DefaultTheme.Info.Render(IconInfo),
 		stepNumber,
-		HeaderStyle.Render(step.Name))
-	
+		theme.DefaultTheme.Header.Render(step.Name))
+
 	if step.Description != "" {
-		prompt += "\n" + MutedStyle.Render(step.Description)
+		prompt += "\n" + theme.DefaultTheme.Muted.Render(step.Description)
 	}
-	
-	prompt += "\n" + MutedStyle.Render("Press Enter to continue, 's' to skip, 'q' to quit: ")
-	
+
+	prompt += "\n" + theme.DefaultTheme.Muted.Render("Press Enter to continue, 's' to skip, 'q' to quit: ")
+
 	r.write(prompt)
 }
 
@@ -110,9 +111,9 @@ func (r *Renderer) RenderCommandOutput(stdout, stderr string) {
 			r.write("\n" + InfoBox("Command Output:"))
 			r.write(CodeBlock(stdout) + "\n")
 		}
-		
+
 		if stderr != "" {
-			r.write("\n" + WarningStyle.Render("Command Stderr:"))
+			r.write("\n" + theme.DefaultTheme.Warning.Render("Command Stderr:"))
 			r.write(CodeBlock(stderr) + "\n")
 		}
 	}
@@ -137,7 +138,7 @@ func (r *Renderer) RenderSuccess(message string) {
 
 // RenderList renders a list of items
 func (r *Renderer) RenderList(title string, items []string) {
-	output := HeaderStyle.Render(title) + "\n"
+	output := theme.DefaultTheme.Header.Render(title) + "\n"
 	output += List(items)
 	r.write(output + "\n")
 }

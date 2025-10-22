@@ -9,6 +9,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
+	"github.com/mattsolo1/grove-core/tui/theme"
 	"github.com/spf13/cobra"
 
 	"github.com/mattsolo1/grove-tend/pkg/harness"
@@ -317,12 +318,12 @@ func renderFinalSummary(renderer *ui.Renderer, results []*harness.Result, succes
 	
 	for _, result := range results {
 		status := "✅ PASS"
-		statusStyle := ui.SuccessStyle
+		statusStyle := theme.DefaultTheme.Success
 		if !result.Success {
 			status = "❌ FAIL"
-			statusStyle = ui.ErrorStyle
+			statusStyle = theme.DefaultTheme.Error
 		}
-		
+
 		details := "-"
 		if !result.Success && result.FailedStep != "" {
 			details = result.FailedStep

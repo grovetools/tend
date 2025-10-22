@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/mattsolo1/grove-core/tui/theme"
 	"github.com/spf13/cobra"
 
 	"github.com/mattsolo1/grove-tend/pkg/harness"
@@ -70,7 +71,7 @@ func validateScenarios(cmd *cobra.Command, args []string, allScenarios []*harnes
 	} else {
 		renderer.RenderError(fmt.Errorf("found %d validation error(s)", len(validationErrors)))
 		for _, err := range validationErrors {
-			fmt.Printf("  • %s\n", ui.ErrorStyle.Render(err))
+			fmt.Printf("  • %s\n", theme.DefaultTheme.Error.Render(err))
 		}
 		return fmt.Errorf("validation failed")
 	}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mattsolo1/grove-core/tui/components/table"
+	"github.com/mattsolo1/grove-core/tui/theme"
 	"github.com/spf13/cobra"
 
 	"github.com/mattsolo1/grove-tend/pkg/harness"
@@ -113,13 +114,13 @@ func listScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sc
 		// Style based on column
 		switch col {
 		case 0: // Name column
-			return ui.TitleStyle.Copy().Bold(true)
+			return theme.DefaultTheme.Title.Copy().Bold(true)
 		case 2, 3: // Local and Explicit columns (centered)
 			return lipgloss.NewStyle().Padding(0, 1).Align(lipgloss.Center)
 		case 4: // Tags column
-			return ui.InfoStyle.Copy().Padding(0, 1)
+			return theme.DefaultTheme.Info.Copy().Padding(0, 1)
 		case 5: // Steps column
-			return ui.SuccessStyle.Copy().Padding(0, 1)
+			return theme.DefaultTheme.Success.Copy().Padding(0, 1)
 		default:
 			return lipgloss.NewStyle().Padding(0, 1)
 		}
@@ -140,48 +141,56 @@ func listScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sc
 
 func displayScenarioDetails(renderer *ui.Renderer, scenario *harness.Scenario) {
 	// Scenario name and description
-	fmt.Printf("\n%s %s\n", 
-		ui.HeaderStyle.Render("●"), 
-		ui.TitleStyle.Render(scenario.Name))
-	
+	fmt.Printf("\n%s %s\n",
+		theme.DefaultTheme.Header.Render("●"),
+		theme.DefaultTheme.Title.Render(scenario.Name))
+
 	if scenario.Description != "" {
-		fmt.Printf("  %s\n", ui.MutedStyle.Render(scenario.Description))
+		fmt.Printf("  %s\n", theme.DefaultTheme.Muted.Render(scenario.Description))
 	}
-	
+
 	// Show LocalOnly warning
 	if scenario.LocalOnly {
 		fmt.Printf("  %s This scenario is marked as local-only and will be skipped in CI environments\n",
-			ui.WarningStyle.Render("⚠"))
+			theme.DefaultTheme.Warning.Render("⚠"))
 	}
-	
+
 	// Show ExplicitOnly warning
 	if scenario.ExplicitOnly {
 		fmt.Printf("  %s This scenario must be run explicitly by name (skipped during 'tend run')\n",
-			ui.WarningStyle.Render("⚠"))
+			theme.DefaultTheme.Warning.Render("⚠"))
 	}
-	
+
 	// Tags
 	if len(scenario.Tags) > 0 {
 		tagStr := strings.Join(scenario.Tags, ", ")
-		fmt.Printf("  %s %s\n", 
-			ui.InfoStyle.Render("Tags:"), 
-			ui.MutedStyle.Render(tagStr))
+		fmt.Printf("  %s %s\n",
+			theme.DefaultTheme.Info.Render("Tags:"),
+			theme.DefaultTheme.Muted.Render(tagStr))
 	}
-	
+
 	// Step count
-	fmt.Printf("  %s %d step(s)\n", 
-		ui.InfoStyle.Render("Steps:"), 
+	fmt.Printf("  %s %d step(s)\n",
+		theme.DefaultTheme.Info.Render("Steps:"),
 		len(scenario.Steps))
-	
+
 	// If verbose, show step details
 	if verbose {
+		stepNumberStyle := lipgloss.NewStyle().
+			Foreground(theme.DefaultTheme.Colors.Orange).
+			Bold(true).
+			Width(3).
+			Align(lipgloss.Right)
+		stepNameStyle := lipgloss.NewStyle().
+			Foreground(theme.DefaultTheme.Colors.LightText).
+			MarginLeft(1)
 		for i, step := range scenario.Steps {
-			fmt.Printf("    %s %s\n", 
-				ui.StepNumberStyle.Render(fmt.Sprintf("%d.", i+1)), 
-				ui.StepNameStyle.Render(step.Name))
-			
+			fmt.Printf("    %s %s\n",
+				stepNumberStyle.Render(fmt.Sprintf("%d.", i+1)),
+				stepNameStyle.Render(step.Name))
+
 			if step.Description != "" {
-				fmt.Printf("      %s\n", ui.MutedStyle.Render(step.Description))
+				fmt.Printf("      %s\n", theme.DefaultTheme.Muted.Render(step.Description))
 			}
 		}
 	}

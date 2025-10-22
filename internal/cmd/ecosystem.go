@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mattsolo1/grove-core/tui/components/table"
+	"github.com/mattsolo1/grove-core/tui/theme"
 	"github.com/mattsolo1/grove-tend/pkg/command"
 	"github.com/mattsolo1/grove-tend/pkg/harness/reporters"
 	"github.com/mattsolo1/grove-tend/pkg/ui"
@@ -89,9 +90,9 @@ func runEcosystemTests(cmd *cobra.Command, args []string) error {
 
 			success := result.ExitCode == 0
 			if !success {
-				fmt.Printf("❌ %s\n", ui.ErrorStyle.Render(projectName))
+				fmt.Printf("❌ %s\n", theme.DefaultTheme.Error.Render(projectName))
 			} else {
-				fmt.Printf("✅ %s\n", ui.SuccessStyle.Render(projectName))
+				fmt.Printf("✅ %s\n", theme.DefaultTheme.Success.Render(projectName))
 			}
 			resultsChan <- testResult{
 				ProjectName: projectName,
@@ -221,9 +222,9 @@ func aggregateAndDisplayResults(resultsDir string, resultsChan <-chan testResult
 			continue
 		}
 		res := report.Results[0]
-		status := ui.SuccessStyle.Render("✅ PASS")
+		status := theme.DefaultTheme.Success.Render("✅ PASS")
 		if !res.Success || report.Failed > 0 {
-			status = ui.ErrorStyle.Render("❌ FAIL")
+			status = theme.DefaultTheme.Error.Render("❌ FAIL")
 			allPassed = false
 		}
 		tbl.Row(res.Name, status, res.Duration, fmt.Sprintf("%d", report.Passed), fmt.Sprintf("%d", report.Failed))
@@ -239,7 +240,7 @@ func aggregateAndDisplayResults(resultsDir string, resultsChan <-chan testResult
 			}
 		}
 		if !hasReport {
-			status := ui.ErrorStyle.Render("❌ FAIL")
+			status := theme.DefaultTheme.Error.Render("❌ FAIL")
 			errorMsg := "Build/Make failed"
 			if failed.Error != nil {
 				errorMsg = failed.Error.Error()
@@ -254,7 +255,7 @@ func aggregateAndDisplayResults(resultsDir string, resultsChan <-chan testResult
 	fmt.Println(tbl)
 
 	if len(failedProjects) > 0 {
-		fmt.Println("\n" + ui.TitleStyle.Render("Failure Details"))
+		fmt.Println("\n" + theme.DefaultTheme.Title.Render("Failure Details"))
 		fmt.Println()
 
 		for i, proj := range failedProjects {
@@ -262,7 +263,7 @@ func aggregateAndDisplayResults(resultsDir string, resultsChan <-chan testResult
 				fmt.Println()
 			}
 
-			fmt.Printf("%s %s\n", ui.ErrorStyle.Render("❌"), ui.TitleStyle.Render(proj.ProjectName))
+			fmt.Printf("%s %s\n", theme.DefaultTheme.Error.Render("❌"), theme.DefaultTheme.Title.Render(proj.ProjectName))
 			reportPath := filepath.Join(resultsDir, proj.ProjectName+".json")
 
 			if data, err := os.ReadFile(reportPath); err == nil {
@@ -275,17 +276,17 @@ func aggregateAndDisplayResults(resultsDir string, resultsChan <-chan testResult
 							if failedScenarios > 1 {
 								fmt.Println()
 							}
-							fmt.Printf("   %s %s\n", ui.MutedStyle.Render("Scenario:"), res.Name)
-							fmt.Printf("   %s %s\n", ui.MutedStyle.Render("Step:    "), res.FailedStep)
+							fmt.Printf("   %s %s\n", theme.DefaultTheme.Muted.Render("Scenario:"), res.Name)
+							fmt.Printf("   %s %s\n", theme.DefaultTheme.Muted.Render("Step:    "), res.FailedStep)
 							// Only show first line of error
 							errorLines := strings.Split(res.Error, "\n")
 							if len(errorLines) > 0 {
-								fmt.Printf("   %s %s\n", ui.MutedStyle.Render("Error:   "), errorLines[0])
+								fmt.Printf("   %s %s\n", theme.DefaultTheme.Muted.Render("Error:   "), errorLines[0])
 							}
 						}
 					}
 					if failedScenarios == 0 {
-						fmt.Printf("   %s\n", ui.MutedStyle.Render("Build/test runner failed (no detailed failure info available)"))
+						fmt.Printf("   %s\n", theme.DefaultTheme.Muted.Render("Build/test runner failed (no detailed failure info available)"))
 					}
 				}
 			} else if proj.Error != nil {
@@ -293,7 +294,7 @@ func aggregateAndDisplayResults(resultsDir string, resultsChan <-chan testResult
 				errMsg := proj.Error.Error()
 				errLines := strings.Split(errMsg, "\n")
 				if len(errLines) > 0 {
-					fmt.Printf("   %s %s\n", ui.MutedStyle.Render("Error:"), errLines[0])
+					fmt.Printf("   %s %s\n", theme.DefaultTheme.Muted.Render("Error:"), errLines[0])
 				}
 			}
 		}
