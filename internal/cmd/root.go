@@ -76,6 +76,7 @@ Features:
 	rootCmd.AddCommand(newVersionCmd())
 	rootCmd.AddCommand(cli.NewDocsCommand(docs.DocsJSON))
 	rootCmd.AddCommand(newEcosystemCmd())
+	rootCmd.AddCommand(newTuiCmd())
 
 	return rootCmd
 }
