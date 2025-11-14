@@ -17,6 +17,38 @@ type Mock struct {
 	BinaryPath string
 }
 
+// SetupMocksWithSubprocessSupport is like SetupMocks but also creates a wrapper
+// shell script that forces PATH for subprocess commands. This is useful when
+// the code under test spawns subprocesses via `sh -c` or similar, which may
+// not inherit the modified PATH correctly.
+func SetupMocksWithSubprocessSupport(mocks ...Mock) Step {
+	return NewStep("Setup test environment with subprocess-safe mocks", func(ctx *Context) error {
+		// First run the standard mock setup
+		if err := SetupMocks(mocks...).Func(ctx); err != nil {
+			return err
+		}
+
+		// Create a wrapper shell script that forces PATH
+		mockBinDir := ctx.GetString("test_bin_dir")
+		wrapperPath := filepath.Join(ctx.RootDir, "mock-shell")
+		wrapperContent := fmt.Sprintf(`#!/bin/bash
+# Wrapper shell that ensures mocks are on PATH for subprocess commands
+export PATH=%s:$PATH
+exec /bin/bash "$@"
+`, mockBinDir)
+
+		if err := os.WriteFile(wrapperPath, []byte(wrapperContent), 0755); err != nil {
+			return fmt.Errorf("failed to create shell wrapper: %w", err)
+		}
+
+		// Set SHELL to use our wrapper
+		os.Setenv("SHELL", wrapperPath)
+		ctx.Set("mock_shell_wrapper", wrapperPath)
+
+		return nil
+	})
+}
+
 // SetupMocks is a harness.Step that prepares a sandboxed `bin` directory
 // with the specified mocks, making them available on the PATH for
 // subsequent steps. For complex, stateful, or dynamic mocks, it is
