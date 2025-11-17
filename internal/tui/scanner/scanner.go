@@ -22,6 +22,7 @@ var (
 // It returns a map where keys are file paths and values are slices of scenarios found in that file.
 func ScanProjectForScenarios(projectPath string) (map[string][]*harness.Scenario, error) {
 	scenariosByFile := make(map[string][]*harness.Scenario)
+	visitedFiles := make(map[string]bool)
 
 	// Walk through the project, looking for test files.
 	// We'll look in common directories like 'tests/e2e' and the project root.
@@ -44,14 +45,23 @@ func ScanProjectForScenarios(projectPath string) (map[string][]*harness.Scenario
 
 			// Only process Go files
 			if !info.IsDir() && strings.HasSuffix(info.Name(), ".go") {
-				content, err := os.ReadFile(path)
+				absPath, err := filepath.Abs(path)
+				if err != nil {
+					return nil // Skip if we can't get an absolute path
+				}
+				if visitedFiles[absPath] {
+					return nil // Already processed, skip.
+				}
+				visitedFiles[absPath] = true
+
+				content, err := os.ReadFile(absPath)
 				if err != nil {
 					return nil // Skip files we can't read
 				}
 
 				foundScenarios := parseScenariosFromFile(string(content))
 				if len(foundScenarios) > 0 {
-					scenariosByFile[path] = append(scenariosByFile[path], foundScenarios...)
+					scenariosByFile[absPath] = foundScenarios
 				}
 			}
 			return nil

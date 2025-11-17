@@ -2,6 +2,7 @@ package runner
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,28 +15,6 @@ import (
 	"github.com/mattsolo1/grove-tend/pkg/harness"
 	"github.com/sirupsen/logrus"
 )
-
-// findMakeTarget discovers the appropriate make target in a project.
-func findMakeTarget(projectPath string) (string, error) {
-	makefile := filepath.Join(projectPath, "Makefile")
-	if _, err := os.Stat(makefile); err != nil {
-		return "", fmt.Errorf("Makefile not found in %s", projectPath)
-	}
-	content, err := os.ReadFile(makefile)
-	if err != nil {
-		return "", fmt.Errorf("could not read Makefile: %w", err)
-	}
-	contentStr := string(content)
-
-	targets := []string{"test-e2e-tend", "test-e2e", "run-tend-tests"}
-	for _, target := range targets {
-		// Look for the target defined in the Makefile
-		if strings.Contains(contentStr, "\n"+target+":") || strings.HasPrefix(contentStr, target+":") {
-			return target, nil
-		}
-	}
-	return "", fmt.Errorf("no suitable test target found in Makefile")
-}
 
 type dataLoadedMsg struct {
 	workspaces         []*workspace.WorkspaceNode
@@ -54,8 +33,14 @@ func loadDataCmd(initialFocusPath string) tea.Cmd {
 	return func() tea.Msg {
 		// 1. Discover all projects using workspace discovery service
 		logger := logrus.New()
+		logPath := filepath.Join(os.TempDir(), "tend-tui.log")
+		// Silently ignore errors, but fallback to discarding logs to prevent UI corruption.
+		if logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+			logger.SetOutput(logFile)
+		} else {
+			logger.SetOutput(io.Discard)
+		}
 		logger.SetLevel(logrus.DebugLevel)
-		logger.SetOutput(os.Stderr) // Log to stderr so it doesn't interfere with TUI
 		discoveryService := workspace.NewDiscoveryService(logger)
 
 		logger.Debugf("[TEND TUI] Starting workspace discovery, initialFocusPath=%s", initialFocusPath)
@@ -176,61 +161,53 @@ func loadDataCmd(initialFocusPath string) tea.Cmd {
 // runTestCmd creates a command to run a test scenario in debug mode.
 func runTestCmd(node *DisplayNode) tea.Cmd {
 	var args []string
-	var projectPath string
+	projectPath := node.Project.Path // All nodes have a project context
 
 	switch {
 	case node.IsScenario:
-		projectPath = node.Project.Path
+		// Correct args for a single scenario: tend run <scenario-name> --debug
 		args = []string{"run", node.Scenario.Name, "--debug"}
 
 	case node.IsFile:
-		projectPath = node.Project.Path
 		var scenarioNames []string
 		for _, s := range node.ScenariosInFile {
 			scenarioNames = append(scenarioNames, s.Name)
 		}
 		if len(scenarioNames) == 0 {
-			return func() tea.Msg {
-				return statusMsg("No scenarios to run in this file.")
-			}
+			return func() tea.Msg { return statusMsg("No scenarios to run in this file.") }
 		}
+		// Correct args for a file: tend run <s1> <s2> ... --debug
 		args = append([]string{"run"}, scenarioNames...)
 		args = append(args, "--debug")
 
 	case node.IsProject:
-		projectPath = node.Project.Path
+		// Correct args for a project: tend run --debug
 		args = []string{"run", "--debug"}
 
 	case node.IsEcosystem:
-		// Running all ecosystem tests from the TUI is disabled for now.
-		return func() tea.Msg {
-			return statusMsg("Cannot run tests for an entire ecosystem from the TUI.")
-		}
+		return func() tea.Msg { return statusMsg("Cannot run tests for an entire ecosystem from the TUI.") }
 
 	default:
-		return func() tea.Msg {
-			return statusMsg("This action is not supported for the selected item.")
-		}
+		return func() tea.Msg { return statusMsg("This action is not supported for the selected item.") }
 	}
 
-	// Discover the correct make target
-	makeTarget, err := findMakeTarget(projectPath)
+	// Get the current executable path to ensure we run the same tend binary.
+	executable, err := os.Executable()
 	if err != nil {
 		return func() tea.Msg {
-			return statusMsg(err.Error())
+			return statusMsg(fmt.Sprintf("Error finding tend binary: %v", err))
 		}
 	}
 
-	// Construct the make command to run the test
-	makeCmd := fmt.Sprintf("make %s ARGS=\"%s\"", makeTarget, strings.Join(args, " "))
-	cmd := exec.Command("bash", "-c", makeCmd)
-	cmd.Dir = projectPath
+	cmd := exec.Command(executable, args...)
+	cmd.Dir = projectPath // Run the command in the project's directory
 
+	// tea.ExecProcess suspends the TUI and hands terminal control to the child process.
+	// The tend harness will then manage the interactive session and its single tmux split.
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		if err != nil {
 			return statusMsg(fmt.Sprintf("Test run failed: %v", err))
 		}
-		// After the command finishes, the TUI will resume.
 		return statusMsg("Test run finished. Press 'R' to refresh if needed.")
 	})
 }

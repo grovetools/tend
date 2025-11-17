@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -148,8 +149,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // buildDisplayTree constructs the flat list of nodes for rendering.
 func (m *Model) buildDisplayTree() {
 	logger := logrus.New()
+	logPath := filepath.Join(os.TempDir(), "tend-tui.log")
+	// Silently ignore errors, but fallback to discarding logs to prevent UI corruption.
+	if logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+		logger.SetOutput(logFile)
+	} else {
+		logger.SetOutput(io.Discard)
+	}
 	logger.SetLevel(logrus.DebugLevel)
-	logger.SetOutput(os.Stderr)
 
 	logger.Debugf("[TEND TUI buildDisplayTree] Starting, focusedProject=%v, total workspaces=%d", m.focusedProject != nil, len(m.workspaces))
 
