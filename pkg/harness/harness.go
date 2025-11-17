@@ -447,12 +447,16 @@ func (h *Harness) resolveBinary() string {
 }
 
 // handleTmuxSplit attempts to split the tmux window and navigate to the test directory.
+// It reuses an existing pane if one was created previously (tracked in a cache file).
 func (h *Harness) handleTmuxSplit(ctx *Context, ui *UI) error {
 	if os.Getenv("TMUX") == "" {
 		return fmt.Errorf("not in a tmux session")
 	}
 
-	ui.Info("tmux", "Splitting window...")
+	tmuxClient, err := tmux.NewClient()
+	if err != nil {
+		return fmt.Errorf("failed to create tmux client: %w", err)
+	}
 
 	// Build the command to send. Use single quotes to handle paths with spaces.
 	commandStr := fmt.Sprintf("cd '%s'", ctx.RootDir)
@@ -460,29 +464,87 @@ func (h *Harness) handleTmuxSplit(ctx *Context, ui *UI) error {
 		commandStr += " && nvim"
 	}
 
-	// Split the window and get the new pane's ID.
-	// -v: vertical split (creates horizontal panes stacked on top of each other)
-	// -P: don't make the new pane active
-	// -F '#{pane_id}': print the pane ID to stdout
-	splitCmd := command.New("tmux", "split-window", "-v", "-P", "-F", "#{pane_id}")
-	paneIDResult := splitCmd.Run()
-	if paneIDResult.Error != nil {
-		return fmt.Errorf("failed to split tmux window: %w\n%s", paneIDResult.Error, paneIDResult.Stderr)
-	}
-	paneID := strings.TrimSpace(paneIDResult.Stdout)
+	// Path to cache file storing the pane ID
+	paneIDFile := filepath.Join(os.TempDir(), "tend-debug-pane-id")
 
+	// Check if we already have a pane from a previous test run
+	var paneID string
+	if data, err := os.ReadFile(paneIDFile); err == nil {
+		existingPaneID := strings.TrimSpace(string(data))
+		if existingPaneID != "" {
+			// Verify the pane still exists
+			if tmuxClient.PaneExists(context.Background(), existingPaneID) {
+				ui.Info("tmux", "Reusing existing pane...")
+				paneID = existingPaneID
+
+				// Check if nvim (or other programs) is running in the pane and kill it
+				if currentCmd, err := tmuxClient.GetPaneCommand(context.Background(), paneID); err == nil {
+					currentCmd = strings.TrimSpace(currentCmd)
+					// Kill nvim or other editors if they're running
+					if currentCmd == "nvim" || currentCmd == "vim" || currentCmd == "vi" {
+						ui.Info("tmux", "Killing existing editor...")
+						// Send Escape to exit insert mode, then :qa! to quit without saving
+						tmuxClient.SendKeys(context.Background(), paneID, "Escape", ":qa!", "C-m")
+						// Give it a moment to exit
+						time.Sleep(100 * time.Millisecond)
+					}
+				}
+			} else {
+				ui.Info("tmux", "Previous pane no longer exists, creating new one...")
+			}
+		}
+	}
+
+	// Create a new pane if we don't have a valid existing one
 	if paneID == "" {
-		return fmt.Errorf("could not get new tmux pane ID")
+		ui.Info("tmux", "Splitting window...")
+
+		// Split the window and get the new pane's ID.
+		// -v: vertical split (creates horizontal panes stacked on top of each other)
+		// -P: don't make the new pane active
+		// Use the tmux client's SplitWindow method
+		newPaneID, err := tmuxClient.SplitWindow(context.Background(), "", false, 0, "")
+		if err != nil {
+			return fmt.Errorf("failed to split tmux window: %w", err)
+		}
+		paneID = newPaneID
+
+		// Store the pane ID for future test runs
+		_ = os.WriteFile(paneIDFile, []byte(paneID), 0644) // Ignore errors - not critical
 	}
 
-	// Send the cd/nvim command to the new pane.
+	// Send the cd/nvim command to the pane.
 	// C-m is the equivalent of pressing 'Enter'.
-	sendKeysCmd := command.New("tmux", "send-keys", "-t", paneID, commandStr, "C-m")
-	sendKeysResult := sendKeysCmd.Run()
-	if sendKeysResult.Error != nil {
-		// Try to kill the pane we just created to avoid leaving an empty pane.
-		command.New("tmux", "kill-pane", "-t", paneID).Run()
-		return fmt.Errorf("failed to send keys to new tmux pane: %w\n%s", sendKeysResult.Error, sendKeysResult.Stderr)
+	sendErr := tmuxClient.SendKeys(context.Background(), paneID, commandStr, "C-m")
+	if sendErr != nil {
+		// The pane no longer exists - clear cache and retry once
+		if strings.Contains(sendErr.Error(), "can't find pane") {
+			os.Remove(paneIDFile)
+
+			// Create a new pane
+			ui.Info("tmux", "Pane disappeared, creating new one...")
+			newPaneID, err := tmuxClient.SplitWindow(context.Background(), "", false, 0, "")
+			if err != nil {
+				return fmt.Errorf("failed to split tmux window: %w", err)
+			}
+			paneID = newPaneID
+			_ = os.WriteFile(paneIDFile, []byte(paneID), 0644)
+
+			// Try sending keys again
+			if err := tmuxClient.SendKeys(context.Background(), paneID, commandStr, "C-m"); err != nil {
+				command.New("tmux", "kill-pane", "-t", paneID).Run()
+				os.Remove(paneIDFile)
+				return fmt.Errorf("failed to send keys to new tmux pane: %w", err)
+			}
+			return nil
+		}
+
+		// Other error - clean up if this was a newly created pane
+		if data, readErr := os.ReadFile(paneIDFile); readErr == nil && strings.TrimSpace(string(data)) == paneID {
+			command.New("tmux", "kill-pane", "-t", paneID).Run()
+			os.Remove(paneIDFile)
+		}
+		return fmt.Errorf("failed to send keys to tmux pane: %w", sendErr)
 	}
 
 	return nil

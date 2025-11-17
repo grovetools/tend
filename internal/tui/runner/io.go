@@ -204,6 +204,7 @@ func runTestCmd(node *DisplayNode) tea.Cmd {
 
 	// tea.ExecProcess suspends the TUI and hands terminal control to the child process.
 	// The tend harness will then manage the interactive session and its single tmux split.
+	// The pane ID is persisted in a cache file (/tmp/tend-debug-pane-id) and reused across runs.
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		if err != nil {
 			return statusMsg(fmt.Sprintf("Test run failed: %v", err))
