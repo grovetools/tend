@@ -529,11 +529,8 @@ func (h *Harness) setupDebugPanes(ctx *Context, ui *UI, scenario *Scenario) erro
 
 	// Setup Shell Pane if requested
 	if h.opts.TmuxSplit {
-		shellCommand := fmt.Sprintf("cd '%s'", ctx.RootDir)
-		// If nvim isn't requested separately, open it in the shell pane for old behavior
-		if !h.opts.Nvim {
-			shellCommand += " && nvim"
-		}
+		// Always open nvim in the shell pane for exploring test artifacts
+		shellCommand := fmt.Sprintf("cd '%s' && nvim", ctx.RootDir)
 
 		shellPaneID, err := setupTmuxPane(tmuxClient, ui, "shell", false, shellCommand)
 		if err != nil {
