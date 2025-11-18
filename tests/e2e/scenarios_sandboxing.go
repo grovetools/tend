@@ -11,11 +11,11 @@ import (
 
 // EnvironmentSandboxingScenario tests the automatic environment sandboxing via ctx.Command()
 func EnvironmentSandboxingScenario() *harness.Scenario {
-	return &harness.Scenario{
-		Name:        "environment-sandboxing",
-		Description: "Tests that ctx.Command() automatically sets HOME and XDG_* environment variables.",
-		Tags:        []string{"harness", "sandboxing", "context"},
-		Steps: []harness.Step{
+	return harness.NewScenario(
+		"environment-sandboxing",
+		"Tests that ctx.Command() automatically sets HOME and XDG_* environment variables.",
+		[]string{"harness", "sandboxing", "context"},
+		[]harness.Step{
 			harness.SetupMocks(
 				harness.Mock{CommandName: "print-env"},
 			),
@@ -59,5 +59,5 @@ func EnvironmentSandboxingScenario() *harness.Scenario {
 				return nil
 			}),
 		},
-	}
+	)
 }

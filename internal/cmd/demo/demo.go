@@ -17,11 +17,11 @@ func main() {
 	fmt.Println("=" + string(make([]rune, 50)))
 
 	// Create a sample scenario that demonstrates the framework capabilities
-	scenario := &harness.Scenario{
-		Name:        "grove-tend-demo",
-		Description: "Demonstrates the Grove Tend testing framework",
-		Tags:        []string{"demo", "showcase"},
-		Steps: []harness.Step{
+	scenario := harness.NewScenario(
+		"grove-tend-demo",
+		"Demonstrates the Grove Tend testing framework",
+		[]string{"demo", "showcase"},
+		[]harness.Step{
 			harness.NewStep("Setup workspace", func(ctx *harness.Context) error {
 				// Create project structure
 				workspaceDir := ctx.NewDir("workspace")
@@ -145,7 +145,7 @@ func newFeature() {
 				return retry.Func(ctx)
 			}),
 		},
-	}
+	)
 
 	// Run the scenario
 	h := harness.New(harness.Options{

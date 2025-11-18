@@ -2,17 +2,27 @@ package harness
 
 import (
 	"fmt"
+	"runtime"
 	"time"
 )
 
 // StepFunc is a convenience type for step functions
 type StepFunc func(ctx *Context) error
 
-// NewStep creates a new step with the given name and function
+// NewStep creates a new step with the given name and function.
+//
+// This constructor automatically captures the source location where the step is defined,
+// which enables the debug editor feature (--debug flag) to navigate to each step as the
+// test progresses.
+//
+// Using NewStep is recommended over Step{} literals for better debugging support.
 func NewStep(name string, fn StepFunc) Step {
+	_, file, line, _ := runtime.Caller(1)
 	return Step{
 		Name: name,
 		Func: fn,
+		File: file,
+		Line: line,
 	}
 }
 

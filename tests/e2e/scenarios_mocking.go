@@ -11,11 +11,11 @@ import (
 )
 
 // GitWorkflowScenario demonstrates mocking git commands
-var GitWorkflowScenario = &harness.Scenario{
-	Name:        "git-workflow",
-	Description: "Tests a git workflow using mocked git commands",
-	Tags:        []string{"git", "mocking"},
-	Steps: []harness.Step{
+var GitWorkflowScenario = harness.NewScenario(
+	"git-workflow",
+	"Tests a git workflow using mocked git commands",
+	[]string{"git", "mocking"},
+	[]harness.Step{
 		harness.SetupMocks(harness.Mock{CommandName: "git"}),
 		harness.NewStep("Create test directory", func(ctx *harness.Context) error {
 			testDir := ctx.NewDir("git-test")
@@ -45,14 +45,14 @@ var GitWorkflowScenario = &harness.Scenario{
 			return assert.Contains(commitResult.Stdout, "Initial commit", "commit message should appear in output")
 		}),
 	},
-}
+)
 
 // DockerScenario demonstrates mocking docker commands
-var DockerScenario = &harness.Scenario{
-	Name:        "docker-operations",
-	Description: "Tests docker operations using mocked docker commands",
-	Tags:        []string{"docker", "mocking"},
-	Steps: []harness.Step{
+var DockerScenario = harness.NewScenario(
+	"docker-operations",
+	"Tests docker operations using mocked docker commands",
+	[]string{"docker", "mocking"},
+	[]harness.Step{
 		harness.SetupMocks(harness.Mock{CommandName: "docker"}),
 		harness.NewStep("Check docker version", func(ctx *harness.Context) error {
 			cmd := ctx.Command("docker", "version")
@@ -67,14 +67,14 @@ var DockerScenario = &harness.Scenario{
 			return assert.Contains(result.Stdout, "REPOSITORY", "should show image list header")
 		}),
 	},
-}
+)
 
 // LLMIntegrationScenario demonstrates using both inline scripts and binary mocks
-var LLMIntegrationScenario = &harness.Scenario{
-	Name:        "llm-integration",
-	Description: "Tests LLM integration with different mock strategies",
-	Tags:        []string{"llm", "mocking", "integration"},
-	Steps: []harness.Step{
+var LLMIntegrationScenario = harness.NewScenario(
+	"llm-integration",
+	"Tests LLM integration with different mock strategies",
+	[]string{"llm", "mocking", "integration"},
+	[]harness.Step{
 		harness.SetupMocks(harness.Mock{CommandName: "llm"}),
 		harness.NewStep("Query LLM with test prompt", func(ctx *harness.Context) error {
 			cmd := ctx.Command("llm", "Tell me about testing")
@@ -83,14 +83,14 @@ var LLMIntegrationScenario = &harness.Scenario{
 			return assert.Contains(result.Stdout, "testing", "LLM should respond about testing")
 		}),
 	},
-}
+)
 
 // FlowMockScenario demonstrates swapping between mock and real flow
-var FlowMockScenario = &harness.Scenario{
-	Name:        "flow-mock-demo",
-	Description: "Demonstrates mock/real binary swapping with grove flow",
-	Tags:        []string{"flow", "real-deps"},
-	Steps: []harness.Step{
+var FlowMockScenario = harness.NewScenario(
+	"flow-mock-demo",
+	"Demonstrates mock/real binary swapping with grove flow",
+	[]string{"flow", "real-deps"},
+	[]harness.Step{
 		harness.SetupMocks(harness.Mock{CommandName: "flow"}),
 		harness.NewStep("Check flow version", func(ctx *harness.Context) error {
 			cmd := ctx.Command("flow", "version")
@@ -102,14 +102,14 @@ var FlowMockScenario = &harness.Scenario{
 			return nil
 		}),
 	},
-}
+)
 
 // MixedDependenciesScenario demonstrates selective mock swapping
-var MixedDependenciesScenario = &harness.Scenario{
-	Name:        "mixed-dependencies",
-	Description: "Tests using a mix of mocked and real dependencies",
-	Tags:        []string{"integration", "real-deps"},
-	Steps: []harness.Step{
+var MixedDependenciesScenario = harness.NewScenario(
+	"mixed-dependencies",
+	"Tests using a mix of mocked and real dependencies",
+	[]string{"integration", "real-deps"},
+	[]harness.Step{
 		harness.SetupMocks(
 			harness.Mock{CommandName: "git"},
 			harness.Mock{CommandName: "docker"},
@@ -150,4 +150,4 @@ kubectl version --client=true 2>/dev/null || echo "kubectl mock: ready"
 			return assert.Contains(result.Stdout, "Mock kubectl version", "kubectl mock output")
 		}),
 	},
-}
+)
