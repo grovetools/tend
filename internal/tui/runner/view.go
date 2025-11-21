@@ -95,18 +95,32 @@ func (m Model) View() string {
 				name = "<unnamed>"
 			}
 
-			// Apply prefix for tree structure
-			fullName := node.Prefix + name
-
-			// Apply highlighting if there's a filter
-			if m.filterInput.Value() != "" {
-				// Highlight just the name part, not the prefix
-				highlightedName := highlightMatch(name, m.filterInput.Value())
-				fullName = node.Prefix + highlightedName
+			// Add indicators for scenarios
+			var indicatorStr string
+			if node.IsScenario && node.Scenario != nil {
+				var indicators []string
+				if node.Scenario.LocalOnly {
+					indicators = append(indicators, theme.DefaultTheme.Muted.Render("[L]"))
+				}
+				if node.Scenario.ExplicitOnly {
+					indicators = append(indicators, theme.DefaultTheme.Warning.Render("[E]"))
+				}
+				if len(indicators) > 0 {
+					indicatorStr = strings.Join(indicators, " ") + " "
+				}
 			}
 
-			// Apply styling
-			styledName := style.Render(fullName)
+			// Apply highlighting if there's a filter
+			var highlightedName string
+			if m.filterInput.Value() != "" {
+				// Highlight just the name part, not the prefix
+				highlightedName = highlightMatch(name, m.filterInput.Value())
+			} else {
+				highlightedName = name
+			}
+
+			// Apply styling, but don't re-style the indicators which already have styles
+			styledName := style.Render(node.Prefix) + indicatorStr + style.Render(highlightedName)
 
 			listRows = append(listRows, []string{styledName})
 		}

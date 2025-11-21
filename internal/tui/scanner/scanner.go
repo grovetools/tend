@@ -12,10 +12,13 @@ import (
 
 // Scenario patterns for regex parsing
 var (
-	scenarioBlockRegex = regexp.MustCompile(`(?s)&harness\.Scenario\{(.*?)\}`)
+	// scenarioStartRegex finds the start of a struct literal scenario
+	scenarioStartRegex = regexp.MustCompile(`&harness\.Scenario\{`)
 	nameRegex          = regexp.MustCompile(`Name:\s*"(.*?)"`)
 	descriptionRegex   = regexp.MustCompile(`Description:\s*"(.*?)"`)
 	tagsRegex          = regexp.MustCompile(`Tags:\s*\[\]string\{(.*?)\}`)
+	localOnlyRegex     = regexp.MustCompile(`LocalOnly:\s*true`)
+	explicitOnlyRegex  = regexp.MustCompile(`ExplicitOnly:\s*true`)
 )
 
 // ScanProjectForScenarios walks a project directory and parses Go files to find scenario definitions.
@@ -79,12 +82,17 @@ func ScanProjectForScenarios(projectPath string) (map[string][]*harness.Scenario
 func parseScenariosFromFile(content string) []*harness.Scenario {
 	var scenarios []*harness.Scenario
 
-	blocks := scenarioBlockRegex.FindAllStringSubmatch(content, -1)
-	for _, block := range blocks {
-		if len(block) < 2 {
+	// Find struct literal scenarios using balanced brace matching
+	matches := scenarioStartRegex.FindAllStringIndex(content, -1)
+	for _, match := range matches {
+		// Find the opening brace position
+		startBrace := match[1] - 1
+		endBrace := findMatchingBrace(content, startBrace)
+		if endBrace == -1 {
 			continue
 		}
-		scenarioContent := block[1]
+
+		scenarioContent := content[startBrace+1 : endBrace]
 
 		nameMatch := nameRegex.FindStringSubmatch(scenarioContent)
 		if len(nameMatch) < 2 {
@@ -109,8 +117,116 @@ func parseScenariosFromFile(content string) []*harness.Scenario {
 				}
 			}
 		}
+
+		if localOnlyRegex.MatchString(scenarioContent) {
+			scenario.LocalOnly = true
+		}
+		if explicitOnlyRegex.MatchString(scenarioContent) {
+			scenario.ExplicitOnly = true
+		}
+
+		scenarios = append(scenarios, scenario)
+	}
+
+	// Also parse scenarios created with constructor functions
+	scenarios = append(scenarios, parseFunctionScenarios(content)...)
+
+	return scenarios
+}
+
+// parseFunctionScenarios finds scenarios defined with harness.NewScenario...()
+func parseFunctionScenarios(content string) []*harness.Scenario {
+	var scenarios []*harness.Scenario
+	funcRegex := regexp.MustCompile(`harness\.NewScenario(WithOptions)?\(`)
+	stringLiteralRegex := regexp.MustCompile(`"([^"]*)"`)
+	boolRegex := regexp.MustCompile(`(true|false)`)
+
+	matches := funcRegex.FindAllStringSubmatchIndex(content, -1)
+	for _, match := range matches {
+		// match[0] is start of full match, match[1] is end
+		// For finding the opening paren, we need to find it within the matched text
+		startParen := match[1] - 1 // The '(' is the last character of the match
+		endParen := findMatchingParen(content, startParen)
+		if endParen == -1 {
+			continue
+		}
+
+		// Extract content within the function call parentheses
+		argContent := content[startParen+1 : endParen]
+		isWithOptions := match[2] != -1 // Check if "WithOptions" was captured
+
+		// Parse arguments - find string literals for name and description
+		stringMatches := stringLiteralRegex.FindAllStringSubmatch(argContent, -1)
+		if len(stringMatches) < 2 {
+			continue // Must have at least name and description
+		}
+
+		scenario := &harness.Scenario{
+			Name:        stringMatches[0][1],
+			Description: stringMatches[1][1],
+		}
+
+		if tagsMatch := tagsRegex.FindStringSubmatch(argContent); len(tagsMatch) > 1 {
+			tagsStr := tagsMatch[1]
+			tags := strings.Split(tagsStr, ",")
+			for _, tag := range tags {
+				tag = strings.Trim(tag, ` "`)
+				if tag != "" {
+					scenario.Tags = append(scenario.Tags, tag)
+				}
+			}
+		}
+
+		if isWithOptions {
+			// Find the last two boolean values for LocalOnly and ExplicitOnly
+			boolMatches := boolRegex.FindAllString(argContent, -1)
+			if len(boolMatches) >= 2 {
+				scenario.LocalOnly = boolMatches[len(boolMatches)-2] == "true"
+				scenario.ExplicitOnly = boolMatches[len(boolMatches)-1] == "true"
+			}
+		}
 		scenarios = append(scenarios, scenario)
 	}
 
 	return scenarios
+}
+
+// findMatchingParen finds the matching closing parenthesis for an opening one at start index.
+func findMatchingParen(content string, start int) int {
+	if start >= len(content) || content[start] != '(' {
+		return -1
+	}
+	balance := 1
+	for i := start + 1; i < len(content); i++ {
+		switch content[i] {
+		case '(':
+			balance++
+		case ')':
+			balance--
+			if balance == 0 {
+				return i
+			}
+		}
+	}
+	return -1
+}
+
+// findMatchingBrace finds the matching closing brace for an opening one at start index.
+func findMatchingBrace(content string, start int) int {
+	if start >= len(content) || content[start] != '{' {
+		return -1
+	}
+	balance := 1
+	for i := start + 1; i < len(content); i++ {
+		switch content[i] {
+		case '{':
+			balance++
+		case '}':
+			balance--
+			if balance == 0 {
+				return i
+			}
+		}
+	}
+	return -1
 }
