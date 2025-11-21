@@ -473,6 +473,7 @@ func (h *Harness) resolveBinary() string {
 func setupTmuxPane(client *tmux.Client, ui *UI, paneType string, splitHorizontal bool, commandStr string) (string, error) {
 	paneIDFile := filepath.Join(os.TempDir(), fmt.Sprintf("tend-debug-%s-pane-id", paneType))
 	var paneID string
+	var isReusedPane bool
 
 	// Check for a cached pane ID
 	if data, err := os.ReadFile(paneIDFile); err == nil {
@@ -480,6 +481,7 @@ func setupTmuxPane(client *tmux.Client, ui *UI, paneType string, splitHorizontal
 		if client.PaneExists(context.Background(), existingPaneID) {
 			ui.Info("tmux", fmt.Sprintf("Reusing existing %s pane...", paneType))
 			paneID = existingPaneID
+			isReusedPane = true
 
 			// Kill any running editor to ensure a clean state
 			if currentCmd, err := client.GetPaneCommand(context.Background(), paneID); err == nil {
@@ -507,7 +509,27 @@ func setupTmuxPane(client *tmux.Client, ui *UI, paneType string, splitHorizontal
 
 	// Send the command to the pane
 	if err := client.SendKeys(context.Background(), paneID, commandStr, "C-m"); err != nil {
-		// Clean up and return error if sending keys fails
+		// If this was a reused pane, the cache might be stale - try creating a new one
+		if isReusedPane {
+			ui.Info("tmux", fmt.Sprintf("Cached %s pane is stale, creating new one...", paneType))
+			os.Remove(paneIDFile)
+			newPaneID, createErr := client.SplitWindow(context.Background(), "", splitHorizontal, 0, "")
+			if createErr != nil {
+				return "", fmt.Errorf("failed to split tmux window for %s pane: %w", paneType, createErr)
+			}
+			paneID = newPaneID
+			_ = os.WriteFile(paneIDFile, []byte(paneID), 0644)
+
+			// Retry sending keys to the new pane
+			if retryErr := client.SendKeys(context.Background(), paneID, commandStr, "C-m"); retryErr != nil {
+				command.New("tmux", "kill-pane", "-t", paneID).Run()
+				os.Remove(paneIDFile)
+				return "", fmt.Errorf("failed to send keys to %s pane: %w", paneType, retryErr)
+			}
+			return paneID, nil
+		}
+
+		// Clean up and return error if sending keys fails on a new pane
 		command.New("tmux", "kill-pane", "-t", paneID).Run()
 		os.Remove(paneIDFile)
 		return "", fmt.Errorf("failed to send keys to %s pane: %w", paneType, err)
