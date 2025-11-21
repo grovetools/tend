@@ -3,6 +3,7 @@ package runner
 import (
 	"time"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mattsolo1/grove-core/pkg/workspace"
 	"github.com/mattsolo1/grove-core/tui/components/help"
@@ -60,6 +61,9 @@ type Model struct {
 	lastKey          string                   // For detecting 'gg' and 'z' chords
 	statusMessage    string
 	statusTimeout    time.Time
+
+	// Filter/search
+	filterInput textinput.Model
 }
 
 // New creates a new TUI model.
@@ -70,6 +74,11 @@ func New(initialFocusPath string) Model {
 		WithTitle("Tend Test Runner - Help").
 		Build()
 
+	ti := textinput.New()
+	ti.Placeholder = "Search scenarios..."
+	ti.CharLimit = 100
+	ti.Width = 50
+
 	return Model{
 		isLoading:          true,
 		keys:               newKeyMap(),
@@ -77,6 +86,7 @@ func New(initialFocusPath string) Model {
 		scenariosByProject: make(map[string]map[string][]*harness.Scenario),
 		collapsedNodes:     make(map[string]bool),
 		initialFocusPath:   initialFocusPath,
+		filterInput:        ti,
 	}
 }
 

@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mattsolo1/grove-core/pkg/workspace"
 	"github.com/sirupsen/logrus"
@@ -49,6 +51,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.help.ShowAll {
 			m.help.Toggle()
 			return m, nil
+		}
+
+		// Handle input while filtering
+		if m.filterInput.Focused() {
+			var cmd tea.Cmd
+			switch msg.String() {
+			case "enter", "esc":
+				m.filterInput.Blur()
+				return m, nil
+			}
+
+			// Update the filter input and re-build the display tree
+			prevValue := m.filterInput.Value()
+			m.filterInput, cmd = m.filterInput.Update(msg)
+			if m.filterInput.Value() != prevValue {
+				m.buildDisplayTree()
+				m.cursor = 0 // Reset cursor on new filter
+			}
+			return m, cmd
 		}
 
 		// Handle 'gg' and 'z' chords
@@ -136,6 +157,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, runTestCmd(node)
 			}
+		case key.Matches(msg, m.keys.Search):
+			m.filterInput.Focus()
+			return m, textinput.Blink
 		case key.Matches(msg, m.keys.Help):
 			m.help.Toggle()
 		default:
@@ -161,6 +185,7 @@ func (m *Model) buildDisplayTree() {
 	logger.Debugf("[TEND TUI buildDisplayTree] Starting, focusedProject=%v, total workspaces=%d", m.focusedProject != nil, len(m.workspaces))
 
 	var nodes []*DisplayNode
+	filter := strings.ToLower(m.filterInput.Value())
 
 	var projectsToDisplay []*workspace.WorkspaceNode
 	if m.focusedProject != nil {
@@ -280,6 +305,73 @@ func (m *Model) buildDisplayTree() {
 			}
 		}
 	}
+
+	// Apply filtering if there's a search term
+	if filter != "" {
+		logger.Debugf("[TEND TUI buildDisplayTree] Applying filter: %q", filter)
+		nodesToKeep := make(map[string]bool)
+
+		// First pass: identify matching nodes and mark them
+		for i, node := range nodes {
+			var name string
+			if node.IsEcosystem || node.IsProject {
+				name = node.Project.Name
+			} else if node.IsFile {
+				name = filepath.Base(node.FilePath)
+			} else if node.IsScenario && node.Scenario != nil {
+				name = node.Scenario.Name
+			}
+
+			// Check if this node matches the filter
+			if strings.Contains(strings.ToLower(name), filter) {
+				logger.Debugf("[TEND TUI buildDisplayTree] Match found: %q at index %d", name, i)
+				// Mark this node
+				if id := node.ID(); id != "" {
+					nodesToKeep[id] = true
+				}
+				// For scenarios (which don't have IDs), we track by index temporarily
+				if node.IsScenario {
+					nodesToKeep[fmt.Sprintf("idx:%d", i)] = true
+				}
+
+				// Mark all ancestors by traversing backwards
+				for j := i - 1; j >= 0; j-- {
+					ancestor := nodes[j]
+					// An ancestor is a node with lower depth
+					if ancestor.Depth < node.Depth {
+						if ancestorID := ancestor.ID(); ancestorID != "" {
+							if !nodesToKeep[ancestorID] {
+								logger.Debugf("[TEND TUI buildDisplayTree] Marking ancestor: %q at index %d", ancestor.Project.Name, j)
+								nodesToKeep[ancestorID] = true
+							}
+						}
+						// Stop at the immediate parent's depth level
+						if ancestor.Depth == node.Depth-1 {
+							break
+						}
+					}
+				}
+			}
+		}
+
+		// Second pass: build filtered list
+		var filteredNodes []*DisplayNode
+		for i, node := range nodes {
+			shouldKeep := false
+			if id := node.ID(); id != "" {
+				shouldKeep = nodesToKeep[id]
+			} else if node.IsScenario {
+				shouldKeep = nodesToKeep[fmt.Sprintf("idx:%d", i)]
+			}
+
+			if shouldKeep {
+				filteredNodes = append(filteredNodes, node)
+			}
+		}
+		nodes = filteredNodes
+		logger.Debugf("[TEND TUI buildDisplayTree] After filtering: %d nodes remain", len(nodes))
+	}
+
 	m.displayNodes = nodes
 
 	logger.Debugf("[TEND TUI buildDisplayTree] Created %d display nodes", len(m.displayNodes))

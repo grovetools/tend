@@ -17,6 +17,7 @@ type KeyMap struct {
 	Fold           key.Binding
 	Unfold         key.Binding
 	FoldPrefix     key.Binding // z
+	Search         key.Binding
 }
 
 func newKeyMap() KeyMap {
@@ -59,6 +60,10 @@ func newKeyMap() KeyMap {
 			key.WithKeys("z"),
 			key.WithHelp("z*", "fold commands (za, zc, zo, zR, zM)"),
 		),
+		Search: key.NewBinding(
+			key.WithKeys("/"),
+			key.WithHelp("/", "search"),
+		),
 	}
 }
 
@@ -71,6 +76,6 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 		{k.Up, k.Down, k.GoToTop, k.GoToBottom},
 		{k.Fold, k.Unfold, k.FoldPrefix},
 		{k.FocusSelected, k.FocusEcosystem, k.ClearFocus},
-		{k.DebugRun, k.Help, k.Quit},
+		{k.Search, k.DebugRun, k.Help, k.Quit},
 	}
 }

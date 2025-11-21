@@ -3,12 +3,36 @@ package runner
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mattsolo1/grove-core/tui/components/table"
 	"github.com/mattsolo1/grove-core/tui/theme"
 )
+
+// highlightMatch highlights the filter text within the name
+func highlightMatch(text, filter string) string {
+	if filter == "" {
+		return text
+	}
+
+	lowerText := strings.ToLower(text)
+	lowerFilter := strings.ToLower(filter)
+	idx := strings.Index(lowerText, lowerFilter)
+
+	if idx == -1 {
+		return text
+	}
+
+	// Highlight the matched portion
+	before := text[:idx]
+	match := text[idx : idx+len(filter)]
+	after := text[idx+len(filter):]
+
+	highlightStyle := theme.DefaultTheme.Success.Copy().Reverse(true)
+	return before + highlightStyle.Render(match) + after
+}
 
 func (m Model) View() string {
 	if m.err != nil {
@@ -30,6 +54,9 @@ func (m Model) View() string {
 		header = fmt.Sprintf("Focus: %s", m.focusedProject.Name)
 	}
 	headerView := theme.DefaultTheme.Header.Render(header)
+
+	// Search input
+	searchView := m.filterInput.View()
 
 	// Main content: full-width scrollable list
 	// Calculate viewport boundaries
@@ -71,6 +98,13 @@ func (m Model) View() string {
 			// Apply prefix for tree structure
 			fullName := node.Prefix + name
 
+			// Apply highlighting if there's a filter
+			if m.filterInput.Value() != "" {
+				// Highlight just the name part, not the prefix
+				highlightedName := highlightMatch(name, m.filterInput.Value())
+				fullName = node.Prefix + highlightedName
+			}
+
 			// Apply styling
 			styledName := style.Render(fullName)
 
@@ -98,6 +132,7 @@ func (m Model) View() string {
 
 	fullView := lipgloss.JoinVertical(lipgloss.Left,
 		headerView,
+		searchView,
 		"",
 		listView,
 		"",
