@@ -26,6 +26,21 @@ func NewTempDirManager(prefix string) (*TempDirManager, error) {
 	}, nil
 }
 
+// NewTempDirManagerForExisting creates a new TempDirManager for a path that
+// already exists. The manager will not delete this path on Cleanup since it
+// was created by an external process (the orchestrator).
+func NewTempDirManagerForExisting(path string) (*TempDirManager, error) {
+	// Verify the path exists
+	if _, err := os.Stat(path); err != nil {
+		return nil, fmt.Errorf("existing path does not exist: %w", err)
+	}
+
+	return &TempDirManager{
+		baseDir: path,
+		dirs:    []string{}, // Empty dirs list means Cleanup won't remove anything
+	}, nil
+}
+
 // BaseDir returns the root temporary directory
 func (m *TempDirManager) BaseDir() string {
 	return m.baseDir

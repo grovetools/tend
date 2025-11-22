@@ -212,3 +212,47 @@ func runTestCmd(node *DisplayNode) tea.Cmd {
 		return statusMsg("Test run finished. Press 'R' to refresh if needed.")
 	})
 }
+
+// runTestDebugSessionCmd creates debug sessions for scenarios.
+// For a single scenario, creates one session. For a file, creates a session per scenario.
+func runTestDebugSessionCmd(node *DisplayNode) tea.Cmd {
+	projectPath := node.Project.Path
+
+	// Get the current executable path to ensure we run the same tend binary.
+	executable, err := os.Executable()
+	if err != nil {
+		return func() tea.Msg {
+			return statusMsg(fmt.Sprintf("Error finding tend binary: %v", err))
+		}
+	}
+
+	var scenarios []string
+	if node.IsScenario {
+		scenarios = []string{node.Scenario.Name}
+	} else if node.IsFile {
+		for _, s := range node.ScenariosInFile {
+			scenarios = append(scenarios, s.Name)
+		}
+	}
+
+	if len(scenarios) == 0 {
+		return func() tea.Msg {
+			return statusMsg("No scenarios to run.")
+		}
+	}
+
+	// Run --debug-session for each scenario
+	return func() tea.Msg {
+		for _, scenarioName := range scenarios {
+			args := []string{"run", scenarioName, "--debug-session"}
+			cmd := exec.Command(executable, args...)
+			cmd.Dir = projectPath
+			// Run synchronously so all sessions get created
+			_ = cmd.Run()
+		}
+		if len(scenarios) == 1 {
+			return statusMsg(fmt.Sprintf("Debug session created. Use: tmux -L tend-debug attach -t %s", scenarios[0]))
+		}
+		return statusMsg(fmt.Sprintf("Created %d debug sessions. Use: tmux -L tend-debug ls", len(scenarios)))
+	}
+}

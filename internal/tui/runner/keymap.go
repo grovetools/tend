@@ -9,6 +9,7 @@ import (
 type KeyMap struct {
 	keymap.Base
 	DebugRun       key.Binding
+	DebugSession   key.Binding
 	FocusSelected  key.Binding
 	FocusEcosystem key.Binding
 	ClearFocus     key.Binding
@@ -27,6 +28,10 @@ func newKeyMap() KeyMap {
 		DebugRun: key.NewBinding(
 			key.WithKeys("d"),
 			key.WithHelp("d", "run in debug mode"),
+		),
+		DebugSession: key.NewBinding(
+			key.WithKeys("D"),
+			key.WithHelp("D", "run in debug session"),
 		),
 		FocusSelected: key.NewBinding(
 			key.WithKeys("."),
@@ -76,6 +81,6 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 		{k.Up, k.Down, k.GoToTop, k.GoToBottom},
 		{k.Fold, k.Unfold, k.FoldPrefix},
 		{k.FocusSelected, k.FocusEcosystem, k.ClearFocus},
-		{k.Search, k.DebugRun, k.Help, k.Quit},
+		{k.Search, k.DebugRun, k.DebugSession, k.Help, k.Quit},
 	}
 }

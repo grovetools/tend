@@ -78,6 +78,13 @@ type Options struct {
 	TmuxSplit       bool          // Split tmux window and cd to test directory
 	Nvim            bool          // Start nvim in the new tmux split
 	UseRealDeps     []string      // List of dependencies to use real binaries for
+	// TestRootDir specifies a pre-existing directory to use for the test run.
+	// If empty, a new temporary directory will be created.
+	TestRootDir string
+	// TmuxSocket specifies a custom tmux socket for debug-session mode.
+	TmuxSocket string
+	// TmuxEditorTarget specifies the tmux target for the editor window in debug-session mode.
+	TmuxEditorTarget string
 }
 
 // Harness runs scenarios
@@ -256,18 +263,31 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 		}
 
 		// Jump to step definition in editor if in debug mode
-		if h.opts.Nvim && testCtx.editorPaneID != "" && step.Line > 0 {
-			tmuxClient, err := tmux.NewClient()
-			if err == nil {
+		if step.Line > 0 {
+			var tmuxClient *tmux.Client
+			var editorTarget string
+			var err error
+
+			// Check for debug-session mode (dedicated tmux server)
+			if h.opts.TmuxSocket != "" && h.opts.TmuxEditorTarget != "" {
+				tmuxClient, err = tmux.NewClientWithSocket(h.opts.TmuxSocket)
+				editorTarget = h.opts.TmuxEditorTarget
+			} else if h.opts.Nvim && testCtx.editorPaneID != "" {
+				// Pane-based debug mode
+				tmuxClient, err = tmux.NewClient()
+				editorTarget = testCtx.editorPaneID
+			}
+
+			if err == nil && tmuxClient != nil && editorTarget != "" {
 				// Check if the step is in a different file and switch if needed
 				if step.File != testCtx.currentEditorFile {
-					tmuxClient.SendKeys(context.Background(), testCtx.editorPaneID, fmt.Sprintf(":e %s", step.File), "C-m")
+					tmuxClient.SendKeys(context.Background(), editorTarget, fmt.Sprintf(":e %s", step.File), "C-m")
 					testCtx.currentEditorFile = step.File
 					time.Sleep(100 * time.Millisecond) // Give nvim time to open the file
 				}
 				// Now, jump to the line
 				jumpCmd := fmt.Sprintf(":%d", step.Line)
-				tmuxClient.SendKeys(context.Background(), testCtx.editorPaneID, jumpCmd, "C-m")
+				tmuxClient.SendKeys(context.Background(), editorTarget, jumpCmd, "C-m")
 			}
 		}
 
@@ -397,6 +417,11 @@ func (h *Harness) RunAll(ctx context.Context, scenarios []*Scenario) ([]*Result,
 
 // createTempManager creates a temporary directory manager for a scenario
 func (h *Harness) createTempManager(scenarioName string) (*fs.TempDirManager, error) {
+	// If TestRootDir is set, use the existing directory
+	if h.opts.TestRootDir != "" {
+		return fs.NewTempDirManagerForExisting(h.opts.TestRootDir)
+	}
+	// Otherwise, create a new temporary directory
 	prefix := fmt.Sprintf("grove-tend-%s-", scenarioName)
 	return fs.NewTempDirManager(prefix)
 }

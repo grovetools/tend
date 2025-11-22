@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
+	"github.com/mattsolo1/grove-core/pkg/tmux"
 	"github.com/mattsolo1/grove-core/tui/theme"
 	"github.com/spf13/cobra"
 
@@ -18,18 +21,22 @@ import (
 )
 
 var (
-	parallel     bool
-	timeout      time.Duration
-	noCleanup    bool
-	outputFormat string
-	junitOutput  string
-	jsonOutput   string
-	tmuxSplit    bool
-	nvim         bool
-	debug        bool
-	useRealDeps  []string
-	includeLocal bool
-	explicitOnly bool
+	parallel            bool
+	timeout             time.Duration
+	noCleanup           bool
+	outputFormat        string
+	junitOutput         string
+	jsonOutput          string
+	tmuxSplit           bool
+	nvim                bool
+	debug               bool
+	debugSession        bool
+	testRootDirOverride string
+	tmuxSocketOverride  string
+	tmuxEditorTarget    string
+	useRealDeps         []string
+	includeLocal        bool
+	explicitOnly        bool
 )
 
 // newRunCmd creates the run command with the provided scenarios
@@ -62,16 +69,28 @@ Examples:
 	runCmd.Flags().BoolVar(&tmuxSplit, "tmux-split", false, "Split tmux window and cd to test directory")
 	runCmd.Flags().BoolVar(&nvim, "nvim", false, "Start nvim in the new tmux split (requires --tmux-split)")
 	runCmd.Flags().BoolVarP(&debug, "debug", "d", false, "Enable debug mode (shorthand for -i --no-cleanup --tmux-split --nvim --very-verbose)")
+	runCmd.Flags().BoolVar(&debugSession, "debug-session", false, "Enable debug mode in a new tmux session with windows (implies -i, --no-cleanup)")
+	runCmd.Flags().StringVar(&testRootDirOverride, "_test-root-dir", "", "Internal use: override the test root directory")
+	runCmd.Flags().StringVar(&tmuxSocketOverride, "_tmux-socket", "", "Internal use: tmux socket name for debug session")
+	runCmd.Flags().StringVar(&tmuxEditorTarget, "_tmux-editor", "", "Internal use: tmux editor window target")
+	_ = runCmd.Flags().MarkHidden("_test-root-dir")
+	_ = runCmd.Flags().MarkHidden("_tmux-socket")
+	_ = runCmd.Flags().MarkHidden("_tmux-editor")
 	runCmd.Flags().StringSliceVar(&useRealDeps, "use-real-deps", []string{}, "A comma-separated list of dependencies to use real binaries for instead of mocks (e.g., flow,cx). Use 'all' to swap all.")
 	runCmd.Flags().BoolVar(&includeLocal, "include-local", false, "Include local-only scenarios even when in a CI environment")
 	runCmd.Flags().BoolVar(&explicitOnly, "explicit", false, "Run only explicit-only scenarios (automatically enables --no-cleanup)")
-	
+
 	return runCmd
 }
 
 func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Scenario) error {
 	ctx := cmd.Context()
-	
+
+	// Validate mutually exclusive flags
+	if debug && debugSession {
+		return fmt.Errorf("--debug and --debug-session cannot be used at the same time")
+	}
+
 	// Handle the debug flag shorthand
 	if debug {
 		interactive = true
@@ -81,12 +100,20 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 		veryVerbose = true
 		verbose = true // --very-verbose implies --verbose
 	}
-	
+
+	// Handle the debug-session flag shorthand
+	if debugSession {
+		interactive = true
+		noCleanup = true
+		veryVerbose = true
+		verbose = true // --very-verbose implies --verbose
+	}
+
 	// If running explicit-only scenarios, automatically enable no-cleanup
 	if explicitOnly {
 		noCleanup = true
 	}
-	
+
 	if nvim && !tmuxSplit {
 		return fmt.Errorf("--nvim can only be used with --tmux-split")
 	}
@@ -152,28 +179,135 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 		renderer.RenderInfo("No scenarios match the specified criteria")
 		return nil
 	}
-	
+
+	// Debug session orchestration - creates a dedicated tmux server and re-executes tend
+	if debugSession {
+		if len(selectedScenarios) != 1 {
+			return fmt.Errorf("--debug-session requires exactly one scenario to be specified, but found %d", len(selectedScenarios))
+		}
+		scenario := selectedScenarios[0]
+
+		// Create the temporary directory for the test
+		testRootDir, err := os.MkdirTemp("", "tend-debug-*")
+		if err != nil {
+			return fmt.Errorf("failed to create temp dir for debug session: %w", err)
+		}
+		renderer.RenderInfo(fmt.Sprintf("Debug session root directory: %s", testRootDir))
+
+		// Set up a dedicated tmux server for all debug sessions
+		socketName := "tend-debug"
+		sanitizedName := regexp.MustCompile(`[^a-zA-Z0-9_-]+`).ReplaceAllString(scenario.Name, "_")
+		sessionName := sanitizedName
+
+		client, err := tmux.NewClientWithSocket(socketName)
+		if err != nil {
+			return fmt.Errorf("failed to create tmux client: %w", err)
+		}
+
+		// Kill any existing session with the same name
+		_ = client.KillSession(ctx, sessionName)
+
+		// Create a new session with a 'shell' window
+		launchOpts := tmux.LaunchOptions{
+			SessionName:      sessionName,
+			WorkingDirectory: testRootDir,
+			WindowName:       "shell",
+			WindowIndex:      -1,
+			Panes: []tmux.PaneOptions{
+				{SendKeys: "nvim"},
+			},
+		}
+		if err := client.Launch(ctx, launchOpts); err != nil {
+			return fmt.Errorf("failed to create tmux session: %w", err)
+		}
+
+		// Create an 'editor' window for viewing test source
+		projectRoot := rootDir
+		if projectRoot == "" {
+			projectRoot, _ = os.Getwd()
+		}
+
+		if err := client.NewWindow(ctx, sessionName, "editor", ""); err != nil {
+			return fmt.Errorf("failed to create editor window: %w", err)
+		}
+		editorTarget := fmt.Sprintf("%s:editor", sessionName)
+
+		// Open nvim with the scenario file if available, otherwise just nvim in project root
+		var editorCmd string
+		if scenario.File != "" {
+			editorCmd = fmt.Sprintf("cd '%s' && nvim '%s'", projectRoot, scenario.File)
+		} else {
+			editorCmd = fmt.Sprintf("cd '%s' && nvim", projectRoot)
+		}
+		if err := client.SendKeys(ctx, editorTarget, editorCmd, "C-m"); err != nil {
+			renderer.RenderInfo(fmt.Sprintf("Warning: failed to open editor: %v", err))
+		}
+		if scenario.File != "" && scenario.Line > 0 {
+			time.Sleep(100 * time.Millisecond) // Give nvim time to start
+			lineCmd := fmt.Sprintf(":%d", scenario.Line)
+			if err := client.SendKeys(ctx, editorTarget, lineCmd, "C-m"); err != nil {
+				renderer.RenderInfo(fmt.Sprintf("Warning: failed to jump to line: %v", err))
+			}
+		}
+
+		// Create a 'runner' window and execute tend
+		if err := client.NewWindow(ctx, sessionName, "runner", ""); err != nil {
+			return fmt.Errorf("failed to create runner window: %w", err)
+		}
+		runnerTarget := fmt.Sprintf("%s:runner", sessionName)
+
+		// Reconstruct the command, replacing --debug-session with interactive flags
+		newArgs := []string{}
+		for _, arg := range os.Args[1:] {
+			if arg != "--debug-session" {
+				newArgs = append(newArgs, arg)
+			}
+		}
+		// Add flags that --debug-session implies (editorTarget already defined above)
+		newArgs = append(newArgs,
+			"-i", "--no-cleanup", "--very-verbose",
+			"--_test-root-dir="+testRootDir,
+			"--_tmux-socket="+socketName,
+			"--_tmux-editor="+editorTarget,
+		)
+		tendCmd := os.Args[0] + " " + strings.Join(newArgs, " ")
+
+		if err := client.SendKeys(ctx, runnerTarget, tendCmd, "C-m"); err != nil {
+			return fmt.Errorf("failed to send command to runner window: %w", err)
+		}
+
+		// Print instructions for attaching
+		renderer.RenderInfo(fmt.Sprintf("Debug session '%s' created in tmux server '%s'", sessionName, socketName))
+		renderer.RenderInfo(fmt.Sprintf("To attach: tmux -L %s attach -t %s", socketName, sessionName))
+		renderer.RenderInfo(fmt.Sprintf("List sessions: tmux -L %s ls", socketName))
+
+		return nil
+	}
+
 	// Display selected scenarios
 	scenarioNames := make([]string, len(selectedScenarios))
 	for i, scenario := range selectedScenarios {
 		scenarioNames[i] = scenario.Name
 	}
 	renderer.RenderList(fmt.Sprintf("Running %d scenario(s):", len(selectedScenarios)), scenarioNames)
-	
+
 	// Create harness options
 	opts := harness.Options{
-		Verbose:       verbose,
-		VeryVerbose:   veryVerbose,
-		Interactive:   interactive,
-		NoCleanup:     noCleanup,
-		Timeout:       timeout,
-		GroveBinary:   groveBinary,
-		RootDir:       rootDir,
-		MonitorDocker: monitorDocker,
-		DockerFilter:  dockerFilter,
-		TmuxSplit:     tmuxSplit,
-		Nvim:          nvim,
-		UseRealDeps:   useRealDeps,
+		Verbose:          verbose,
+		VeryVerbose:      veryVerbose,
+		Interactive:      interactive,
+		NoCleanup:        noCleanup,
+		Timeout:          timeout,
+		GroveBinary:      groveBinary,
+		RootDir:          rootDir,
+		MonitorDocker:    monitorDocker,
+		DockerFilter:     dockerFilter,
+		TmuxSplit:        tmuxSplit,
+		Nvim:             nvim,
+		UseRealDeps:      useRealDeps,
+		TestRootDir:      testRootDirOverride,
+		TmuxSocket:       tmuxSocketOverride,
+		TmuxEditorTarget: tmuxEditorTarget,
 	}
 	
 	// Configure for CI if needed

@@ -157,6 +157,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, runTestCmd(node)
 			}
+		case key.Matches(msg, m.keys.DebugSession):
+			if m.cursor < len(m.displayNodes) {
+				node := m.displayNodes[m.cursor]
+				if node.IsEcosystem || node.IsProject {
+					m.statusMessage = "Select a scenario or file for debug session."
+					m.statusTimeout = time.Now().Add(3 * time.Second)
+					return m, clearStatusCmd(3 * time.Second)
+				}
+				return m, runTestDebugSessionCmd(node)
+			}
 		case key.Matches(msg, m.keys.Search):
 			m.filterInput.Focus()
 			return m, textinput.Blink
