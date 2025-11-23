@@ -69,10 +69,32 @@ func proxyToProjectBinary() {
 		return
 	}
 
-	// Try to find a project-specific tend binary
-	projectBinary, err := project.FindTendBinary(cwd)
+	// Style helpers for messages
+	arrow := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("4")).
+		Render("→")
+
+	style := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("2")).
+		Bold(true)
+
+	pathStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("8")).
+		Italic(true)
+
+	// Print building message
+	buildMsg := fmt.Sprintf("%s %s", arrow, style.Render("Building project test runner..."))
+	fmt.Fprintln(os.Stderr, buildMsg)
+
+	// Build the project-specific tend binary (always rebuilds for latest changes)
+	projectBinary, err := project.BuildProjectTendBinary(cwd)
 	if err != nil {
-		// No project tend binary found, continue with global binary
+		fmt.Fprintf(os.Stderr, "Error building project test runner: %v\n", err)
+		os.Exit(1)
+	}
+
+	if projectBinary == "" {
+		// No project-specific binary source found, continue with global binary
 		return
 	}
 
@@ -88,26 +110,13 @@ func proxyToProjectBinary() {
 		return
 	}
 
-	// Create a nice styled message about the proxying
-	style := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("2")).
-		Bold(true)
-	
-	arrow := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("4")).
-		Render("→")
-	
-	pathStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("8")).
-		Italic(true)
-	
-	message := fmt.Sprintf("%s %s %s",
+	// Print executing message
+	execMsg := fmt.Sprintf("%s %s %s",
 		arrow,
-		style.Render("Found project tend:"),
+		style.Render("Executing project test runner:"),
 		pathStyle.Render(projectBinary),
 	)
-	
-	fmt.Fprintln(os.Stderr, message)
+	fmt.Fprintln(os.Stderr, execMsg)
 
 	// Prepare the environment with the child process marker
 	env := os.Environ()
