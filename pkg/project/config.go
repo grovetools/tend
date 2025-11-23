@@ -122,16 +122,31 @@ func buildLDFlags(info gitInfo) string {
 }
 
 // buildMocksByConvention builds mock binaries from conventional locations.
-// It looks for directories under <sourceDir>/mocks/src/ and builds each one
-// that contains a main.go to <sourceDir>/mocks/bin/mock-<dirname>.
+// It looks for directories under <sourceDir>/mocks/src/ or <sourceDir>/tend/mocks/src/
+// and builds each one that contains a main.go to the corresponding mocks/bin/mock-<dirname>.
 func buildMocksByConvention(sourceDir string) error {
-	mockSrcDir := filepath.Join(sourceDir, "mocks", "src")
-	if _, err := os.Stat(mockSrcDir); os.IsNotExist(err) {
-		// No mocks directory, nothing to build
-		return nil
+	// Check both conventional locations
+	mockLocations := []struct {
+		srcDir string
+		binDir string
+	}{
+		{filepath.Join(sourceDir, "mocks", "src"), filepath.Join(sourceDir, "mocks", "bin")},
+		{filepath.Join(sourceDir, "tend", "mocks", "src"), filepath.Join(sourceDir, "tend", "mocks", "bin")},
 	}
 
-	mockBinDir := filepath.Join(sourceDir, "mocks", "bin")
+	var mockSrcDir, mockBinDir string
+	for _, loc := range mockLocations {
+		if _, err := os.Stat(loc.srcDir); err == nil {
+			mockSrcDir = loc.srcDir
+			mockBinDir = loc.binDir
+			break
+		}
+	}
+
+	if mockSrcDir == "" {
+		// No mocks directory found, nothing to build
+		return nil
+	}
 	if err := os.MkdirAll(mockBinDir, 0755); err != nil {
 		return fmt.Errorf("failed to create mock bin directory: %w", err)
 	}

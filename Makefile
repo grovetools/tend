@@ -31,7 +31,7 @@ MOCKS ?= $(shell find $(MOCK_SRC_DIR) -mindepth 1 -maxdepth 1 -type d -exec base
 
 .PHONY: all build test clean fmt vet lint run check dev build-all help build-mocks generate-docs \
         build-custom-example build-tmux-example build-examples test-tmux test-headless \
-        test-tui-verbose test-tui-interactive run-scenarios test-e2e build-e2e-runner build-e2e-mocks
+        test-tui-verbose test-tui-interactive run-scenarios test-e2e build-e2e-mocks build-e2e-runner
 
 all: build
 
@@ -155,34 +155,29 @@ build-mocks:
 	fi
 
 # --- E2E Testing for Tend ---
-E2E_BINARY_NAME=tend-e2e
-E2E_RUNNER_SRC=tests/e2e
-E2E_MOCK_SRC_DIR=tests/e2e/tend/mocks/src
-E2E_MOCK_BIN_DIR=tests/e2e/tend/mocks/bin
-E2E_MOCKS ?= $(shell find $(E2E_MOCK_SRC_DIR) -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null)
-
-.PHONY: test-e2e build-e2e-runner build-e2e-mocks
+# For self-testing grove-tend, we need to:
+# 1. Build the test runner from tests/e2e/ (includes scenarios)
+# 2. Build mocks (since proxy is skipped when testing ourselves)
+E2E_RUNNER=tend-e2e
+E2E_MOCK_SRC=tests/e2e/tend/mocks/src
+E2E_MOCK_BIN=tests/e2e/tend/mocks/bin
 
 build-e2e-mocks:
-	@if [ -d "$(E2E_MOCK_SRC_DIR)" ]; then \
-		echo "Building E2E mocks: $(E2E_MOCKS)"; \
-		mkdir -p $(E2E_MOCK_BIN_DIR); \
-		for mock in $(E2E_MOCKS); do \
-			echo "  -> Building mock-$$mock"; \
-			go build -o $(E2E_MOCK_BIN_DIR)/mock-$$mock ./$(E2E_MOCK_SRC_DIR)/$$mock; \
+	@if [ -d "$(E2E_MOCK_SRC)" ]; then \
+		mkdir -p $(E2E_MOCK_BIN); \
+		for mock in $$(ls $(E2E_MOCK_SRC)); do \
+			echo "  Building mock-$$mock..."; \
+			go build -o $(E2E_MOCK_BIN)/mock-$$mock ./$(E2E_MOCK_SRC)/$$mock; \
 		done; \
-	else \
-		echo "No E2E mock directory found, skipping mock build."; \
 	fi
 
 build-e2e-runner:
-	@echo "Building E2E test runner $(E2E_BINARY_NAME)..."
-	@mkdir -p $(BIN_DIR)
-	@go build $(LDFLAGS) -o $(BIN_DIR)/$(E2E_BINARY_NAME) ./$(E2E_RUNNER_SRC)
+	@echo "Building E2E test runner..."
+	@go build $(LDFLAGS) -o $(BIN_DIR)/$(E2E_RUNNER) ./tests/e2e
 
 test-e2e: build-e2e-runner build-e2e-mocks
 	@echo "Running tend E2E test suite..."
-	@$(BIN_DIR)/$(E2E_BINARY_NAME) run $(ARGS)
+	@$(BIN_DIR)/$(E2E_RUNNER) run $(ARGS)
 
 # Generate documentation using the new docgen tool
 generate-docs:
@@ -216,9 +211,7 @@ help:
 	@echo "  make test-tui-interactive  - Run TUI tests in interactive debug mode"
 	@echo ""
 	@echo "E2E testing targets:"
-	@echo "  make test-e2e          - Build and run E2E test suite"
-	@echo "  make build-e2e-runner  - Build E2E test runner binary"
-	@echo "  make build-e2e-mocks   - Build E2E mock binaries"
+	@echo "  make test-e2e          - Run E2E test suite (mocks built automatically)"
 	@echo ""
 	@echo "Other targets:"
 	@echo "  make run-scenarios - Run agent-isolation scenario"
