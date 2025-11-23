@@ -164,6 +164,12 @@ func (s *Session) WaitForUIStable(timeout time.Duration, pollInterval time.Durat
 	}, opts)
 }
 
+// WaitStable waits for the UI to stabilize using sensible defaults.
+// Equivalent to WaitForUIStable(2*time.Second, 100*time.Millisecond, 200*time.Millisecond).
+func (s *Session) WaitStable() error {
+	return s.WaitForUIStable(2*time.Second, 100*time.Millisecond, 200*time.Millisecond)
+}
+
 // AssertContains immediately checks if the TUI's current content contains the specified text.
 func (s *Session) AssertContains(text string) error {
 	content, err := s.Capture()
