@@ -183,12 +183,15 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 	if !h.opts.NoCleanup {
 		defer func() {
 			ui.Cleanup()
-			// Clean up any TUI sessions if testCtx was initialized
+			// Clean up all TUI sessions if testCtx was initialized
 			if testCtx != nil {
-				if sessionName := testCtx.GetString("active_tui_session_name"); sessionName != "" {
+				sessions := testCtx.GetStringSlice("tui_sessions")
+				if len(sessions) > 0 {
 					tmuxClient, err := tmux.NewClient()
 					if err == nil {
-						_ = tmuxClient.KillSession(context.Background(), sessionName)
+						for _, sessionName := range sessions {
+							_ = tmuxClient.KillSession(context.Background(), sessionName)
+						}
 					}
 				}
 			}
@@ -293,9 +296,8 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 
 		ui.StepStart(i+1, len(scenario.Steps), step.Name)
 
-		// Interactive pause
-		if h.opts.Interactive {
-			// First, display the TUI state if a session is active
+		// Display TUI state if verbose and a session is active
+		if h.opts.Verbose || h.opts.VeryVerbose {
 			if sessionName := testCtx.GetString("active_tui_session_name"); sessionName != "" {
 				tmuxClient, err := tmux.NewClient()
 				if err == nil {
@@ -304,7 +306,10 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 					}
 				}
 			}
+		}
 
+		// Interactive pause
+		if h.opts.Interactive {
 			action := ui.WaitForUser()
 			switch action {
 			case "quit":

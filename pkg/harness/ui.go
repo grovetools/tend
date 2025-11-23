@@ -105,29 +105,8 @@ func (ui *UI) WaitForUser() string {
 // RenderTUICapture displays the captured content of a TUI session
 func (ui *UI) RenderTUICapture(content string) {
 	if ui.verbose {
-		fmt.Println("\n" + Box("TUI State", content) + "\n")
+		fmt.Println(content)
 	}
-}
-
-// Box creates a boxed display of content
-func Box(title, content string) string {
-	lines := strings.Split(content, "\n")
-	maxWidth := len(title)
-	for _, line := range lines {
-		if len(line) > maxWidth {
-			maxWidth = len(line)
-		}
-	}
-	
-	border := "┌─" + title + strings.Repeat("─", maxWidth-len(title)+2) + "┐"
-	result := []string{border}
-	
-	for _, line := range lines {
-		result = append(result, "│ " + line + strings.Repeat(" ", maxWidth-len(line)) + " │")
-	}
-	
-	result = append(result, "└" + strings.Repeat("─", maxWidth+2) + "┘")
-	return strings.Join(result, "\n")
 }
 
 // Cleanup displays cleanup message

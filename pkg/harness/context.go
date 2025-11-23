@@ -73,6 +73,14 @@ func (c *Context) GetString(key string) string {
 	return ""
 }
 
+// GetStringSlice retrieves a stored string slice value
+func (c *Context) GetStringSlice(key string) []string {
+	if v, ok := c.Get(key).([]string); ok {
+		return v
+	}
+	return nil
+}
+
 // GetInt retrieves a stored int value
 func (c *Context) GetInt(key string) int {
 	if v, ok := c.Get(key).(int); ok {
@@ -289,6 +297,7 @@ func (c *Context) StartTUI(binaryPath string, args []string, opts ...tui.StartOp
 	launchOpts := tmux.LaunchOptions{
 		SessionName:      sessionName,
 		WorkingDirectory: c.RootDir, // TUI runs in the test's temp directory
+		WindowIndex:      -1,        // Don't reorder window position
 		Panes: []tmux.PaneOptions{
 			{
 				Command: cmdBuilder.String(),
@@ -301,8 +310,11 @@ func (c *Context) StartTUI(binaryPath string, args []string, opts ...tui.StartOp
 		return nil, fmt.Errorf("failed to launch TUI in tmux session '%s': %w", sessionName, err)
 	}
 
-	// Register for cleanup (we need to track this in the Context)
-	c.Set("active_tui_session_name", sessionName)
+	// Register for cleanup - track all sessions created
+	c.Set("active_tui_session_name", sessionName) // Keep for backward compat
+	sessions := c.GetStringSlice("tui_sessions")
+	sessions = append(sessions, sessionName)
+	c.Set("tui_sessions", sessions)
 
 	// Return the session handle
 	return tui.NewSession(sessionName, tmuxClient, c.RootDir), nil
