@@ -271,6 +271,23 @@ func (c *Context) StartTUI(binaryPath string, args []string, opts ...tui.StartOp
 		}
 	}
 
+	// Set default color env vars so TUIs render colors in test sessions
+	// These work with grove-core's tui.InitializeTUI() to enable colors
+	colorEnvSet := false
+	for _, env := range config.Env {
+		if strings.HasPrefix(env, "CLICOLOR_FORCE=") {
+			colorEnvSet = true
+			break
+		}
+	}
+	if !colorEnvSet {
+		config.Env = append(config.Env,
+			"CLICOLOR_FORCE=1",
+			"COLORTERM=truecolor",
+			"TERM=xterm-256color",
+		)
+	}
+
 	tmuxClient, err := tmux.NewClient()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tmux client for TUI session: %w", err)
