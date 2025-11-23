@@ -8,6 +8,7 @@ import (
 // KeyMap defines the keybindings for the test runner TUI.
 type KeyMap struct {
 	keymap.Base
+	Run            key.Binding
 	DebugRun       key.Binding
 	DebugSession   key.Binding
 	FocusSelected  key.Binding
@@ -25,6 +26,10 @@ func newKeyMap() KeyMap {
 	base := keymap.NewBase()
 	return KeyMap{
 		Base: base,
+		Run: key.NewBinding(
+			key.WithKeys("r", "enter"),
+			key.WithHelp("r/⏎", "run"),
+		),
 		DebugRun: key.NewBinding(
 			key.WithKeys("d"),
 			key.WithHelp("d", "run in debug mode"),
@@ -81,6 +86,6 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 		{k.Up, k.Down, k.GoToTop, k.GoToBottom},
 		{k.Fold, k.Unfold, k.FoldPrefix},
 		{k.FocusSelected, k.FocusEcosystem, k.ClearFocus},
-		{k.Search, k.DebugRun, k.DebugSession, k.Help, k.Quit},
+		{k.Run, k.DebugRun, k.DebugSession, k.Search, k.Help, k.Quit},
 	}
 }

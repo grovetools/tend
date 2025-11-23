@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -28,6 +29,72 @@ type clearStatusMsg struct{}
 
 // statusMsg is used to display a status message to the user.
 type statusMsg string
+
+// testOutputMsg carries output from a running test.
+type testOutputMsg struct {
+	output string
+	done   bool
+	err    error
+}
+
+// runTestInPaneCmd runs a test in the background and streams output to the TUI.
+func runTestInPaneCmd(node *DisplayNode) tea.Cmd {
+	var args []string
+	projectPath := node.Project.Path
+
+	switch {
+	case node.IsScenario:
+		args = []string{"run", node.Scenario.Name}
+	case node.IsFile:
+		var scenarioNames []string
+		for _, s := range node.ScenariosInFile {
+			scenarioNames = append(scenarioNames, s.Name)
+		}
+		if len(scenarioNames) == 0 {
+			return func() tea.Msg { return testOutputMsg{output: "No scenarios to run.", done: true} }
+		}
+		args = append([]string{"run"}, scenarioNames...)
+	case node.IsProject:
+		args = []string{"run"}
+	case node.IsEcosystem:
+		return func() tea.Msg { return testOutputMsg{output: "Cannot run ecosystem tests.", done: true} }
+	default:
+		return func() tea.Msg { return testOutputMsg{output: "Not supported.", done: true} }
+	}
+
+	executable, err := os.Executable()
+	if err != nil {
+		return func() tea.Msg { return testOutputMsg{output: fmt.Sprintf("Error: %v", err), done: true, err: err} }
+	}
+
+	return func() tea.Msg {
+		cmd := exec.Command(executable, args...)
+		cmd.Dir = projectPath
+		cmd.Env = append(os.Environ(), "CLICOLOR_FORCE=1", "TERM=xterm-256color")
+
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			return testOutputMsg{output: fmt.Sprintf("Error: %v", err), done: true, err: err}
+		}
+		cmd.Stderr = cmd.Stdout
+
+		if err := cmd.Start(); err != nil {
+			return testOutputMsg{output: fmt.Sprintf("Error starting: %v", err), done: true, err: err}
+		}
+
+		scanner := bufio.NewScanner(stdout)
+		var output strings.Builder
+		for scanner.Scan() {
+			output.WriteString(scanner.Text() + "\n")
+		}
+
+		err = cmd.Wait()
+		if err != nil {
+			return testOutputMsg{output: output.String() + fmt.Sprintf("\n\n❌ Failed: %v", err), done: true, err: err}
+		}
+		return testOutputMsg{output: output.String() + "\n\n✅ Completed", done: true}
+	}
+}
 
 func loadDataCmd(initialFocusPath string) tea.Cmd {
 	return func() tea.Msg {

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mattsolo1/grove-core/pkg/workspace"
 	"github.com/mattsolo1/grove-core/tui/components/help"
@@ -64,6 +65,12 @@ type Model struct {
 
 	// Filter/search
 	filterInput textinput.Model
+
+	// Output pane for test results
+	outputPane    viewport.Model
+	outputContent string
+	outputVisible bool
+	testRunning   bool
 }
 
 // New creates a new TUI model.

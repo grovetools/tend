@@ -11,6 +11,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mattsolo1/grove-core/pkg/workspace"
 	"github.com/sirupsen/logrus"
@@ -23,6 +24,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		m.help.SetSize(msg.Width, msg.Height)
+		paneWidth := m.width/2 - 4
+		paneHeight := m.height - 8
+		if paneHeight < 5 {
+			paneHeight = 5
+		}
+		m.outputPane = viewport.New(paneWidth, paneHeight)
+		m.outputPane.SetContent(m.outputContent)
 		m.ready = true
 		return m, nil
 
@@ -45,6 +53,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case clearStatusMsg:
 		m.statusMessage = ""
+		return m, nil
+
+	case testOutputMsg:
+		m.outputContent = msg.output
+		m.outputPane.SetContent(m.outputContent)
+		m.outputPane.GotoBottom()
+		if msg.done {
+			m.testRunning = false
+		}
 		return m, nil
 
 	case tea.KeyMsg:
@@ -70,6 +87,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor = 0 // Reset cursor on new filter
 			}
 			return m, cmd
+		}
+
+		// Close output pane with Escape
+		if m.outputVisible && !m.testRunning && msg.String() == "esc" {
+			m.outputVisible = false
+			return m, nil
 		}
 
 		// Handle 'gg' and 'z' chords
@@ -145,6 +168,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.focusedProject = nil
 				m.buildDisplayTree()
 				m.cursor = 0
+			}
+		case key.Matches(msg, m.keys.Run):
+			if m.cursor < len(m.displayNodes) {
+				node := m.displayNodes[m.cursor]
+				if node.IsEcosystem {
+					m.statusMessage = "Cannot run tests for an entire ecosystem from the TUI."
+					m.statusTimeout = time.Now().Add(3 * time.Second)
+					return m, clearStatusCmd(3 * time.Second)
+				}
+				m.outputContent = "Running test...\n"
+				m.outputVisible = true
+				m.testRunning = true
+				m.outputPane.SetContent(m.outputContent)
+				return m, runTestInPaneCmd(node)
 			}
 		case key.Matches(msg, m.keys.DebugRun):
 			if m.cursor < len(m.displayNodes) {

@@ -126,8 +126,12 @@ func (m Model) View() string {
 		}
 	}
 
-	// Create the selectable table for the list (full width)
-	listWidth := m.width - 4 // Use full width minus some padding
+	// Create the selectable table for the list
+	// Width depends on whether output pane is visible
+	listWidth := m.width - 4
+	if m.outputVisible {
+		listWidth = m.width/2 - 4
+	}
 
 	// Adjust cursor for SelectableTable, which only sees the visible slice
 	relativeCursor := m.cursor - m.scrollOffset
@@ -135,6 +139,27 @@ func (m Model) View() string {
 	listView := lipgloss.NewStyle().Width(listWidth).Render(
 		table.SelectableTable(nil, listRows, relativeCursor),
 	)
+
+	// Build main content area (potentially with output pane on right)
+	var mainContent string
+	if m.outputVisible {
+		// Output pane title
+		outputTitle := "Test Output"
+		if m.testRunning {
+			outputTitle = "Test Output (running...)"
+		}
+
+		outputPane := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("240")).
+			Width(m.width/2 - 2).
+			Height(m.height - 10).
+			Render(theme.DefaultTheme.Muted.Render(outputTitle) + "\n" + m.outputPane.View())
+
+		mainContent = lipgloss.JoinHorizontal(lipgloss.Top, listView, outputPane)
+	} else {
+		mainContent = listView
+	}
 
 	// Footer
 	var footer string
@@ -148,7 +173,7 @@ func (m Model) View() string {
 		headerView,
 		searchView,
 		"",
-		listView,
+		mainContent,
 		"",
 		footer,
 	)
