@@ -121,6 +121,51 @@ func buildLDFlags(info gitInfo) string {
 	)
 }
 
+// buildMocksByConvention builds mock binaries from conventional locations.
+// It looks for directories under <sourceDir>/mocks/src/ and builds each one
+// that contains a main.go to <sourceDir>/mocks/bin/mock-<dirname>.
+func buildMocksByConvention(sourceDir string) error {
+	mockSrcDir := filepath.Join(sourceDir, "mocks", "src")
+	if _, err := os.Stat(mockSrcDir); os.IsNotExist(err) {
+		// No mocks directory, nothing to build
+		return nil
+	}
+
+	mockBinDir := filepath.Join(sourceDir, "mocks", "bin")
+	if err := os.MkdirAll(mockBinDir, 0755); err != nil {
+		return fmt.Errorf("failed to create mock bin directory: %w", err)
+	}
+
+	entries, err := os.ReadDir(mockSrcDir)
+	if err != nil {
+		return fmt.Errorf("failed to read mock source directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		mockName := entry.Name()
+		mockSrc := filepath.Join(mockSrcDir, mockName)
+
+		// Check if this directory has a main.go
+		if _, err := os.Stat(filepath.Join(mockSrc, "main.go")); os.IsNotExist(err) {
+			continue
+		}
+
+		// Build the mock
+		outputPath := filepath.Join(mockBinDir, "mock-"+mockName)
+		buildCmd := command.New("go", "build", "-o", outputPath, ".").Dir(mockSrc).Timeout(30 * time.Second)
+		result := buildCmd.Run()
+		if result.Error != nil {
+			return fmt.Errorf("failed to build mock %s: %w\nStderr: %s", mockName, result.Error, result.Stderr)
+		}
+	}
+
+	return nil
+}
+
 // BuildProjectTendBinary finds the project's tend test runner source, builds it, and returns the path to the executable.
 // It always rebuilds to ensure the latest changes are included.
 func BuildProjectTendBinary(startDir string) (string, error) {
@@ -150,26 +195,9 @@ func BuildProjectTendBinary(startDir string) (string, error) {
 		return "", nil
 	}
 
-	// 2. Handle mock-building prerequisites.
-	makefile := filepath.Join(projectRoot, "Makefile")
-	if _, err := os.Stat(makefile); err == nil {
-		content, err := os.ReadFile(makefile)
-		if err != nil {
-			return "", fmt.Errorf("failed to read Makefile at %s: %w", makefile, err)
-		}
-
-		mockTargets := []string{"build-e2e-mocks", "build-mocks"}
-		for _, target := range mockTargets {
-			if strings.Contains(string(content), target+":") {
-				cmd := command.New("make", target).Dir(projectRoot).Timeout(2 * time.Minute)
-				result := cmd.Run()
-				if result.Error != nil {
-					return "", fmt.Errorf("failed to run prerequisite 'make %s': %w\nStdout: %s\nStderr: %s",
-						target, result.Error, result.Stdout, result.Stderr)
-				}
-				break // Only run the first mock target found.
-			}
-		}
+	// 2. Build mocks by convention (tests/e2e/tend/mocks/src/<name>/ → mocks/bin/mock-<name>)
+	if err := buildMocksByConvention(sourceDir); err != nil {
+		return "", fmt.Errorf("failed to build mocks: %w", err)
 	}
 
 	// 3. Get git info for version injection.

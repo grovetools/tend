@@ -23,6 +23,7 @@ func main() {
 		// TUI Scenarios
 		// AutoPathMocksScenario(), // Commented out due to shell-specific tmux issues
 		EnvPassingTestScenario(),
+		TendTUIScenario(),
 
 		// Mocking Scenarios
 		GitWorkflowScenario,

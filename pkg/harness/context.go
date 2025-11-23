@@ -271,6 +271,15 @@ func (c *Context) StartTUI(binaryPath string, args []string, opts ...tui.StartOp
 		}
 	}
 
+	// Inject sandboxed home environment variables (HOME, XDG_CONFIG_HOME, etc.)
+	// This ensures TUI processes use the test's isolated directories, similar to ctx.Command()
+	config.Env = append(config.Env,
+		fmt.Sprintf("HOME=%s", c.homeDir),
+		fmt.Sprintf("XDG_CONFIG_HOME=%s", c.configDir),
+		fmt.Sprintf("XDG_DATA_HOME=%s", c.dataDir),
+		fmt.Sprintf("XDG_CACHE_HOME=%s", c.cacheDir),
+	)
+
 	// Set default color env vars so TUIs render colors in test sessions
 	// These work with grove-core's tui.InitializeTUI() to enable colors
 	colorEnvSet := false
