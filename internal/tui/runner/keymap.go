@@ -20,6 +20,8 @@ type KeyMap struct {
 	Unfold         key.Binding
 	FoldPrefix     key.Binding // z
 	Search         key.Binding
+	HalfPageUp     key.Binding
+	HalfPageDown   key.Binding
 }
 
 func newKeyMap() KeyMap {
@@ -74,6 +76,14 @@ func newKeyMap() KeyMap {
 			key.WithKeys("/"),
 			key.WithHelp("/", "search"),
 		),
+		HalfPageUp: key.NewBinding(
+			key.WithKeys("ctrl+u"),
+			key.WithHelp("C-u", "half page up"),
+		),
+		HalfPageDown: key.NewBinding(
+			key.WithKeys("ctrl+d"),
+			key.WithHelp("C-d", "half page down"),
+		),
 	}
 }
 
@@ -83,7 +93,7 @@ func (k KeyMap) ShortHelp() []key.Binding {
 
 func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.Up, k.Down, k.GoToTop, k.GoToBottom},
+		{k.Up, k.Down, k.HalfPageUp, k.HalfPageDown, k.GoToTop, k.GoToBottom},
 		{k.Fold, k.Unfold, k.FoldPrefix},
 		{k.FocusSelected, k.FocusEcosystem, k.ClearFocus},
 		{k.Run, k.DebugRun, k.DebugSession, k.Search, k.Help, k.Quit},

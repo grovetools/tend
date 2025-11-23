@@ -132,6 +132,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor++
 			}
 			m.adjustScrollOffset()
+		case key.Matches(msg, m.keys.HalfPageUp):
+			halfPage := m.getVisibleNodeCount() / 2
+			if halfPage < 1 {
+				halfPage = 1
+			}
+			m.cursor -= halfPage
+			if m.cursor < 0 {
+				m.cursor = 0
+			}
+			m.adjustScrollOffset()
+		case key.Matches(msg, m.keys.HalfPageDown):
+			halfPage := m.getVisibleNodeCount() / 2
+			if halfPage < 1 {
+				halfPage = 1
+			}
+			m.cursor += halfPage
+			if m.cursor >= len(m.displayNodes) {
+				m.cursor = len(m.displayNodes) - 1
+			}
+			if m.cursor < 0 {
+				m.cursor = 0
+			}
+			m.adjustScrollOffset()
 		case key.Matches(msg, m.keys.GoToTop):
 			m.lastKey = "g" // Wait for second 'g'
 		case key.Matches(msg, m.keys.GoToBottom):
