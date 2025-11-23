@@ -69,6 +69,18 @@ func proxyToProjectBinary() {
 		return
 	}
 
+	// Build the project-specific tend binary (always rebuilds for latest changes)
+	projectBinary, err := project.BuildProjectTendBinary(cwd)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error building project test runner: %v\n", err)
+		os.Exit(1)
+	}
+
+	if projectBinary == "" {
+		// No project-specific binary source found, continue with global binary
+		return
+	}
+
 	// Style helpers for messages
 	arrow := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("4")).
@@ -81,22 +93,6 @@ func proxyToProjectBinary() {
 	pathStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("8")).
 		Italic(true)
-
-	// Print building message
-	buildMsg := fmt.Sprintf("%s %s", arrow, style.Render("Building project test runner..."))
-	fmt.Fprintln(os.Stderr, buildMsg)
-
-	// Build the project-specific tend binary (always rebuilds for latest changes)
-	projectBinary, err := project.BuildProjectTendBinary(cwd)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error building project test runner: %v\n", err)
-		os.Exit(1)
-	}
-
-	if projectBinary == "" {
-		// No project-specific binary source found, continue with global binary
-		return
-	}
 
 	// Resolve symlinks for the project binary
 	projectBinary, err = filepath.EvalSymlinks(projectBinary)
