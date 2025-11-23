@@ -68,6 +68,59 @@ func findGroveYml(dir string) (string, error) {
 	return "", fmt.Errorf("grove.yml not found in or above %s", dir)
 }
 
+// gitInfo holds version information from git.
+type gitInfo struct {
+	Commit    string
+	Branch    string
+	IsDirty   bool
+	BuildDate string
+}
+
+// getGitInfo retrieves git version information from the project directory.
+func getGitInfo(projectRoot string) gitInfo {
+	info := gitInfo{
+		Commit:    "unknown",
+		Branch:    "unknown",
+		BuildDate: time.Now().UTC().Format(time.RFC3339),
+	}
+
+	// Get commit hash
+	commitCmd := command.New("git", "rev-parse", "--short", "HEAD").Dir(projectRoot).Timeout(5 * time.Second)
+	if result := commitCmd.Run(); result.Error == nil {
+		info.Commit = strings.TrimSpace(result.Stdout)
+	}
+
+	// Get branch name
+	branchCmd := command.New("git", "rev-parse", "--abbrev-ref", "HEAD").Dir(projectRoot).Timeout(5 * time.Second)
+	if result := branchCmd.Run(); result.Error == nil {
+		info.Branch = strings.TrimSpace(result.Stdout)
+	}
+
+	// Check if dirty
+	statusCmd := command.New("git", "status", "--porcelain").Dir(projectRoot).Timeout(5 * time.Second)
+	if result := statusCmd.Run(); result.Error == nil && strings.TrimSpace(result.Stdout) != "" {
+		info.IsDirty = true
+	}
+
+	return info
+}
+
+// buildLDFlags constructs the -ldflags string for injecting version info.
+func buildLDFlags(info gitInfo) string {
+	versionPkg := "github.com/mattsolo1/grove-core/version"
+	version := info.Branch + "-" + info.Commit
+	if info.IsDirty {
+		version += "-dirty"
+	}
+
+	return fmt.Sprintf("-X '%s.Version=%s' -X '%s.Commit=%s' -X '%s.Branch=%s' -X '%s.BuildDate=%s'",
+		versionPkg, version,
+		versionPkg, info.Commit,
+		versionPkg, info.Branch,
+		versionPkg, info.BuildDate,
+	)
+}
+
 // BuildProjectTendBinary finds the project's tend test runner source, builds it, and returns the path to the executable.
 // It always rebuilds to ensure the latest changes are included.
 func BuildProjectTendBinary(startDir string) (string, error) {
@@ -119,14 +172,18 @@ func BuildProjectTendBinary(startDir string) (string, error) {
 		}
 	}
 
-	// 3. Compile the test runner.
+	// 3. Get git info for version injection.
+	gitInfo := getGitInfo(projectRoot)
+	ldflags := buildLDFlags(gitInfo)
+
+	// 4. Compile the test runner with version info.
 	binDir := filepath.Join(projectRoot, "bin")
 	if err := os.MkdirAll(binDir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create bin directory at %s: %w", binDir, err)
 	}
 	outputPath := filepath.Join(binDir, "tend")
 
-	buildCommand := command.New("go", "build", "-o", outputPath, ".").Dir(sourceDir).Timeout(2 * time.Minute)
+	buildCommand := command.New("go", "build", "-ldflags", ldflags, "-o", outputPath, ".").Dir(sourceDir).Timeout(2 * time.Minute)
 	buildResult := buildCommand.Run()
 	if buildResult.Error != nil {
 		return "", fmt.Errorf("failed to build test runner from %s: %w\nStdout: %s\nStderr: %s",
