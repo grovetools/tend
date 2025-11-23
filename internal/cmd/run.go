@@ -194,6 +194,25 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 		}
 		renderer.RenderInfo(fmt.Sprintf("Debug session root directory: %s", testRootDir))
 
+		// Create the sandboxed home directory structure
+		homeDir := filepath.Join(testRootDir, "home")
+		configDir := filepath.Join(homeDir, ".config")
+		dataDir := filepath.Join(homeDir, ".local", "share")
+		cacheDir := filepath.Join(homeDir, ".cache")
+		for _, dir := range []string{homeDir, configDir, dataDir, cacheDir} {
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				return fmt.Errorf("failed to create sandbox dir %s: %w", dir, err)
+			}
+		}
+
+		// Prepare the environment variable map for injection
+		sandboxEnv := map[string]string{
+			"HOME":            homeDir,
+			"XDG_CONFIG_HOME": configDir,
+			"XDG_DATA_HOME":   dataDir,
+			"XDG_CACHE_HOME":  cacheDir,
+		}
+
 		// Set up a dedicated tmux server for all debug sessions
 		socketName := "tend-debug"
 		sanitizedName := regexp.MustCompile(`[^a-zA-Z0-9_-]+`).ReplaceAllString(scenario.Name, "_")
@@ -207,51 +226,80 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 		// Kill any existing session with the same name
 		_ = client.KillSession(ctx, sessionName)
 
-		// Create a new session with a 'shell' window
+		// Create a new session with a 'shell' window (starts with clean shell for env setup)
 		launchOpts := tmux.LaunchOptions{
 			SessionName:      sessionName,
 			WorkingDirectory: testRootDir,
 			WindowName:       "shell",
 			WindowIndex:      -1,
 			Panes: []tmux.PaneOptions{
-				{SendKeys: "nvim"},
+				{}, // Start with a clean shell; we'll configure its environment next
 			},
 		}
 		if err := client.Launch(ctx, launchOpts); err != nil {
 			return fmt.Errorf("failed to create tmux session: %w", err)
 		}
 
-		// Create an 'editor' window for viewing test source
+		// Configure the environment for the 'shell' pane
+		shellPaneID, err := client.GetWindowPaneID(ctx, sessionName+":shell")
+		if err != nil {
+			return fmt.Errorf("could not get shell pane ID: %w", err)
+		}
+		if err := client.SetPaneEnvironment(ctx, shellPaneID, sandboxEnv); err != nil {
+			return fmt.Errorf("could not set shell pane environment: %w", err)
+		}
+
+		// Create an 'editor' window for viewing test source with user's real environment
 		projectRoot := rootDir
 		if projectRoot == "" {
 			projectRoot, _ = os.Getwd()
 		}
 
-		if err := client.NewWindow(ctx, sessionName, "editor", ""); err != nil {
+		// Get the user's real home directory for editor environment
+		realHome, _ := os.UserHomeDir()
+		editorEnv := []string{
+			fmt.Sprintf("HOME=%s", realHome),
+			fmt.Sprintf("XDG_CONFIG_HOME=%s", filepath.Join(realHome, ".config")),
+			fmt.Sprintf("XDG_DATA_HOME=%s", filepath.Join(realHome, ".local", "share")),
+			fmt.Sprintf("XDG_CACHE_HOME=%s", filepath.Join(realHome, ".cache")),
+		}
+
+		// Build nvim command with optional file and line jump
+		var editorCmd string
+		if scenario.File != "" {
+			if scenario.Line > 0 {
+				editorCmd = fmt.Sprintf("nvim +%d '%s'", scenario.Line, scenario.File)
+			} else {
+				editorCmd = fmt.Sprintf("nvim '%s'", scenario.File)
+			}
+		} else {
+			editorCmd = "nvim"
+		}
+
+		editorOpts := tmux.NewWindowOptions{
+			Target:     sessionName,
+			WindowName: "editor",
+			WorkingDir: projectRoot,
+			Command:    editorCmd,
+			Env:        editorEnv, // Explicitly use user's real environment
+		}
+		if err := client.NewWindowWithOptions(ctx, editorOpts); err != nil {
 			return fmt.Errorf("failed to create editor window: %w", err)
 		}
 		editorTarget := fmt.Sprintf("%s:editor", sessionName)
 
-		// Open nvim with the scenario file if available, otherwise just nvim in project root
-		var editorCmd string
-		if scenario.File != "" {
-			editorCmd = fmt.Sprintf("cd '%s' && nvim '%s'", projectRoot, scenario.File)
-		} else {
-			editorCmd = fmt.Sprintf("cd '%s' && nvim", projectRoot)
+		// Create a 'runner' window with the sandboxed environment
+		runnerEnv := []string{}
+		for k, v := range sandboxEnv {
+			runnerEnv = append(runnerEnv, fmt.Sprintf("%s=%s", k, v))
 		}
-		if err := client.SendKeys(ctx, editorTarget, editorCmd, "C-m"); err != nil {
-			renderer.RenderInfo(fmt.Sprintf("Warning: failed to open editor: %v", err))
+		runnerOpts := tmux.NewWindowOptions{
+			Target:     sessionName,
+			WindowName: "runner",
+			WorkingDir: testRootDir,
+			Env:        runnerEnv,
 		}
-		if scenario.File != "" && scenario.Line > 0 {
-			time.Sleep(100 * time.Millisecond) // Give nvim time to start
-			lineCmd := fmt.Sprintf(":%d", scenario.Line)
-			if err := client.SendKeys(ctx, editorTarget, lineCmd, "C-m"); err != nil {
-				renderer.RenderInfo(fmt.Sprintf("Warning: failed to jump to line: %v", err))
-			}
-		}
-
-		// Create a 'runner' window and execute tend
-		if err := client.NewWindow(ctx, sessionName, "runner", ""); err != nil {
+		if err := client.NewWindowWithOptions(ctx, runnerOpts); err != nil {
 			return fmt.Errorf("failed to create runner window: %w", err)
 		}
 		runnerTarget := fmt.Sprintf("%s:runner", sessionName)
@@ -270,7 +318,9 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 			"--_tmux-socket="+socketName,
 			"--_tmux-editor="+editorTarget,
 		)
-		tendCmd := os.Args[0] + " " + strings.Join(newArgs, " ")
+		// Prepending with a space is a convention for many shells (bash, zsh, fish)
+		// to not save the command in history.
+		tendCmd := " " + os.Args[0] + " " + strings.Join(newArgs, " ")
 
 		if err := client.SendKeys(ctx, runnerTarget, tendCmd, "C-m"); err != nil {
 			return fmt.Errorf("failed to send command to runner window: %w", err)
