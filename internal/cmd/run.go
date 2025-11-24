@@ -181,6 +181,12 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 	}
 
 	// Debug session orchestration - creates a dedicated tmux server and re-executes tend
+	// Creates 5 windows:
+	//   1. runner        - Runs the actual test with sandboxed environment
+	//   2. editor_test_dir   - nvim viewing test directory with real user environment
+	//   3. editor_test_steps - nvim for editing test steps with real user environment
+	//   4. term          - Interactive shell with sandboxed environment
+	//   5. logs          - Log viewer with sandboxed environment
 	if debugSession {
 		if len(selectedScenarios) != 1 {
 			return fmt.Errorf("--debug-session requires exactly one scenario to be specified, but found %d", len(selectedScenarios))
@@ -205,12 +211,32 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 			}
 		}
 
-		// Prepare the environment variable map for injection
-		sandboxEnv := map[string]string{
-			"HOME":            homeDir,
-			"XDG_CONFIG_HOME": configDir,
-			"XDG_DATA_HOME":   dataDir,
-			"XDG_CACHE_HOME":  cacheDir,
+		// 1. Prepare Environments
+		// Sandboxed environment for 'runner' and 'logs' windows
+		sandboxEnvSlice := []string{
+			fmt.Sprintf("HOME=%s", homeDir),
+			fmt.Sprintf("XDG_CONFIG_HOME=%s", configDir),
+			fmt.Sprintf("XDG_DATA_HOME=%s", dataDir),
+			fmt.Sprintf("XDG_CACHE_HOME=%s", cacheDir),
+		}
+
+		// Real environment for editor windows to ensure user's nvim config loads
+		realHome, err := os.UserHomeDir()
+		if err != nil {
+			return fmt.Errorf("could not get user home directory: %w", err)
+		}
+		realEnvSlice := []string{
+			fmt.Sprintf("HOME=%s", realHome),
+		}
+		// Propagate user's XDG dirs if they exist, so Neovim finds its config
+		if xdgConfigHome := os.Getenv("XDG_CONFIG_HOME"); xdgConfigHome != "" {
+			realEnvSlice = append(realEnvSlice, fmt.Sprintf("XDG_CONFIG_HOME=%s", xdgConfigHome))
+		}
+		if xdgDataHome := os.Getenv("XDG_DATA_HOME"); xdgDataHome != "" {
+			realEnvSlice = append(realEnvSlice, fmt.Sprintf("XDG_DATA_HOME=%s", xdgDataHome))
+		}
+		if xdgCacheHome := os.Getenv("XDG_CACHE_HOME"); xdgCacheHome != "" {
+			realEnvSlice = append(realEnvSlice, fmt.Sprintf("XDG_CACHE_HOME=%s", xdgCacheHome))
 		}
 
 		// Set up a dedicated tmux server for all debug sessions
@@ -226,44 +252,64 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 		// Kill any existing session with the same name
 		_ = client.KillSession(ctx, sessionName)
 
-		// Create a new session with a 'shell' window (starts with clean shell for env setup)
-		launchOpts := tmux.LaunchOptions{
-			SessionName:      sessionName,
-			WorkingDirectory: testRootDir,
-			WindowName:       "shell",
-			WindowIndex:      -1,
-			Panes: []tmux.PaneOptions{
-				{}, // Start with a clean shell; we'll configure its environment next
-			},
-		}
-		if err := client.Launch(ctx, launchOpts); err != nil {
-			return fmt.Errorf("failed to create tmux session: %w", err)
-		}
-
-		// Configure the environment for the 'shell' pane
-		shellPaneID, err := client.GetWindowPaneID(ctx, sessionName+":shell")
-		if err != nil {
-			return fmt.Errorf("could not get shell pane ID: %w", err)
-		}
-		if err := client.SetPaneEnvironment(ctx, shellPaneID, sandboxEnv); err != nil {
-			return fmt.Errorf("could not set shell pane environment: %w", err)
-		}
-
-		// Create an 'editor' window for viewing test source with user's real environment
+		// The project directory is the CWD of the tend process
 		projectRoot := rootDir
 		if projectRoot == "" {
 			projectRoot, _ = os.Getwd()
 		}
 
-		// Get the user's real home directory for editor environment
-		realHome, _ := os.UserHomeDir()
-		editorEnv := []string{
-			fmt.Sprintf("HOME=%s", realHome),
-			fmt.Sprintf("XDG_CONFIG_HOME=%s", filepath.Join(realHome, ".config")),
-			fmt.Sprintf("XDG_DATA_HOME=%s", filepath.Join(realHome, ".local", "share")),
-			fmt.Sprintf("XDG_CACHE_HOME=%s", filepath.Join(realHome, ".cache")),
+		// 2. Create Initial Session with 'runner' Window
+		launchOpts := tmux.LaunchOptions{
+			SessionName:      sessionName,
+			WorkingDirectory: projectRoot,
+			WindowName:       "runner",
+			WindowIndex:      -1,
+			Panes: []tmux.PaneOptions{
+				{}, // Start with an empty shell
+			},
+		}
+		if err := client.Launch(ctx, launchOpts); err != nil {
+			return fmt.Errorf("failed to launch debug session: %w", err)
 		}
 
+		// 3. Reconstruct the command, replacing --debug-session with interactive flags
+		newArgs := []string{}
+		for _, arg := range os.Args[1:] {
+			if arg != "--debug-session" {
+				newArgs = append(newArgs, arg)
+			}
+		}
+		// The editor target will point to editor_test_steps window
+		editorTarget := sessionName + ":editor_test_steps"
+		newArgs = append(newArgs,
+			"-i", "--no-cleanup", "--very-verbose",
+			"--_test-root-dir="+testRootDir,
+			"--_tmux-socket="+socketName,
+			"--_tmux-editor="+editorTarget,
+		)
+		// Prepending with a space is a convention for many shells (bash, zsh, fish)
+		// to not save the command in history.
+		tendCmd := " " + os.Args[0] + " " + strings.Join(newArgs, " ")
+
+		runnerTarget := sessionName + ":runner"
+		if err := client.SendKeys(ctx, runnerTarget, tendCmd, "C-m"); err != nil {
+			return fmt.Errorf("failed to send command to runner pane: %w", err)
+		}
+
+		// 4. Create additional windows
+
+		// Window: editor_test_dir - nvim viewing test directory with real user env
+		if err := client.NewWindowWithOptions(ctx, tmux.NewWindowOptions{
+			Target:     sessionName,
+			WindowName: "editor_test_dir",
+			WorkingDir: testRootDir,
+			Env:        realEnvSlice,
+			Command:    "nvim .",
+		}); err != nil {
+			return fmt.Errorf("failed to create editor_test_dir window: %w", err)
+		}
+
+		// Window: editor_test_steps - nvim for editing test steps with real user env
 		// Build nvim command with optional file and line jump
 		var editorCmd string
 		if scenario.File != "" {
@@ -275,55 +321,42 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 		} else {
 			editorCmd = "nvim"
 		}
-
-		editorOpts := tmux.NewWindowOptions{
+		if err := client.NewWindowWithOptions(ctx, tmux.NewWindowOptions{
 			Target:     sessionName,
-			WindowName: "editor",
+			WindowName: "editor_test_steps",
 			WorkingDir: projectRoot,
+			Env:        realEnvSlice,
 			Command:    editorCmd,
-			Env:        editorEnv, // Explicitly use user's real environment
+		}); err != nil {
+			return fmt.Errorf("failed to create editor_test_steps window: %w", err)
 		}
-		if err := client.NewWindowWithOptions(ctx, editorOpts); err != nil {
-			return fmt.Errorf("failed to create editor window: %w", err)
-		}
-		editorTarget := fmt.Sprintf("%s:editor", sessionName)
 
-		// Create a 'runner' window with the sandboxed environment
-		runnerEnv := []string{}
-		for k, v := range sandboxEnv {
-			runnerEnv = append(runnerEnv, fmt.Sprintf("%s=%s", k, v))
-		}
-		runnerOpts := tmux.NewWindowOptions{
+		// Window: term - Interactive shell with sandboxed environment
+		if err := client.NewWindowWithOptions(ctx, tmux.NewWindowOptions{
 			Target:     sessionName,
-			WindowName: "runner",
+			WindowName: "term",
 			WorkingDir: testRootDir,
-			Env:        runnerEnv,
+			Env:        sandboxEnvSlice,
+			Command:    "", // Empty command for interactive shell
+		}); err != nil {
+			return fmt.Errorf("failed to create term window: %w", err)
 		}
-		if err := client.NewWindowWithOptions(ctx, runnerOpts); err != nil {
-			return fmt.Errorf("failed to create runner window: %w", err)
-		}
-		runnerTarget := fmt.Sprintf("%s:runner", sessionName)
 
-		// Reconstruct the command, replacing --debug-session with interactive flags
-		newArgs := []string{}
-		for _, arg := range os.Args[1:] {
-			if arg != "--debug-session" {
-				newArgs = append(newArgs, arg)
-			}
+		// Window: logs - Log viewer with sandboxed environment
+		if err := client.NewWindowWithOptions(ctx, tmux.NewWindowOptions{
+			Target:     sessionName,
+			WindowName: "logs",
+			WorkingDir: testRootDir,
+			Env:        sandboxEnvSlice,
+			Command:    "sh -c 'core logs --tui || read'", // Keep window open if command fails
+		}); err != nil {
+			return fmt.Errorf("failed to create logs window: %w", err)
 		}
-		// Add flags that --debug-session implies (editorTarget already defined above)
-		newArgs = append(newArgs,
-			"-i", "--no-cleanup", "--very-verbose",
-			"--_test-root-dir="+testRootDir,
-			"--_tmux-socket="+socketName,
-			"--_tmux-editor="+editorTarget,
-		)
-		// Prepending with a space is a convention for many shells (bash, zsh, fish)
-		// to not save the command in history.
-		tendCmd := " " + os.Args[0] + " " + strings.Join(newArgs, " ")
 
-		if err := client.SendKeys(ctx, runnerTarget, tendCmd, "C-m"); err != nil {
-			return fmt.Errorf("failed to send command to runner window: %w", err)
+		// 5. Finalize Session State
+		// Select the runner window to be the active one on attach
+		if err := client.SelectWindow(ctx, runnerTarget); err != nil {
+			return fmt.Errorf("failed to select runner window: %w", err)
 		}
 
 		// Print instructions for attaching
