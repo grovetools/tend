@@ -16,6 +16,33 @@ import (
 
 const childProcessEnvVar = "TEND_IS_CHILD_PROCESS"
 
+// shouldSkipProxy determines if we should skip proxying based on the command being run.
+// Commands that don't need project-specific test runners can skip the rebuild.
+func shouldSkipProxy() bool {
+	// If no args, show help - doesn't need proxy
+	if len(os.Args) <= 1 {
+		return true
+	}
+
+	// Check the first argument (the command)
+	cmd := os.Args[1]
+
+	// Commands that don't need project-specific test runners
+	skipCommands := map[string]bool{
+		"version":    true, // Just shows version info
+		"help":       true, // Shows help text
+		"completion": true, // Generates shell completions
+		"docs":       true, // Prints JSON documentation
+		"sessions":   true, // Manages test sessions (operates on existing data)
+		"-h":         true, // Help flag
+		"--help":     true, // Help flag
+		"-v":         true, // Might be version flag
+		"--version":  true, // Version flag (if supported)
+	}
+
+	return skipCommands[cmd]
+}
+
 func main() {
 	// Try to proxy to project-specific binary first
 	proxyToProjectBinary()
@@ -47,6 +74,11 @@ func main() {
 func proxyToProjectBinary() {
 	// Check if we're already a child process to prevent recursion
 	if os.Getenv(childProcessEnvVar) == "true" {
+		return
+	}
+
+	// Skip proxying for commands that don't need project-specific test runners
+	if shouldSkipProxy() {
 		return
 	}
 

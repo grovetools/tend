@@ -192,6 +192,17 @@ func BuildProjectTendBinary(startDir string) (string, error) {
 
 	projectRoot := filepath.Dir(configPath)
 
+	// Read the grove.yml to get the binary name
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return "", fmt.Errorf("reading grove.yml at %s: %w", configPath, err)
+	}
+
+	var config GroveConfig
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return "", fmt.Errorf("parsing grove.yml at %s: %w", configPath, err)
+	}
+
 	// 1. Find the source directory for the test runner.
 	sourceDirs := []string{
 		filepath.Join(projectRoot, "tests", "e2e", "tend"),
@@ -224,7 +235,15 @@ func BuildProjectTendBinary(startDir string) (string, error) {
 	if err := os.MkdirAll(binDir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create bin directory at %s: %w", binDir, err)
 	}
-	outputPath := filepath.Join(binDir, "tend")
+
+	// Determine the output binary name.
+	// If the project's main binary is named "tend", use a different name for the test runner
+	// to avoid overwriting the library binary (important for grove-tend itself).
+	outputName := "tend"
+	if config.Binary.Name == "tend" {
+		outputName = "tend-e2e"
+	}
+	outputPath := filepath.Join(binDir, outputName)
 
 	buildCommand := command.New("go", "build", "-ldflags", ldflags, "-o", outputPath, ".").Dir(sourceDir).Timeout(2 * time.Minute)
 	buildResult := buildCommand.Run()
