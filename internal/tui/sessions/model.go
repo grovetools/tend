@@ -4,6 +4,7 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/mattsolo1/grove-core/tui/theme"
 )
 
 // item represents a single session in our list.
@@ -31,12 +32,29 @@ type Model struct {
 
 // NewModel creates a new sessions TUI model.
 func NewModel() (*Model, error) {
-	// Create list with default delegate
+	// Create list with themed delegate
 	delegate := list.NewDefaultDelegate()
+
+	// Apply grove-core theme to the delegate
+	delegate.Styles.SelectedTitle = theme.DefaultTheme.Selected.Copy()
+	delegate.Styles.SelectedDesc = theme.DefaultTheme.Selected.Copy()
+	delegate.Styles.NormalTitle = theme.DefaultTheme.Normal.Copy()
+	delegate.Styles.NormalDesc = theme.DefaultTheme.Muted.Copy()
+	delegate.Styles.DimmedTitle = theme.DefaultTheme.Muted.Copy()
+	delegate.Styles.DimmedDesc = theme.DefaultTheme.Muted.Copy()
+	delegate.Styles.FilterMatch = theme.DefaultTheme.Highlight.Copy()
+
 	l := list.New([]list.Item{}, delegate, 0, 0)
 	l.Title = "Test Sessions"
 	l.SetShowStatusBar(true)
 	l.SetShowHelp(true)
+
+	// Apply theme to list title and status bar
+	l.Styles.Title = theme.DefaultTheme.Header.Copy()
+	l.Styles.TitleBar = theme.DefaultTheme.Normal.Copy()
+	l.Styles.StatusBar = theme.DefaultTheme.Muted.Copy()
+	l.Styles.FilterPrompt = theme.DefaultTheme.Accent.Copy()
+	l.Styles.FilterCursor = theme.DefaultTheme.Cursor.Copy()
 
 	// Create viewport for preview pane
 	vp := viewport.New(0, 0)

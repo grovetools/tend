@@ -5,37 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-)
-
-var (
-	docStyle = lipgloss.NewStyle().Margin(1, 2)
-
-	// Border styles
-	borderStyle = lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("62"))
-
-	// Header style
-	headerStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("99")).
-			Padding(0, 1)
-
-	// Status indicator styles
-	runningStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("10")) // Green
-	pausedStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("11")) // Yellow
-	idleStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))  // Gray
-
-	// Empty state style
-	emptyStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("241")).
-			Italic(true).
-			Align(lipgloss.Center)
-
-	// Help style
-	helpStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("241")).
-			Padding(0, 1)
+	"github.com/mattsolo1/grove-core/tui/theme"
 )
 
 // View renders the sessions TUI.
@@ -66,15 +36,19 @@ func (m *Model) View() string {
 	// Add footer with help text
 	footer := m.renderFooter()
 
-	return lipgloss.JoinVertical(
+	// Apply left margin to the entire view
+	content := lipgloss.JoinVertical(
 		lipgloss.Left,
 		combined,
 		footer,
 	)
+
+	return lipgloss.NewStyle().MarginLeft(2).Render(content)
 }
 
 // renderEmptyState shows the empty state when no sessions are found.
 func (m *Model) renderEmptyState() string {
+	emptyStyle := theme.DefaultTheme.Muted.Copy().Italic(true).Align(lipgloss.Center)
 	content := emptyStyle.Render(
 		"\n\n" +
 			"No active test sessions\n\n" +
@@ -82,7 +56,7 @@ func (m *Model) renderEmptyState() string {
 			"Or run: tend run <scenario> --debug-session\n\n",
 	)
 
-	footer := helpStyle.Render("q: quit  •  r: refresh")
+	footer := theme.DefaultTheme.Muted.Render("q: quit  •  r: refresh")
 
 	return lipgloss.JoinVertical(
 		lipgloss.Center,
@@ -95,15 +69,16 @@ func (m *Model) renderEmptyState() string {
 
 // renderPreview renders the preview pane.
 func (m *Model) renderPreview() string {
-	title := headerStyle.Render("Preview")
+	title := theme.DefaultTheme.Header.Render("Preview")
 
 	// Get selected session name for title
 	if selectedItem, ok := m.list.SelectedItem().(item); ok {
-		title = headerStyle.Render(fmt.Sprintf("Preview: %s", selectedItem.title))
+		title = theme.DefaultTheme.Header.Render(fmt.Sprintf("Preview: %s", selectedItem.title))
 	}
 
 	content := m.viewport.View()
 	if strings.TrimSpace(content) == "" {
+		emptyStyle := theme.DefaultTheme.Muted.Copy().Italic(true).Align(lipgloss.Center)
 		content = emptyStyle.Render("\n\nNo preview available\n\n")
 	}
 
@@ -114,10 +89,11 @@ func (m *Model) renderPreview() string {
 		content,
 	)
 
-	return borderStyle.
+	borderStyle := theme.DefaultTheme.Box.Copy().
 		Width(m.viewport.Width + 2).
-		Height(m.viewport.Height + 4).
-		Render(preview)
+		Height(m.viewport.Height + 4)
+
+	return borderStyle.Render(preview)
 }
 
 // renderFooter renders the help footer.
@@ -126,17 +102,17 @@ func (m *Model) renderFooter() string {
 
 	// Status indicators legend
 	legend := fmt.Sprintf("%s running  %s paused  %s idle",
-		runningStyle.Render("●"),
-		pausedStyle.Render("◐"),
-		idleStyle.Render("○"),
+		theme.DefaultTheme.Success.Render("●"),
+		theme.DefaultTheme.Warning.Render("◐"),
+		theme.DefaultTheme.Muted.Render("○"),
 	)
 	parts = append(parts, legend)
 
 	// Key bindings
-	bindings := "enter: switch  •  k: kill  •  r: refresh  •  q: quit"
+	bindings := "enter: switch  •  x: kill  •  r: refresh  •  q: quit"
 	parts = append(parts, bindings)
 
-	footer := helpStyle.Render(strings.Join(parts, "  •  "))
+	footer := theme.DefaultTheme.Muted.Render(strings.Join(parts, "  •  "))
 
 	return "\n" + footer
 }

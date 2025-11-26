@@ -29,9 +29,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		h, v := lipgloss.NewStyle().Margin(1, 2).GetFrameSize()
 		m.list.SetSize(listWidth-h, msg.Height-v)
 
-		// Update viewport size
+		// Update viewport size (50% height of terminal)
 		m.viewport.Width = msg.Width - listWidth - 4
-		m.viewport.Height = msg.Height - 4
+		m.viewport.Height = (msg.Height / 2) - 4
 
 		return m, nil
 
@@ -111,7 +111,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			}
 
-		case "k", "K":
+		case "x", "X":
 			// Kill the selected session
 			if selectedItem, ok := m.list.SelectedItem().(item); ok {
 				sessionName := selectedItem.sessionName

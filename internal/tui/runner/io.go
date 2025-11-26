@@ -318,8 +318,8 @@ func runTestDebugSessionCmd(node *DisplayNode) tea.Cmd {
 			_ = cmd.Run()
 		}
 		if len(scenarios) == 1 {
-			return statusMsg(fmt.Sprintf("Debug session created. Use: tmux -L tend-debug attach -t %s", scenarios[0]))
+			return statusMsg(fmt.Sprintf("Debug session created: tend_%s. Run 'tend sessions' to view.", scenarios[0]))
 		}
-		return statusMsg(fmt.Sprintf("Created %d debug sessions. Use: tmux -L tend-debug ls", len(scenarios)))
+		return statusMsg(fmt.Sprintf("Created %d debug sessions. Run 'tend sessions' to view.", len(scenarios)))
 	}
 }

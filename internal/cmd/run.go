@@ -214,7 +214,7 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 		}
 
 		// 1. Prepare Environments
-		// Sandboxed environment for 'runner' and 'logs' windows
+		// Sandboxed environment for 'runner', 'term', and 'logs' windows
 		sandboxEnvSlice := []string{
 			fmt.Sprintf("HOME=%s", homeDir),
 			fmt.Sprintf("XDG_CONFIG_HOME=%s", configDir),
@@ -243,8 +243,8 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 
 		// Determine server mode from config and flag
 		// TODO: Load config to get default server mode
-		// For now, default to "dedicated" for backward compatibility
-		serverMode := "dedicated"
+		// Default to "main" for better integration with tmux workflows
+		serverMode := "main"
 		if debugServer != "" {
 			serverMode = debugServer
 		}
@@ -281,6 +281,12 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 		if projectRoot == "" {
 			projectRoot, _ = os.Getwd()
 		}
+
+		// Add project bin directory to PATH for sandboxed environment
+		projectBinDir := filepath.Join(projectRoot, "bin")
+		currentPath := os.Getenv("PATH")
+		sandboxPath := fmt.Sprintf("%s:%s", projectBinDir, currentPath)
+		sandboxEnvSlice = append(sandboxEnvSlice, fmt.Sprintf("PATH=%s", sandboxPath))
 
 		// 2. Create Initial Session with 'runner' Window
 		launchOpts := tmux.LaunchOptions{
@@ -337,34 +343,49 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 		}
 
 		// Window: editor_test_steps - nvim for editing test steps with real user env
-		// Build nvim command with optional file and line jump
-		var editorCmd string
-		if scenario.File != "" {
-			if scenario.Line > 0 {
-				editorCmd = fmt.Sprintf("nvim +%d '%s'", scenario.Line, scenario.File)
-			} else {
-				editorCmd = fmt.Sprintf("nvim '%s'", scenario.File)
-			}
-		} else {
-			editorCmd = "nvim"
-		}
+		// Create window with empty shell first
 		if err := client.NewWindowWithOptions(ctx, tmux.NewWindowOptions{
 			Target:     sessionName,
 			WindowName: "editor_test_steps",
 			WorkingDir: projectRoot,
 			Env:        realEnvSlice,
-			Command:    editorCmd,
+			Command:    "", // Empty shell, we'll send keys next
 		}); err != nil {
 			return fmt.Errorf("failed to create editor_test_steps window: %w", err)
 		}
 
+		// Send nvim command to open the file
+		// Since WorkingDir is projectRoot, relative paths in scenario.File will work
+		editorStepsTarget := sessionName + ":editor_test_steps"
+		if scenario.File != "" {
+			var nvimCmd string
+			if scenario.Line > 0 {
+				nvimCmd = fmt.Sprintf("nvim +%d %s", scenario.Line, scenario.File)
+			} else {
+				nvimCmd = fmt.Sprintf("nvim %s", scenario.File)
+			}
+			if err := client.SendKeys(ctx, editorStepsTarget, nvimCmd, "C-m"); err != nil {
+				return fmt.Errorf("failed to send nvim command: %w", err)
+			}
+		} else {
+			// No file, open nvim at tests/e2e directory for easy navigation to scenarios
+			if err := client.SendKeys(ctx, editorStepsTarget, "nvim tests/e2e", "C-m"); err != nil {
+				return fmt.Errorf("failed to send nvim command: %w", err)
+			}
+		}
+
 		// Window: term - Interactive shell with sandboxed environment
+		// Build export commands from sandboxEnvSlice and exec the shell
+		var exports []string
+		for _, env := range sandboxEnvSlice {
+			exports = append(exports, fmt.Sprintf("export %s", env))
+		}
+		termCmd := fmt.Sprintf("%s && exec $SHELL", strings.Join(exports, " && "))
 		if err := client.NewWindowWithOptions(ctx, tmux.NewWindowOptions{
 			Target:     sessionName,
 			WindowName: "term",
 			WorkingDir: testRootDir,
-			Env:        sandboxEnvSlice,
-			Command:    "", // Empty command for interactive shell
+			Command:    termCmd,
 		}); err != nil {
 			return fmt.Errorf("failed to create term window: %w", err)
 		}
