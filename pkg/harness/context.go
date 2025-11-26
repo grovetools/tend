@@ -12,6 +12,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mattsolo1/grove-core/pkg/tmux"
 	"github.com/mattsolo1/grove-tend/pkg/command"
+	"github.com/mattsolo1/grove-tend/pkg/project"
 	"github.com/mattsolo1/grove-tend/pkg/teatest"
 	"github.com/mattsolo1/grove-tend/pkg/tui"
 )
@@ -223,6 +224,26 @@ func (c *Context) Command(program string, args ...string) *command.Command {
 	}
 
 	return cmd
+}
+
+// Bin creates a new command using the project binary under test.
+// This is a convenience wrapper around Command() that automatically uses
+// the binary path from grove.yml (stored in c.GroveBinary).
+//
+// Example:
+//   cmd := ctx.Bin("plan", "init", "my-plan")  // instead of ctx.Command(flowBinary, "plan", "init", "my-plan")
+func (c *Context) Bin(args ...string) *command.Command {
+	// If GroveBinary is not a path (just "grove" or similar), try to resolve it
+	if c.GroveBinary == "" || !filepath.IsAbs(c.GroveBinary) {
+		// Try to find the binary via project.GetBinaryPath
+		if c.ProjectRoot != "" {
+			if binaryPath, err := project.GetBinaryPath(c.ProjectRoot); err == nil {
+				c.GroveBinary = binaryPath
+			}
+		}
+		// If still not resolved and is just "grove", this will use whatever is in PATH
+	}
+	return c.Command(c.GroveBinary, args...)
 }
 
 // getOverrideEnvVarName generates the environment variable name for a command override
