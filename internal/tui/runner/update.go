@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mattsolo1/grove-core/pkg/workspace"
+	"github.com/mattsolo1/grove-tend/pkg/harness/reporters"
 	"github.com/sirupsen/logrus"
 )
 
@@ -61,6 +63,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.outputPane.GotoBottom()
 		if msg.done {
 			m.testRunning = false
+			// Update status based on result
+			status := StatusPassed
+			if msg.err != nil {
+				status = StatusFailed
+			}
+			m.updateStatuses(msg.nodeID, status)
+
+			// Parse JSON results to update individual scenario statuses
+			if msg.jsonPath != "" {
+				m.parseJSONResults(msg.jsonPath, msg.nodeID)
+				// Clean up temp file
+				os.Remove(msg.jsonPath)
+			}
+
+			m.statusMessage = "Test finished."
+			m.statusTimeout = time.Now().Add(3 * time.Second)
+			return m, clearStatusCmd(3 * time.Second)
 		}
 		return m, nil
 
@@ -193,7 +212,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor = 0
 			}
 		case key.Matches(msg, m.keys.Run):
-			if m.cursor < len(m.displayNodes) {
+			if m.cursor < len(m.displayNodes) && !m.testRunning {
 				node := m.displayNodes[m.cursor]
 				if node.IsEcosystem {
 					m.statusMessage = "Cannot run tests for an entire ecosystem from the TUI."
@@ -204,6 +223,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.outputVisible = true
 				m.testRunning = true
 				m.outputPane.SetContent(m.outputContent)
+				m.updateStatuses(node.ID(), StatusRunning)
 				return m, runTestInPaneCmd(node)
 			}
 		case key.Matches(msg, m.keys.DebugRun):
@@ -553,4 +573,119 @@ func clearStatusCmd(d time.Duration) tea.Cmd {
 	return tea.Tick(d, func(t time.Time) tea.Msg {
 		return clearStatusMsg{}
 	})
+}
+
+// updateStatuses sets the status for a given node ID.
+// For scenarios, it only updates the scenario.
+// For files/projects when setting to Running, it updates all child scenarios to Running.
+// For files/projects when setting to Passed/Failed, it only updates the parent node, not children.
+func (m *Model) updateStatuses(nodeID string, status TestStatus) {
+	m.testStatuses[nodeID] = status
+
+	// Find the node in the display tree
+	var parentNode *DisplayNode
+	for _, n := range m.displayNodes {
+		if n.ID() == nodeID {
+			parentNode = n
+			break
+		}
+	}
+
+	if parentNode == nil {
+		return // Should not happen
+	}
+
+	// Only propagate StatusRunning to children, not Passed/Failed
+	// This allows individual scenario results to show through
+	if (parentNode.IsProject || parentNode.IsFile) && status == StatusRunning {
+		for _, n := range m.displayNodes {
+			// A child scenario will have a deeper depth and a matching project/file path
+			if n.IsScenario && n.Depth > parentNode.Depth {
+				if parentNode.IsProject && n.Project.Path == parentNode.Project.Path {
+					m.testStatuses[n.ID()] = StatusRunning
+				}
+				if parentNode.IsFile && n.FilePath == parentNode.FilePath {
+					m.testStatuses[n.ID()] = StatusRunning
+				}
+			}
+		}
+	}
+}
+
+// parseJSONResults reads the JSON results file and updates scenario statuses
+func (m *Model) parseJSONResults(jsonPath, parentNodeID string) {
+	logger := logrus.New()
+	logPath := filepath.Join(os.TempDir(), "tend-tui.log")
+	if logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+		logger.SetOutput(logFile)
+	} else {
+		logger.SetOutput(io.Discard)
+	}
+	logger.SetLevel(logrus.DebugLevel)
+
+	logger.Infof("[PARSE] Parsing JSON results from: %s", jsonPath)
+
+	// Find the parent node to determine which scenarios to update
+	var parentNode *DisplayNode
+	for _, n := range m.displayNodes {
+		if n.ID() == parentNodeID {
+			parentNode = n
+			break
+		}
+	}
+
+	if parentNode == nil || parentNode.IsScenario {
+		logger.Debugf("[PARSE] Skipping: parentNode is nil or is a scenario")
+		return // Only parse for file/project runs
+	}
+
+	logger.Debugf("[PARSE] Parent node: IsFile=%v, IsProject=%v, Path=%s", parentNode.IsFile, parentNode.IsProject, parentNode.FilePath)
+
+	// Read and parse JSON file
+	data, err := os.ReadFile(jsonPath)
+	if err != nil {
+		logger.Errorf("[PARSE] Failed to read JSON file: %v", err)
+		return
+	}
+
+	var report reporters.JSONReport
+	if err := json.Unmarshal(data, &report); err != nil {
+		logger.Errorf("[PARSE] Failed to parse JSON: %v", err)
+		return
+	}
+
+	logger.Infof("[PARSE] Parsed JSON: %d results, %d passed, %d failed", report.TotalTests, report.Passed, report.Failed)
+
+	// Update individual scenario statuses from JSON results
+	matchCount := 0
+	for _, result := range report.Results {
+		scenarioName := result.Name
+		var status TestStatus
+		if result.Success {
+			status = StatusPassed
+		} else {
+			status = StatusFailed
+		}
+
+		logger.Debugf("[PARSE] JSON result: Scenario=%q, Success=%v", scenarioName, result.Success)
+
+		// Find the scenario node and update its status
+		found := false
+		for _, n := range m.displayNodes {
+			if n.IsScenario && n.Scenario != nil && n.Scenario.Name == scenarioName {
+				// Make sure it's a child of the parent node that was run
+				if (parentNode.IsFile && n.FilePath == parentNode.FilePath) ||
+					(parentNode.IsProject && n.Project.Path == parentNode.Project.Path) {
+					logger.Debugf("[PARSE] Updating status for scenario %q (ID: %s) to %d", scenarioName, n.ID(), status)
+					m.testStatuses[n.ID()] = status
+					matchCount++
+					found = true
+				}
+			}
+		}
+		if !found {
+			logger.Warnf("[PARSE] Could not find matching display node for scenario: %q", scenarioName)
+		}
+	}
+	logger.Infof("[PARSE] Updated %d scenario statuses from JSON", matchCount)
 }

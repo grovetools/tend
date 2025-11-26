@@ -95,6 +95,26 @@ func (m Model) View() string {
 				name = "<unnamed>"
 			}
 
+			// 1. Status Icon
+			status, exists := m.testStatuses[node.ID()]
+			if !exists {
+				status = StatusNotRun
+			}
+			statusIcon := "  " // Default for not-runnable
+			switch {
+			case node.IsScenario, node.IsFile, node.IsProject && !node.IsEcosystem:
+				switch status {
+				case StatusRunning:
+					statusIcon = theme.DefaultTheme.Warning.Render("~ ")
+				case StatusPassed:
+					statusIcon = theme.DefaultTheme.Success.Render("✓ ")
+				case StatusFailed:
+					statusIcon = theme.DefaultTheme.Error.Render("✗ ")
+				case StatusNotRun:
+					statusIcon = "  "
+				}
+			}
+
 			// Add indicators for scenarios
 			var indicatorStr string
 			if node.IsScenario && node.Scenario != nil {
@@ -120,7 +140,7 @@ func (m Model) View() string {
 			}
 
 			// Apply styling, but don't re-style the indicators which already have styles
-			styledName := style.Render(node.Prefix) + indicatorStr + style.Render(highlightedName)
+			styledName := statusIcon + style.Render(node.Prefix) + indicatorStr + style.Render(highlightedName)
 
 			listRows = append(listRows, []string{styledName})
 		}
@@ -147,6 +167,8 @@ func (m Model) View() string {
 		outputTitle := "Test Output"
 		if m.testRunning {
 			outputTitle = "Test Output (running...)"
+		} else {
+			outputTitle = "Test Output (press 'esc' to close)"
 		}
 
 		outputPane := lipgloss.NewStyle().

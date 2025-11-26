@@ -11,6 +11,16 @@ import (
 	"github.com/mattsolo1/grove-tend/pkg/harness"
 )
 
+// TestStatus represents the run state of a testable node.
+type TestStatus int
+
+const (
+	StatusNotRun TestStatus = iota
+	StatusRunning
+	StatusPassed
+	StatusFailed
+)
+
 // DisplayNode represents a single line in the hierarchical TUI view.
 type DisplayNode struct {
 	IsEcosystem bool
@@ -29,7 +39,7 @@ type DisplayNode struct {
 	Depth  int
 }
 
-// ID returns a unique identifier for this node, used for tracking collapsed state.
+// ID returns a unique identifier for this node, used for tracking collapsed state and test status.
 func (n *DisplayNode) ID() string {
 	if n.IsEcosystem || n.IsProject {
 		return "ws:" + n.Project.Path
@@ -37,7 +47,10 @@ func (n *DisplayNode) ID() string {
 	if n.IsFile {
 		return "file:" + n.FilePath
 	}
-	// Scenarios are not foldable, so they don't need a unique ID.
+	if n.IsScenario {
+		// Use file path and scenario name for a unique ID
+		return "sc:" + n.FilePath + "::" + n.Scenario.Name
+	}
 	return ""
 }
 
@@ -66,7 +79,8 @@ type Model struct {
 	// Filter/search
 	filterInput textinput.Model
 
-	// Output pane for test results
+	// Test execution state
+	testStatuses  map[string]TestStatus // Key is DisplayNode.ID()
 	outputPane    viewport.Model
 	outputContent string
 	outputVisible bool
@@ -94,6 +108,7 @@ func New(initialFocusPath string) Model {
 		collapsedNodes:     make(map[string]bool),
 		initialFocusPath:   initialFocusPath,
 		filterInput:        ti,
+		testStatuses:       make(map[string]TestStatus),
 	}
 }
 

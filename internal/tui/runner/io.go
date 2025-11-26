@@ -1,7 +1,6 @@
 package runner
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -32,15 +31,19 @@ type statusMsg string
 
 // testOutputMsg carries output from a running test.
 type testOutputMsg struct {
-	output string
-	done   bool
-	err    error
+	nodeID   string // ID of the node that was run
+	output   string
+	jsonPath string // Path to JSON results file
+	done     bool
+	err      error
 }
 
 // runTestInPaneCmd runs a test in the background and streams output to the TUI.
 func runTestInPaneCmd(node *DisplayNode) tea.Cmd {
 	var args []string
 	projectPath := node.Project.Path
+
+	nodeID := node.ID()
 
 	switch {
 	case node.IsScenario:
@@ -51,48 +54,62 @@ func runTestInPaneCmd(node *DisplayNode) tea.Cmd {
 			scenarioNames = append(scenarioNames, s.Name)
 		}
 		if len(scenarioNames) == 0 {
-			return func() tea.Msg { return testOutputMsg{output: "No scenarios to run.", done: true} }
+			return func() tea.Msg { return testOutputMsg{nodeID: nodeID, output: "No scenarios to run.", done: true} }
 		}
 		args = append([]string{"run"}, scenarioNames...)
 	case node.IsProject:
 		args = []string{"run"}
 	case node.IsEcosystem:
-		return func() tea.Msg { return testOutputMsg{output: "Cannot run ecosystem tests.", done: true} }
+		return func() tea.Msg { return testOutputMsg{nodeID: nodeID, output: "Cannot run ecosystem tests.", done: true} }
 	default:
-		return func() tea.Msg { return testOutputMsg{output: "Not supported.", done: true} }
+		return func() tea.Msg { return testOutputMsg{nodeID: nodeID, output: "Not supported.", done: true} }
 	}
 
 	executable, err := os.Executable()
 	if err != nil {
-		return func() tea.Msg { return testOutputMsg{output: fmt.Sprintf("Error: %v", err), done: true, err: err} }
+		return func() tea.Msg { return testOutputMsg{nodeID: nodeID, output: fmt.Sprintf("Error: %v", err), done: true, err: err} }
 	}
 
 	return func() tea.Msg {
+		// Create a temp file for JSON output
+		jsonFile, err := os.CreateTemp("", "tend-results-*.json")
+		if err != nil {
+			return testOutputMsg{
+				nodeID: nodeID,
+				output: fmt.Sprintf("Error creating temp file: %v", err),
+				done:   true,
+				err:    err,
+			}
+		}
+		jsonPath := jsonFile.Name()
+		jsonFile.Close()
+
+		// Add --json flag to write structured results
+		args = append(args, "--json", jsonPath)
+
 		cmd := exec.Command(executable, args...)
 		cmd.Dir = projectPath
 		cmd.Env = append(os.Environ(), "CLICOLOR_FORCE=1", "TERM=xterm-256color")
 
-		stdout, err := cmd.StdoutPipe()
-		if err != nil {
-			return testOutputMsg{output: fmt.Sprintf("Error: %v", err), done: true, err: err}
-		}
-		cmd.Stderr = cmd.Stdout
+		// Use CombinedOutput for simpler capture
+		output, cmdErr := cmd.CombinedOutput()
 
-		if err := cmd.Start(); err != nil {
-			return testOutputMsg{output: fmt.Sprintf("Error starting: %v", err), done: true, err: err}
+		outputStr := string(output)
+		if cmdErr != nil {
+			return testOutputMsg{
+				nodeID:   nodeID,
+				output:   outputStr + fmt.Sprintf("\n\n❌ Failed: %v", cmdErr),
+				jsonPath: jsonPath,
+				done:     true,
+				err:      cmdErr,
+			}
 		}
-
-		scanner := bufio.NewScanner(stdout)
-		var output strings.Builder
-		for scanner.Scan() {
-			output.WriteString(scanner.Text() + "\n")
+		return testOutputMsg{
+			nodeID:   nodeID,
+			output:   outputStr + "\n\n✅ Completed",
+			jsonPath: jsonPath,
+			done:     true,
 		}
-
-		err = cmd.Wait()
-		if err != nil {
-			return testOutputMsg{output: output.String() + fmt.Sprintf("\n\n❌ Failed: %v", err), done: true, err: err}
-		}
-		return testOutputMsg{output: output.String() + "\n\n✅ Completed", done: true}
 	}
 }
 
