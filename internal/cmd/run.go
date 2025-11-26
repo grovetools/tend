@@ -31,6 +31,7 @@ var (
 	nvim                bool
 	debug               bool
 	debugSession        bool
+	debugServer         string
 	testRootDirOverride string
 	tmuxSocketOverride  string
 	tmuxEditorTarget    string
@@ -70,6 +71,7 @@ Examples:
 	runCmd.Flags().BoolVar(&nvim, "nvim", false, "Start nvim in the new tmux split (requires --tmux-split)")
 	runCmd.Flags().BoolVarP(&debug, "debug", "d", false, "Enable debug mode (shorthand for -i --no-cleanup --tmux-split --nvim --very-verbose)")
 	runCmd.Flags().BoolVar(&debugSession, "debug-session", false, "Enable debug mode in a new tmux session with windows (implies -i, --no-cleanup)")
+	runCmd.Flags().StringVar(&debugServer, "server", "", "Debug session server type ('main' or 'dedicated'). Overrides config. (requires --debug-session)")
 	runCmd.Flags().StringVar(&testRootDirOverride, "_test-root-dir", "", "Internal use: override the test root directory")
 	runCmd.Flags().StringVar(&tmuxSocketOverride, "_tmux-socket", "", "Internal use: tmux socket name for debug session")
 	runCmd.Flags().StringVar(&tmuxEditorTarget, "_tmux-editor", "", "Internal use: tmux editor window target")
@@ -180,7 +182,7 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 		return nil
 	}
 
-	// Debug session orchestration - creates a dedicated tmux server and re-executes tend
+	// Debug session orchestration - creates a tmux session and re-executes tend
 	// Creates 5 windows:
 	//   1. runner        - Runs the actual test with sandboxed environment
 	//   2. editor_test_dir   - nvim viewing test directory with real user environment
@@ -239,14 +241,36 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 			realEnvSlice = append(realEnvSlice, fmt.Sprintf("XDG_CACHE_HOME=%s", xdgCacheHome))
 		}
 
-		// Set up a dedicated tmux server for all debug sessions
-		socketName := "tend-debug"
-		sanitizedName := regexp.MustCompile(`[^a-zA-Z0-9_-]+`).ReplaceAllString(scenario.Name, "_")
-		sessionName := sanitizedName
+		// Determine server mode from config and flag
+		// TODO: Load config to get default server mode
+		// For now, default to "dedicated" for backward compatibility
+		serverMode := "dedicated"
+		if debugServer != "" {
+			serverMode = debugServer
+		}
 
-		client, err := tmux.NewClientWithSocket(socketName)
-		if err != nil {
-			return fmt.Errorf("failed to create tmux client: %w", err)
+		// Set up tmux client based on server mode
+		var client *tmux.Client
+		var sessionName string
+		sanitizedName := regexp.MustCompile(`[^a-zA-Z0-9_-]+`).ReplaceAllString(scenario.Name, "_")
+
+		if serverMode == "main" {
+			// New behavior: use main server with namespaced session name
+			// TODO: Get workspace identifier when available
+			// For now, use simple naming with "tend_" prefix
+			sessionName = fmt.Sprintf("tend_%s", sanitizedName)
+			client, err = tmux.NewClient()
+			if err != nil {
+				return fmt.Errorf("failed to create tmux client: %w", err)
+			}
+		} else {
+			// Old behavior: use dedicated server with simple session name
+			socketName := "tend-debug"
+			sessionName = sanitizedName
+			client, err = tmux.NewClientWithSocket(socketName)
+			if err != nil {
+				return fmt.Errorf("failed to create tmux client: %w", err)
+			}
 		}
 
 		// Kill any existing session with the same name
@@ -284,9 +308,12 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 		newArgs = append(newArgs,
 			"-i", "--no-cleanup", "--very-verbose",
 			"--_test-root-dir="+testRootDir,
-			"--_tmux-socket="+socketName,
 			"--_tmux-editor="+editorTarget,
 		)
+		// Only add socket override for dedicated server mode
+		if serverMode == "dedicated" {
+			newArgs = append(newArgs, "--_tmux-socket=tend-debug")
+		}
 		// Prepending with a space is a convention for many shells (bash, zsh, fish)
 		// to not save the command in history.
 		tendCmd := " " + os.Args[0] + " " + strings.Join(newArgs, " ")
@@ -359,10 +386,16 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 			return fmt.Errorf("failed to select runner window: %w", err)
 		}
 
-		// Print instructions for attaching
-		renderer.RenderInfo(fmt.Sprintf("Debug session '%s' created in tmux server '%s'", sessionName, socketName))
-		renderer.RenderInfo(fmt.Sprintf("To attach: tmux -L %s attach -t %s", socketName, sessionName))
-		renderer.RenderInfo(fmt.Sprintf("List sessions: tmux -L %s ls", socketName))
+		// Print instructions for attaching based on server mode
+		if serverMode == "main" {
+			renderer.RenderInfo(fmt.Sprintf("Debug session '%s' created in main tmux server", sessionName))
+			renderer.RenderInfo(fmt.Sprintf("To attach: tmux attach -t %s", sessionName))
+			renderer.RenderInfo("List all tend sessions: tend sessions")
+		} else {
+			renderer.RenderInfo(fmt.Sprintf("Debug session '%s' created in tmux server 'tend-debug'", sessionName))
+			renderer.RenderInfo(fmt.Sprintf("To attach: tmux -L tend-debug attach -t %s", sessionName))
+			renderer.RenderInfo("List sessions: tmux -L tend-debug ls")
+		}
 
 		return nil
 	}
