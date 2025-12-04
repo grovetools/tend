@@ -326,15 +326,19 @@ func (c *Context) StartTUI(binaryPath string, args []string, opts ...tui.StartOp
 	// Generate a unique session name for test isolation
 	sessionName := fmt.Sprintf("tend-tui-%s-%d", filepath.Base(binaryPath), time.Now().UnixNano())
 
-	// Build the command string with environment variables
-	// Environment variables are prepended directly (not wrapped in sh -c)
-	// because tmux send-keys will execute them in the pane's shell
-	var cmdBuilder strings.Builder
-	if len(config.Env) > 0 {
-		// Prepend environment variables to the command
-		cmdBuilder.WriteString(strings.Join(config.Env, " "))
-		cmdBuilder.WriteString(" ")
+	// Parse env vars from the config into a map
+	// This separates environment variable setup from command execution,
+	// avoiding long command strings that can get truncated with fish shell
+	envMap := make(map[string]string)
+	for _, envVar := range config.Env {
+		parts := strings.SplitN(envVar, "=", 2)
+		if len(parts) == 2 {
+			envMap[parts[0]] = parts[1]
+		}
 	}
+
+	// Build the command string *without* environment variables
+	var cmdBuilder strings.Builder
 	cmdBuilder.WriteString(binaryPath)
 	if len(args) > 0 {
 		cmdBuilder.WriteString(" ")
@@ -348,6 +352,7 @@ func (c *Context) StartTUI(binaryPath string, args []string, opts ...tui.StartOp
 		Panes: []tmux.PaneOptions{
 			{
 				Command: cmdBuilder.String(),
+				Env:     envMap,
 			},
 		},
 	}
