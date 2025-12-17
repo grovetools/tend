@@ -345,10 +345,15 @@ func (c *Context) StartTUI(binaryPath string, args []string, opts ...tui.StartOp
 		cmdBuilder.WriteString(strings.Join(args, " "))
 	}
 
+	workingDir := c.RootDir
+	if config.Cwd != "" {
+		workingDir = config.Cwd
+	}
+
 	launchOpts := tmux.LaunchOptions{
 		SessionName:      sessionName,
-		WorkingDirectory: c.RootDir, // TUI runs in the test's temp directory
-		WindowIndex:      -1,        // Don't reorder window position
+		WorkingDirectory: workingDir,
+		WindowIndex:      -1, // Don't reorder window position
 		Panes: []tmux.PaneOptions{
 			{
 				Command: cmdBuilder.String(),
