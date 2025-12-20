@@ -47,25 +47,20 @@ func NewSession(sessionName string, client *tmux.Client, rootDir string) *Sessio
 //   session.Type("g", "g")      // Go to top (sends separately for chord recognition)
 //   session.Type("/", "search") // Open search and type
 func (s *Session) Type(keys ...string) error {
-	// Detect vim chord commands: multiple keys where all are single characters and identical
-	if len(keys) > 1 {
+	// Detect vim chord commands: exactly 2 single-character keys
+	// Examples: "g"+"g" (go to top), "z"+"M" (close all), "z"+"R" (open all)
+	if len(keys) == 2 {
 		allSingleChar := true
-		allIdentical := true
-		firstKey := keys[0]
-
 		for _, key := range keys {
 			if len(key) != 1 {
 				allSingleChar = false
 				break
 			}
-			if key != firstKey {
-				allIdentical = false
-			}
 		}
 
-		// If this looks like a vim chord (e.g., "g", "g" or "z", "M"),
-		// send keys individually with stabilization between them
-		if allSingleChar && allIdentical && len(keys) == 2 {
+		// If both keys are single characters, treat as vim chord
+		// Send them individually with stabilization between them
+		if allSingleChar {
 			if err := s.SendKeys(keys[0]); err != nil {
 				return err
 			}
