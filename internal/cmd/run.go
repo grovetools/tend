@@ -38,6 +38,7 @@ var (
 	useRealDeps         []string
 	includeLocal        bool
 	explicitOnly        bool
+	recordTUIDir        string
 )
 
 // newRunCmd creates the run command with the provided scenarios
@@ -81,6 +82,7 @@ Examples:
 	runCmd.Flags().StringSliceVar(&useRealDeps, "use-real-deps", []string{}, "A comma-separated list of dependencies to use real binaries for instead of mocks (e.g., flow,cx). Use 'all' to swap all.")
 	runCmd.Flags().BoolVar(&includeLocal, "include-local", false, "Include local-only scenarios even when in a CI environment")
 	runCmd.Flags().BoolVar(&explicitOnly, "explicit", false, "Run only explicit-only scenarios (automatically enables --no-cleanup)")
+	runCmd.Flags().StringVar(&recordTUIDir, "record-tui", "", "Directory to save TUI session recordings for failed tests")
 
 	return runCmd
 }
@@ -445,6 +447,7 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 		TestRootDir:      testRootDirOverride,
 		TmuxSocket:       tmuxSocketOverride,
 		TmuxEditorTarget: tmuxEditorTarget,
+		RecordTUIDir:     recordTUIDir,
 	}
 	
 	// Configure for CI if needed

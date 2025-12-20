@@ -48,3 +48,42 @@ func FindProjectBinary() (string, error) {
 
 	return "", fmt.Errorf("could not find project root (no grove.yml found)")
 }
+
+// FindTendBinary finds the actual tend binary path (not the test runner).
+// This is used for testing tend CLI commands like `tend list`.
+func FindTendBinary() (string, error) {
+	// Get the path of the current executable (tend-e2e)
+	execPath, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("failed to get executable path: %w", err)
+	}
+
+	// The tend binary should be in the same directory as tend-e2e
+	binDir := filepath.Dir(execPath)
+	tendPath := filepath.Join(binDir, "tend")
+
+	if _, err := os.Stat(tendPath); err != nil {
+		// Try looking relative to the working directory
+		wd, _ := os.Getwd()
+		// Walk up to find the project root
+		currentDir := wd
+		for {
+			groveYml := filepath.Join(currentDir, "grove.yml")
+			if _, err := os.Stat(groveYml); err == nil {
+				tendPath = filepath.Join(currentDir, "bin", "tend")
+				if _, err := os.Stat(tendPath); err == nil {
+					return tendPath, nil
+				}
+				break
+			}
+			parent := filepath.Dir(currentDir)
+			if parent == currentDir {
+				break
+			}
+			currentDir = parent
+		}
+		return "", fmt.Errorf("tend binary not found at %s or in project bin directory", tendPath)
+	}
+
+	return tendPath, nil
+}

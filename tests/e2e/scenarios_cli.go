@@ -18,20 +18,26 @@ func TestKeywordFilteringScenario() *harness.Scenario {
 		[]string{"test", "filtering", "cli"},
 		[]harness.Step{
 			harness.NewStep("Test keyword filtering for 'git'", func(ctx *harness.Context) error {
-				tendBinary, err := FindProjectBinary()
+				tendBinary, err := FindTendBinary()
 				if err != nil {
 					return err
 				}
-				cmd := command.New(tendBinary, "list", "--keyword=git")
-				result := cmd.Run()
+				// Run from project root so it can discover scenarios
+				// Set TEND_IS_CHILD_PROCESS to prevent delegation to tend-e2e
+				result := command.New(tendBinary, "list", "--keyword=git").
+					Dir(ctx.ProjectRoot).
+					Env("TEND_IS_CHILD_PROCESS=true").
+					Run()
 
 				if result.Error != nil {
-					return fmt.Errorf("tend list --keyword=git failed: %w", result.Error)
+					return fmt.Errorf("tend list --keyword=git failed (dir=%s): %w\nStdout: %s\nStderr: %s",
+						ctx.ProjectRoot, result.Error, result.Stdout, result.Stderr)
 				}
 
 				// Check that output contains git-workflow scenario
 				if !strings.Contains(result.Stdout, "git-workflow") {
-					return fmt.Errorf("expected 'git-workflow' in output, got: %s", result.Stdout)
+					return fmt.Errorf("expected 'git-workflow' in output (dir=%s), got: %s\nStderr: %s",
+						ctx.ProjectRoot, result.Stdout, result.Stderr)
 				}
 
 				// Check that output doesn't contain unrelated scenarios

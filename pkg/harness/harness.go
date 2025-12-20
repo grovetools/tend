@@ -13,6 +13,7 @@ import (
 	"github.com/mattsolo1/grove-tend/pkg/command"
 	"github.com/mattsolo1/grove-tend/pkg/fs"
 	"github.com/mattsolo1/grove-tend/pkg/project"
+	"github.com/mattsolo1/grove-tend/pkg/tui"
 )
 
 // Context carries state through a scenario execution
@@ -37,6 +38,7 @@ type Context struct {
 	shellPaneID       string                 // Tmux pane ID for the shell
 	editorPaneID      string                 // Tmux pane ID for the editor
 	currentEditorFile string                 // The file currently open in the editor pane
+	recordTUIDir      string                 // Directory to save TUI session recordings
 
 	// UI for displaying command output
 	ui *UI
@@ -85,6 +87,8 @@ type Options struct {
 	TmuxSocket string
 	// TmuxEditorTarget specifies the tmux target for the editor window in debug-session mode.
 	TmuxEditorTarget string
+	// RecordTUIDir specifies the directory to save TUI session recordings for failed tests.
+	RecordTUIDir string
 }
 
 // Harness runs scenarios
@@ -237,6 +241,7 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 		values:        make(map[string]interface{}),
 		UseRealDeps:   realDepsMap,
 		mockOverrides: make(map[string]string),
+		recordTUIDir:  h.opts.RecordTUIDir,
 		ui:            ui,
 	}
 	
@@ -352,6 +357,18 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 			result.EndTime = time.Now()
 			result.Duration = result.EndTime.Sub(result.StartTime)
 			result.StepResults = stepResults
+
+			// Stop TUI recording on failure if enabled
+			if h.opts.RecordTUIDir != "" {
+				if tuiSession, ok := testCtx.Get("tui_session").(*tui.Session); ok && tuiSession != nil {
+					if err := tuiSession.StopRecording(); err != nil {
+						ui.Error("Failed to stop TUI recording", err)
+					} else {
+						ui.Info("TUI Recording saved", fmt.Sprintf("Recording saved to %s", h.opts.RecordTUIDir))
+					}
+				}
+			}
+
 			return result, result.Error
 		}
 
@@ -363,6 +380,17 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 	result.Duration = result.EndTime.Sub(result.StartTime)
 	result.StepResults = stepResults
 	ui.ScenarioSuccess(scenario.Name, result.Duration)
+
+	// Stop TUI recording on success if enabled
+	// Note: For successful tests, we could optionally delete the recording
+	// or keep it based on configuration. For now, we save it.
+	if h.opts.RecordTUIDir != "" {
+		if tuiSession, ok := testCtx.Get("tui_session").(*tui.Session); ok && tuiSession != nil {
+			if err := tuiSession.StopRecording(); err != nil {
+				ui.Error("Failed to stop TUI recording", err)
+			}
+		}
+	}
 
 	return result, nil
 }

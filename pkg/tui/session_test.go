@@ -389,3 +389,44 @@ func TestSession_Recording(t *testing.T) {
 	}
 	t.Logf("Key history: %v", history)
 }
+
+func TestSession_AssertLine(t *testing.T) {
+	skipIfNoTmux(t)
+
+	ctx := context.Background()
+	sessionName := "tend-tui-assertline-test"
+	client, _ := tmux.NewClient()
+
+	_ = client.KillSession(ctx, sessionName)
+
+	// Launch a simple shell session
+	err := client.Launch(ctx, tmux.LaunchOptions{
+		SessionName: sessionName,
+		Panes:       []tmux.PaneOptions{{Command: ""}},
+	})
+	if err != nil {
+		t.Fatalf("Failed to launch test session: %v", err)
+	}
+	defer client.KillSession(ctx, sessionName)
+
+	session := NewSession(sessionName, client, t.TempDir())
+
+	// Wait for shell to be ready
+	time.Sleep(200 * time.Millisecond)
+
+	// Test a successful assertion - check for fish shell welcome message
+	err = session.AssertLine(func(line string) bool {
+		return strings.Contains(line, "fish")
+	}, "Expected to find fish shell reference")
+	if err != nil {
+		t.Errorf("AssertLine failed unexpectedly: %v", err)
+	}
+
+	// Test a failing assertion - look for something that doesn't exist
+	err = session.AssertLine(func(line string) bool {
+		return strings.Contains(line, "ThisTextDefinitelyDoesNotExist12345")
+	}, "Expected line with non-existent text")
+	if err == nil {
+		t.Error("AssertLine should have failed but did not")
+	}
+}

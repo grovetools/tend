@@ -373,8 +373,27 @@ func (c *Context) StartTUI(binaryPath string, args []string, opts ...tui.StartOp
 	sessions = append(sessions, sessionName)
 	c.Set("tui_sessions", sessions)
 
-	// Return the session handle
-	return tui.NewSession(sessionName, tmuxClient, c.RootDir), nil
+	// Create the session handle
+	session := tui.NewSession(sessionName, tmuxClient, c.RootDir)
+
+	// Start recording if configured
+	if c.recordTUIDir != "" {
+		// Ensure the recording directory exists
+		if err := os.MkdirAll(c.recordTUIDir, 0755); err != nil {
+			return nil, fmt.Errorf("failed to create TUI recording directory: %w", err)
+		}
+
+		// Generate a unique recording path
+		recordingPath := filepath.Join(c.recordTUIDir, fmt.Sprintf("%s-%d", sessionName, time.Now().Unix()))
+		if err := session.StartRecording(recordingPath); err != nil {
+			// Non-fatal: log but continue
+			if c.ui != nil {
+				c.ui.Error("Failed to start TUI recording", err)
+			}
+		}
+	}
+
+	return session, nil
 }
 
 // StartHeadless launches a BubbleTea model in a headless, non-tmux test runner.

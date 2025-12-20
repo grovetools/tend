@@ -207,12 +207,9 @@ func testNavigationAndFolding(ctx *harness.Context) error {
 
 	// Test 'h' to collapse the current node
 	// First navigate to project-a (has scenarios under it)
-	// Use 'gg' to go to top first
-	if err := session.SendKeys("g"); err != nil {
-		return err
-	}
-	time.Sleep(100 * time.Millisecond)
-	if err := session.SendKeys("g"); err != nil {
+	// Use 'gg' to go to top first (send both g's together as a single vim command)
+	// Note: Using SendKeys + WaitStable because if we're already at top, screen won't change
+	if err := session.SendKeys("g", "g"); err != nil {
 		return err
 	}
 	if err := session.WaitStable(); err != nil {
@@ -221,14 +218,15 @@ func testNavigationAndFolding(ctx *harness.Context) error {
 
 	// Now navigate down to find project-a (it should be after project-b in the list based on the output)
 	// Navigate to find scenarios.go file under project-a
+	// Note: Using SendKeys + WaitStable instead of SendKeysAndWaitForChange because
+	// the screen might not change if we're already at the bottom or all items are visible
 	for i := 0; i < 10; i++ {
 		if err := session.SendKeys("j"); err != nil {
 			return err
 		}
-		time.Sleep(50 * time.Millisecond)
-	}
-	if err := session.WaitStable(); err != nil {
-		return err
+		if err := session.WaitStable(); err != nil {
+			return err
+		}
 	}
 
 	// Test that both scenarios are visible
@@ -322,11 +320,9 @@ func testFocusing(ctx *harness.Context) error {
 	session := ctx.Get("tui_session").(*tui.Session)
 
 	// First, make sure we're in a clean state - go to top of the list
-	if err := session.SendKeys("g"); err != nil {
-		return err
-	}
-	time.Sleep(100 * time.Millisecond)
-	if err := session.SendKeys("g"); err != nil {
+	// Send 'gg' together as a single vim command
+	// Note: Using SendKeys + WaitStable because if we're already at top, screen won't change
+	if err := session.SendKeys("g", "g"); err != nil {
 		return err
 	}
 	if err := session.WaitStable(); err != nil {
@@ -342,14 +338,15 @@ func testFocusing(ctx *harness.Context) error {
 	}
 
 	// Use vim-style navigation to get to project-b
+	// Note: Using SendKeys + WaitStable instead of SendKeysAndWaitForChange because
+	// the screen might not change if items are already visible
 	for i := 0; i < 4; i++ {
 		if err := session.SendKeys("j"); err != nil {
 			return err
 		}
-		time.Sleep(50 * time.Millisecond)
-	}
-	if err := session.WaitStable(); err != nil {
-		return err
+		if err := session.WaitStable(); err != nil {
+			return err
+		}
 	}
 
 	// Focus on the selected item with '.'

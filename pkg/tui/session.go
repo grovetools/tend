@@ -188,6 +188,26 @@ func (s *Session) AssertNotContains(text string) error {
 	return assert.NotContains(content, text)
 }
 
+// AssertLine iterates through each visible line of the TUI and passes if the predicate
+// function returns true for any line. This is a flexible way to assert complex states
+// like focus or selection without relying on specific ANSI codes.
+func (s *Session) AssertLine(predicate func(line string) bool, message string) error {
+	content, err := s.Capture(WithCleanedOutput())
+	if err != nil {
+		return fmt.Errorf("failed to capture screen for AssertLine: %w", err)
+	}
+
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		if predicate(line) {
+			return nil // Predicate matched, assertion passes.
+		}
+	}
+
+	// If no line matched, the assertion fails.
+	return fmt.Errorf("AssertLine failed: %s. Screen content:\n%s", message, content)
+}
+
 // GetCursorPosition returns the 1-based (row, col) of the cursor.
 func (s *Session) GetCursorPosition() (row, col int, err error) {
 	return s.client.GetCursorPosition(context.Background(), s.sessionName)
