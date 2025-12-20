@@ -201,7 +201,7 @@ func testNavigationAndFolding(ctx *harness.Context) error {
 
 	// Test 'h' to collapse the current node
 	// First navigate to project-a (has scenarios under it)
-	// Use 'gg' to go to top first (send both g's together as a single vim command)
+	// Use 'gg' to go to top first
 	if err := session.Type("g", "g"); err != nil {
 		return err
 	}

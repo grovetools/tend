@@ -37,11 +37,49 @@ func NewSession(sessionName string, client *tmux.Client, rootDir string) *Sessio
 // This is the recommended method for most interactions, as it combines
 // SendKeys + WaitStable which is the pattern used in 90% of tests.
 //
+// Special handling for vim-style chord commands:
+// When multiple identical single-character keys are passed (like "g", "g"),
+// they are sent individually with stabilization between each key.
+// This ensures vim chord commands like "gg" are properly recognized.
+//
 // Example:
 //   session.Type("j")           // Navigate down and wait
-//   session.Type("g", "g")      // Go to top and wait
+//   session.Type("g", "g")      // Go to top (sends separately for chord recognition)
 //   session.Type("/", "search") // Open search and type
 func (s *Session) Type(keys ...string) error {
+	// Detect vim chord commands: multiple keys where all are single characters and identical
+	if len(keys) > 1 {
+		allSingleChar := true
+		allIdentical := true
+		firstKey := keys[0]
+
+		for _, key := range keys {
+			if len(key) != 1 {
+				allSingleChar = false
+				break
+			}
+			if key != firstKey {
+				allIdentical = false
+			}
+		}
+
+		// If this looks like a vim chord (e.g., "g", "g" or "z", "M"),
+		// send keys individually with stabilization between them
+		if allSingleChar && allIdentical && len(keys) == 2 {
+			if err := s.SendKeys(keys[0]); err != nil {
+				return err
+			}
+			if err := s.WaitStable(); err != nil {
+				return err
+			}
+			if err := s.SendKeys(keys[1]); err != nil {
+				return err
+			}
+			return s.WaitStable()
+		}
+	}
+
+	// Default behavior: send all keys together and wait
 	if err := s.SendKeys(keys...); err != nil {
 		return err
 	}
