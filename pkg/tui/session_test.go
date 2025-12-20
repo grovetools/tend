@@ -390,6 +390,47 @@ func TestSession_Recording(t *testing.T) {
 	t.Logf("Key history: %v", history)
 }
 
+func TestSession_Type(t *testing.T) {
+	skipIfNoTmux(t)
+
+	ctx := context.Background()
+	sessionName := "tend-tui-type-test"
+	client, _ := tmux.NewClient()
+
+	_ = client.KillSession(ctx, sessionName)
+
+	// Launch a simple shell session
+	err := client.Launch(ctx, tmux.LaunchOptions{
+		SessionName: sessionName,
+		Panes:       []tmux.PaneOptions{{Command: ""}},
+	})
+	if err != nil {
+		t.Fatalf("Failed to launch test session: %v", err)
+	}
+	defer client.KillSession(ctx, sessionName)
+
+	session := NewSession(sessionName, client, t.TempDir())
+
+	// Wait for shell to be ready
+	time.Sleep(200 * time.Millisecond)
+
+	// Type combines SendKeys + WaitStable
+	// This should send the echo command and wait for it to execute
+	err = session.Type("echo 'Type test'", "Enter")
+	if err != nil {
+		t.Errorf("Type should not return an error: %v", err)
+	}
+
+	// Verify the text appears (it should already be stable)
+	content, err := session.Capture()
+	if err != nil {
+		t.Errorf("Capture should not return an error: %v", err)
+	}
+	if !strings.Contains(content, "Type test") {
+		t.Errorf("Expected 'Type test' in output, got:\n%s", content)
+	}
+}
+
 func TestSession_AssertLine(t *testing.T) {
 	skipIfNoTmux(t)
 

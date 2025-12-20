@@ -190,41 +190,26 @@ func testNavigationAndFolding(ctx *harness.Context) error {
 
 	// Test basic navigation using j/k keys
 	// Navigate down with 'j' (vim-style down)
-	if err := session.SendKeys("j"); err != nil {
-		return fmt.Errorf("failed to send j: %w", err)
-	}
-	if err := session.WaitStable(); err != nil {
-		return err
+	if err := session.Type("j"); err != nil {
+		return fmt.Errorf("failed to navigate down: %w", err)
 	}
 
 	// Navigate down again
-	if err := session.SendKeys("j"); err != nil {
-		return fmt.Errorf("failed to send j again: %w", err)
-	}
-	if err := session.WaitStable(); err != nil {
-		return err
+	if err := session.Type("j"); err != nil {
+		return fmt.Errorf("failed to navigate down again: %w", err)
 	}
 
 	// Test 'h' to collapse the current node
 	// First navigate to project-a (has scenarios under it)
 	// Use 'gg' to go to top first (send both g's together as a single vim command)
-	// Note: Using SendKeys + WaitStable because if we're already at top, screen won't change
-	if err := session.SendKeys("g", "g"); err != nil {
-		return err
-	}
-	if err := session.WaitStable(); err != nil {
+	if err := session.Type("g", "g"); err != nil {
 		return err
 	}
 
 	// Now navigate down to find project-a (it should be after project-b in the list based on the output)
 	// Navigate to find scenarios.go file under project-a
-	// Note: Using SendKeys + WaitStable instead of SendKeysAndWaitForChange because
-	// the screen might not change if we're already at the bottom or all items are visible
 	for i := 0; i < 10; i++ {
-		if err := session.SendKeys("j"); err != nil {
-			return err
-		}
-		if err := session.WaitStable(); err != nil {
+		if err := session.Type("j"); err != nil {
 			return err
 		}
 	}
@@ -247,19 +232,13 @@ func testFiltering(ctx *harness.Context) error {
 	session := ctx.Get("tui_session").(*tui.Session)
 
 	// Activate search with '/'
-	if err := session.SendKeys("/"); err != nil {
+	if err := session.Type("/"); err != nil {
 		return fmt.Errorf("failed to activate search: %w", err)
-	}
-	if err := session.WaitStable(); err != nil {
-		return err
 	}
 
 	// Type search term
-	if err := session.SendKeys("sub-app-test"); err != nil {
+	if err := session.Type("sub-app-test"); err != nil {
 		return fmt.Errorf("failed to type search term: %w", err)
-	}
-	if err := session.WaitStable(); err != nil {
-		return err
 	}
 
 	// Verify the filtering is working - sub-app-test should be visible
@@ -276,33 +255,21 @@ func testFiltering(ctx *harness.Context) error {
 
 	// Clear the filter by selecting all text and deleting it
 	// First, send Escape to exit filter mode (blur the input)
-	if err := session.SendKeys("Escape"); err != nil {
+	if err := session.Type("Escape"); err != nil {
 		return fmt.Errorf("failed to send escape: %w", err)
 	}
-	if err := session.WaitStable(); err != nil {
-		return err
-	}
-
-	// Now clear the filter by activating search again and clearing it
-	// Actually, let's just verify that the filter was applied and search text is shown
-	// The filter text should still be shown in the search input
 
 	// Re-enter search mode and clear the text
-	if err := session.SendKeys("/"); err != nil {
-		return err
-	}
-	if err := session.WaitStable(); err != nil {
+	if err := session.Type("/"); err != nil {
 		return err
 	}
 
 	// Send Ctrl+U to clear the input line (common bash/readline shortcut)
+	// Then escape - use SendKeys for both since we don't need to wait between them
 	if err := session.SendKeys("C-u"); err != nil {
 		return err
 	}
-	if err := session.SendKeys("Escape"); err != nil {
-		return err
-	}
-	if err := session.WaitStable(); err != nil {
+	if err := session.Type("Escape"); err != nil {
 		return err
 	}
 
@@ -321,11 +288,7 @@ func testFocusing(ctx *harness.Context) error {
 
 	// First, make sure we're in a clean state - go to top of the list
 	// Send 'gg' together as a single vim command
-	// Note: Using SendKeys + WaitStable because if we're already at top, screen won't change
-	if err := session.SendKeys("g", "g"); err != nil {
-		return err
-	}
-	if err := session.WaitStable(); err != nil {
+	if err := session.Type("g", "g"); err != nil {
 		return err
 	}
 
@@ -338,23 +301,15 @@ func testFocusing(ctx *harness.Context) error {
 	}
 
 	// Use vim-style navigation to get to project-b
-	// Note: Using SendKeys + WaitStable instead of SendKeysAndWaitForChange because
-	// the screen might not change if items are already visible
 	for i := 0; i < 4; i++ {
-		if err := session.SendKeys("j"); err != nil {
-			return err
-		}
-		if err := session.WaitStable(); err != nil {
+		if err := session.Type("j"); err != nil {
 			return err
 		}
 	}
 
 	// Focus on the selected item with '.'
-	if err := session.SendKeys("."); err != nil {
+	if err := session.Type("."); err != nil {
 		return fmt.Errorf("failed to send focus key: %w", err)
-	}
-	if err := session.WaitStable(); err != nil {
-		return err
 	}
 
 	// Verify focus header appears (the header shows "Focus: <name>")
@@ -364,11 +319,8 @@ func testFocusing(ctx *harness.Context) error {
 	}
 
 	// Clear focus with ctrl+g
-	if err := session.SendKeys("C-g"); err != nil {
+	if err := session.Type("C-g"); err != nil {
 		return fmt.Errorf("failed to clear focus: %w", err)
-	}
-	if err := session.WaitStable(); err != nil {
-		return err
 	}
 
 	// Verify project-a is visible again (focus cleared)
@@ -395,11 +347,8 @@ func testHelpView(ctx *harness.Context) error {
 	}
 
 	// Close help with '?' again
-	if err := session.SendKeys("?"); err != nil {
+	if err := session.Type("?"); err != nil {
 		return fmt.Errorf("failed to close help: %w", err)
-	}
-	if err := session.WaitStable(); err != nil {
-		return err
 	}
 
 	// Verify main view is back (check for project-a)

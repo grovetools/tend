@@ -33,15 +33,33 @@ func NewSession(sessionName string, client *tmux.Client, rootDir string) *Sessio
 	}
 }
 
-// SendKeys sends a sequence of keystrokes to the TUI.
+// Type sends keys to the TUI and waits for the screen to stabilize.
+// This is the recommended method for most interactions, as it combines
+// SendKeys + WaitStable which is the pattern used in 90% of tests.
+//
+// Example:
+//   session.Type("j")           // Navigate down and wait
+//   session.Type("g", "g")      // Go to top and wait
+//   session.Type("/", "search") // Open search and type
+func (s *Session) Type(keys ...string) error {
+	if err := s.SendKeys(keys...); err != nil {
+		return err
+	}
+	return s.WaitStable()
+}
+
+// SendKeys sends a sequence of keystrokes to the TUI without waiting.
 // Special keys can be sent (e.g., "Enter", "Esc", "Ctrl+c").
+//
+// NOTE: In most cases, you should use Type() instead, which automatically
+// waits for the screen to stabilize after sending keys.
 func (s *Session) SendKeys(keys ...string) error {
 	// Tmux's send-keys sends all arguments as a single sequence.
 	err := s.client.SendKeys(context.Background(), s.sessionName, keys...)
-	
+
 	// Record the event if recording is enabled
 	s.recordEvent("key", map[string]interface{}{"keys": keys}, "", err)
-	
+
 	// Auto-capture screen after sending keys (async)
 	if s.recording != nil && s.recording.enabled {
 		go func() {
@@ -49,7 +67,7 @@ func (s *Session) SendKeys(keys ...string) error {
 			s.captureForRecording()
 		}()
 	}
-	
+
 	return err
 }
 
