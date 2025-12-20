@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/mattsolo1/grove-tend/pkg/fs"
@@ -108,6 +110,301 @@ echo "CUSTOM_VAR is: $CUSTOM_VAR"`); err != nil {
 			}),
 		},
 		true,  // localOnly - TUI tests require tmux which may not be available in CI
+		false, // explicitOnly
+	)
+}
+
+// ExampleAdvancedTuiNavigation demonstrates the advanced navigation and timing controls.
+func ExampleAdvancedTuiNavigation() *harness.Scenario {
+	return harness.NewScenarioWithOptions(
+		"example-advanced-tui-navigation",
+		"Demonstrates TUI navigation with arrow keys, FindTextLocation, and WaitForUIStable",
+		[]string{"example", "tui", "navigation"},
+		[]harness.Step{
+			harness.NewStep("Launch TUI and wait for it to stabilize", func(ctx *harness.Context) error {
+				// Use the pre-built list-tui fixture from tests/e2e/fixtures/bin
+				cwd, err := os.Getwd()
+				if err != nil {
+					return fmt.Errorf("failed to get working directory: %w", err)
+				}
+				binPath := filepath.Join(cwd, "tests", "e2e", "fixtures", "bin", "list-tui")
+
+				if !fs.Exists(binPath) {
+					return fmt.Errorf("list-tui fixture not found at %s - run 'make build-e2e-fixtures' first", binPath)
+				}
+
+				session, err := ctx.StartTUI(binPath, []string{})
+				if err != nil {
+					return err
+				}
+				ctx.Set("advanced_session", session)
+
+				// OLD WAY: time.Sleep(1 * time.Second)
+				// NEW WAY: Wait for the UI to stop changing content.
+				// This is more reliable than a fixed sleep.
+				fmt.Println("   Waiting for UI to stabilize...")
+				return session.WaitForUIStable(5*time.Second, 100*time.Millisecond, 300*time.Millisecond)
+			}),
+			harness.NewStep("Test FindTextLocation functionality", func(ctx *harness.Context) error {
+				session := ctx.Get("advanced_session").(*tui.Session)
+
+				// Test finding specific text
+				fmt.Println("   Searching for 'docs/guide.md'...")
+				row, col, found, err := session.FindTextLocation("docs/guide.md")
+				if err != nil {
+					return fmt.Errorf("failed to find text location: %w", err)
+				}
+				if !found {
+					return fmt.Errorf("text 'docs/guide.md' not found on screen")
+				}
+
+				fmt.Printf("   Found 'docs/guide.md' at row %d, col %d\n", row, col)
+				return nil
+			}),
+			harness.NewStep("Navigate to docs/guide.md using NavigateToText", func(ctx *harness.Context) error {
+				session := ctx.Get("advanced_session").(*tui.Session)
+
+				// OLD WAY (brittle - breaks if order changes):
+				// session.Type("Down")
+				// session.Type("Down")
+
+				// NEW WAY: Navigate directly using NavigateToText
+				fmt.Println("   Using NavigateToText to select 'docs/guide.md'...")
+				if err := session.NavigateToText("docs/guide.md"); err != nil {
+					return fmt.Errorf("failed to navigate: %w", err)
+				}
+
+				// Verify the selection indicator moved
+				if err := session.AssertLine(func(line string) bool {
+					return strings.Contains(line, "> docs/guide.md")
+				}, "expected '> docs/guide.md' to be selected"); err != nil {
+					return err
+				}
+
+				fmt.Println("   ✓ Successfully selected 'docs/guide.md'")
+				return nil
+			}),
+			harness.NewStep("Navigate back to main.go using NavigateToText", func(ctx *harness.Context) error {
+				session := ctx.Get("advanced_session").(*tui.Session)
+
+				// Navigate back using NavigateToText
+				fmt.Println("   Using NavigateToText to select 'main.go'...")
+				if err := session.NavigateToText("main.go"); err != nil {
+					return fmt.Errorf("failed to navigate: %w", err)
+				}
+
+				// Verify the selection indicator moved
+				if err := session.AssertLine(func(line string) bool {
+					return strings.Contains(line, "> main.go")
+				}, "expected '> main.go' to be selected"); err != nil {
+					return err
+				}
+
+				fmt.Println("   ✓ Successfully selected 'main.go'")
+				fmt.Println("   ✓ NavigateToText works for selection-based TUIs!")
+				return nil
+			}),
+			harness.NewStep("Cleanup", func(ctx *harness.Context) error {
+				session := ctx.Get("advanced_session").(*tui.Session)
+				return session.SendKeys("q")
+			}),
+		},
+		true,  // localOnly - TUI tests require tmux
+		false, // explicitOnly
+	)
+}
+
+// ExampleConditionalFlowsAndRecording demonstrates the new conditional flow and recording features.
+func ExampleConditionalFlowsAndRecording() *harness.Scenario {
+	return harness.NewScenarioWithOptions(
+		"example-conditional-flows-recording",
+		"Demonstrates WaitForAnyText, pattern matching, SelectItem, and session recording",
+		[]string{"example", "tui", "conditional", "recording"},
+		[]harness.Step{
+			harness.NewStep("Launch task manager TUI and start recording", func(ctx *harness.Context) error {
+				// Use pre-built task-manager fixture
+				cwd, err := os.Getwd()
+				if err != nil {
+					return fmt.Errorf("failed to get working directory: %w", err)
+				}
+				binPath := filepath.Join(cwd, "tests", "e2e", "fixtures", "bin", "task-manager")
+
+				if !fs.Exists(binPath) {
+					return fmt.Errorf("task-manager fixture not found at %s - run 'make build-e2e-fixtures' first", binPath)
+				}
+
+				session, err := ctx.StartTUI(binPath, []string{})
+				if err != nil {
+					return err
+				}
+				ctx.Set("cond_session", session)
+
+				// Start recording the session
+				recordingPath := filepath.Join(ctx.RootDir, "session-recording")
+				if err := session.StartRecording(recordingPath); err != nil {
+					return fmt.Errorf("failed to start recording: %w", err)
+				}
+				fmt.Printf("   📹 Recording session to: %s\n", recordingPath)
+
+				// Wait for menu to appear
+				if err := session.WaitForText("Select action:", 2*time.Second); err != nil {
+					return err
+				}
+
+				return nil
+			}),
+			harness.NewStep("Select option and wait for processing", func(ctx *harness.Context) error {
+				session := ctx.Get("cond_session").(*tui.Session)
+
+				// Choose option 1 (Process files)
+				fmt.Println("   Selecting 'Process files' option...")
+				if err := session.Type("1"); err != nil {
+					return err
+				}
+
+				return nil
+			}),
+			harness.NewStep("Test WaitForAnyText for conditional outcomes", func(ctx *harness.Context) error {
+				session := ctx.Get("cond_session").(*tui.Session)
+
+				// Wait for one of multiple possible outcomes
+				fmt.Println("   Waiting for operation result...")
+				result, err := session.WaitForAnyText(
+					[]string{"✓ Success", "✗ Failed", "⚠ Warning"},
+					3*time.Second,
+				)
+				if err != nil {
+					return fmt.Errorf("failed waiting for outcome: %w", err)
+				}
+
+				fmt.Printf("   Got result: %s\n", result)
+
+				// Handle based on result
+				switch result {
+				case "✓ Success":
+					fmt.Println("   ✅ Operation completed successfully!")
+				case "✗ Failed":
+					fmt.Println("   ❌ Operation failed!")
+				case "⚠ Warning":
+					fmt.Println("   ⚠️  Operation completed with warnings")
+				}
+
+				return nil
+			}),
+			harness.NewStep("Test pattern matching for file counts", func(ctx *harness.Context) error {
+				session := ctx.Get("cond_session").(*tui.Session)
+
+				// Use regex pattern to find file counts
+				fmt.Println("   Looking for file count patterns...")
+				pattern := regexp.MustCompile(`\d+ files? (modified|added|deleted)`)
+
+				match, err := session.WaitForTextPattern(pattern, 2*time.Second)
+				if err != nil {
+					// Pattern might not be present depending on choice
+					fmt.Println("   No file counts found (might have chosen different option)")
+					return nil
+				}
+
+				fmt.Printf("   Found pattern match: %s\n", match)
+
+				// Assert pattern exists
+				if err := session.AssertContainsPattern(pattern); err != nil {
+					return fmt.Errorf("pattern assertion failed: %w", err)
+				}
+
+				return nil
+			}),
+			harness.NewStep("Take screenshot and stop recording", func(ctx *harness.Context) error {
+				session := ctx.Get("cond_session").(*tui.Session)
+
+				// Take a screenshot
+				screenshotPath := filepath.Join(ctx.RootDir, "final-state.ansi")
+				if err := session.TakeScreenshot(screenshotPath); err != nil {
+					return fmt.Errorf("failed to take screenshot: %w", err)
+				}
+				fmt.Printf("   📸 Screenshot saved to: %s\n", screenshotPath)
+
+				// Stop recording
+				if err := session.StopRecording(); err != nil {
+					return fmt.Errorf("failed to stop recording: %w", err)
+				}
+
+				// Show key history
+				history := session.GetKeyHistory()
+				fmt.Printf("   Key history: %v\n", history)
+
+				recordingPath := filepath.Join(ctx.RootDir, "session-recording")
+				fmt.Printf("   📊 Recording saved to:\n")
+				fmt.Printf("      - HTML: %s.html\n", recordingPath)
+				fmt.Printf("      - JSON: %s.json\n", recordingPath)
+
+				return nil
+			}),
+			harness.NewStep("Cleanup", func(ctx *harness.Context) error {
+				session := ctx.Get("cond_session").(*tui.Session)
+				return session.Type("q")
+			}),
+		},
+		true,  // localOnly - TUI tests require tmux
+		false, // explicitOnly
+	)
+}
+
+// ExampleFilesystemInteractionScenario demonstrates testing a TUI that interacts with the filesystem
+func ExampleFilesystemInteractionScenario() *harness.Scenario {
+	return harness.NewScenarioWithOptions(
+		"example-tui-filesystem",
+		"Tests a TUI that writes to the filesystem",
+		[]string{"example", "tui", "filesystem"},
+		[]harness.Step{
+			harness.NewStep("Launch file-saver TUI", func(ctx *harness.Context) error {
+				// Use pre-built file-saver fixture
+				cwd, err := os.Getwd()
+				if err != nil {
+					return fmt.Errorf("failed to get working directory: %w", err)
+				}
+				binPath := filepath.Join(cwd, "tests", "e2e", "fixtures", "bin", "file-saver")
+
+				if !fs.Exists(binPath) {
+					return fmt.Errorf("file-saver fixture not found at %s - run 'make build-e2e-fixtures' first", binPath)
+				}
+
+				session, err := ctx.StartTUI(binPath, []string{}, tui.WithCwd(ctx.RootDir))
+				if err != nil {
+					return err
+				}
+				ctx.Set("fs_session", session)
+
+				// Wait for the TUI to be ready
+				return session.WaitForText("Press 's' to save", 5*time.Second)
+			}),
+			harness.NewStep("Save file using 's' key", func(ctx *harness.Context) error {
+				session := ctx.Get("fs_session").(*tui.Session)
+
+				// Press 's' to save
+				if err := session.Type("s"); err != nil {
+					return err
+				}
+
+				// Wait for confirmation message
+				return session.WaitForText("File saved to output.txt", 2*time.Second)
+			}),
+			harness.NewStep("Verify file was created", func(ctx *harness.Context) error {
+				session := ctx.Get("fs_session").(*tui.Session)
+				// Verify the file was created and is visible to the session
+				return session.WaitForFile("output.txt", 5*time.Second)
+			}),
+			harness.NewStep("Verify file content", func(ctx *harness.Context) error {
+				session := ctx.Get("fs_session").(*tui.Session)
+				// Assert the file contains the expected content
+				return session.AssertFileContains("output.txt", "saved at")
+			}),
+			harness.NewStep("Cleanup", func(ctx *harness.Context) error {
+				session := ctx.Get("fs_session").(*tui.Session)
+				return session.SendKeys("q")
+			}),
+		},
+		true,  // localOnly - TUI tests require tmux
 		false, // explicitOnly
 	)
 }

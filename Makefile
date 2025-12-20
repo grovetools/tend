@@ -175,7 +175,14 @@ build-e2e-runner:
 	@echo "Building E2E test runner..."
 	@go build $(LDFLAGS) -o $(BIN_DIR)/$(E2E_RUNNER) ./tests/e2e
 
-test-e2e: build-e2e-runner build-e2e-mocks
+build-e2e-fixtures:
+	@echo "Building E2E test fixtures..."
+	@mkdir -p tests/e2e/fixtures/bin
+	@cd tests/e2e/fixtures/list-tui && GOWORK=off go build -o ../bin/list-tui .
+	@cd tests/e2e/fixtures/task-manager && GOWORK=off go build -o ../bin/task-manager .
+	@cd tests/e2e/fixtures/file-saver && GOWORK=off go build -o ../bin/file-saver .
+
+test-e2e: build-e2e-runner build-e2e-mocks build-e2e-fixtures
 	@echo "Running tend E2E test suite..."
 	@$(BIN_DIR)/$(E2E_RUNNER) run $(ARGS)
 

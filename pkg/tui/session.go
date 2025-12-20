@@ -282,10 +282,12 @@ func (s *Session) FindTextLocation(text string) (row, col int, found bool, err e
 	return 0, 0, false, nil
 }
 
-// NavigateToText moves the cursor from its current position to the location of the specified text.
-// It calculates the required up/down/left/right key presses.
+// NavigateToText moves the selection to the line containing the specified text.
+// For selection-based TUIs (like lists), it finds lines with selection indicators (">", "*", "•")
+// and calculates navigation from the current selection. For cursor-based interfaces, it uses
+// tmux cursor position. Waits for UI to stabilize after each keypress.
 func (s *Session) NavigateToText(text string) error {
-	targetRow, targetCol, found, err := s.FindTextLocation(text)
+	targetRow, _, found, err := s.FindTextLocation(text)
 	if err != nil {
 		return err
 	}
@@ -295,40 +297,47 @@ func (s *Session) NavigateToText(text string) error {
 		return err
 	}
 
-	currentRow, currentCol, err := s.GetCursorPosition()
+	// Try to find current selection by looking for common selection indicators
+	content, err := s.Capture(WithCleanedOutput())
 	if err != nil {
-		err := fmt.Errorf("failed to get current cursor position: %w", err)
-		s.recordEvent("navigate", map[string]interface{}{"text": text}, "", err)
-		return err
+		return fmt.Errorf("failed to capture screen: %w", err)
 	}
 
-	// Calculate vertical movement
+	lines := strings.Split(content, "\n")
+	currentRow := -1
+
+	// Look for selection indicators at the start of lines
+	for i, line := range lines {
+		trimmed := strings.TrimLeft(line, " \t")
+		if len(trimmed) > 0 {
+			// Check for common selection indicators
+			firstChar := rune(trimmed[0])
+			if firstChar == '>' || firstChar == '*' || strings.HasPrefix(trimmed, "•") || strings.HasPrefix(trimmed, "▶") {
+				currentRow = i + 1 // Convert to 1-based
+				break
+			}
+		}
+	}
+
+	// Fall back to tmux cursor position if no selection indicator found
+	if currentRow == -1 {
+		currentRow, _, err = s.GetCursorPosition()
+		if err != nil {
+			return fmt.Errorf("failed to get cursor position: %w", err)
+		}
+	}
+
+	// Calculate vertical movement needed
 	rowDiff := targetRow - currentRow
 	if rowDiff > 0 {
 		for i := 0; i < rowDiff; i++ {
-			if err := s.SendKeys("Down"); err != nil {
+			if err := s.Type("Down"); err != nil {
 				return err
 			}
 		}
 	} else if rowDiff < 0 {
 		for i := 0; i < -rowDiff; i++ {
-			if err := s.SendKeys("Up"); err != nil {
-				return err
-			}
-		}
-	}
-
-	// Calculate horizontal movement
-	colDiff := targetCol - currentCol
-	if colDiff > 0 {
-		for i := 0; i < colDiff; i++ {
-			if err := s.SendKeys("Right"); err != nil {
-				return err
-			}
-		}
-	} else if colDiff < 0 {
-		for i := 0; i < -colDiff; i++ {
-			if err := s.SendKeys("Left"); err != nil {
+			if err := s.Type("Up"); err != nil {
 				return err
 			}
 		}
@@ -337,8 +346,8 @@ func (s *Session) NavigateToText(text string) error {
 	// Record successful navigation
 	s.recordEvent("navigate", map[string]interface{}{
 		"text": text,
-		"from": fmt.Sprintf("(%d,%d)", currentRow, currentCol),
-		"to":   fmt.Sprintf("(%d,%d)", targetRow, targetCol),
+		"from": fmt.Sprintf("row %d", currentRow),
+		"to":   fmt.Sprintf("row %d", targetRow),
 	}, fmt.Sprintf("navigated to '%s'", text), nil)
 
 	return nil
