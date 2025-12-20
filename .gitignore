@@ -35,6 +35,7 @@ Thumbs.db
 *.tmp
 *.temp
 *.log
+*.ansi
 
 # Temp context files
 *.tmp.context

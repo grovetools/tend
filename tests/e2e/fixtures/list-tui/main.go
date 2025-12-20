@@ -4,6 +4,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -11,22 +12,29 @@ import (
 type model struct {
 	items    []string
 	cursor   int
+	selected string
 	quitting bool
+}
+
+type tickMsg time.Time
+
+var allItems = []string{
+	"README.md",
+	"main.go",
+	"docs/guide.md",
 }
 
 func initialModel() model {
 	return model{
-		items: []string{
-			"README.md",
-			"main.go",
-			"docs/guide.md",
-		},
-		cursor: 0,
+		items: []string{},
 	}
 }
 
 func (m model) Init() tea.Cmd {
-	return nil
+	// Start the loading process
+	return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
+		return tickMsg(t)
+	})
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -44,6 +52,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor < len(m.items)-1 {
 				m.cursor++
 			}
+		case "enter":
+			if m.cursor >= 0 && m.cursor < len(m.items) {
+				m.selected = m.items[m.cursor]
+			}
+		}
+
+	case tickMsg:
+		if len(m.items) < len(allItems) {
+			m.items = append(m.items, allItems[len(m.items)])
+			return m, tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
+				return tickMsg(t)
+			})
 		}
 	}
 	return m, nil
@@ -65,7 +85,11 @@ func (m model) View() string {
 		s += fmt.Sprintf("%s %s\n", cursor, item)
 	}
 
-	s += "\nUse arrow keys to navigate. Press 'q' to quit.\n"
+	if m.selected != "" {
+		s += fmt.Sprintf("\nSelected: %s\n", m.selected)
+	}
+
+	s += "\nUse arrow keys to navigate. Press 'enter' to select. Press 'q' to quit.\n"
 	return s
 }
 

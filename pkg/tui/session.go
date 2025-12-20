@@ -175,9 +175,18 @@ func (s *Session) WaitForText(text string, timeout time.Duration) error {
 	return err
 }
 
-// WaitForUIStable polls the TUI screen until its content remains unchanged for a specified duration,
-// or until a timeout is reached. This is useful for waiting for animations or asynchronous updates to complete.
+// WaitForUIStable polls the TUI screen until its content remains unchanged for the specified
+// stable duration, or until the timeout is reached. This is useful for waiting for animations
+// or asynchronous updates to complete.
+//
+// Parameters:
+// - timeout: Maximum time to wait for stability (e.g., 10*time.Second)
+// - pollInterval: How often to check the screen (e.g., 100*time.Millisecond)
+// - stableDuration: How long the screen must be unchanged to be considered stable (e.g., 200*time.Millisecond)
+//
+// For most use cases, use WaitStable() instead, which provides sensible defaults.
 func (s *Session) WaitForUIStable(timeout time.Duration, pollInterval time.Duration, stableDuration time.Duration) error {
+
 	var lastContent string
 	var stableSince time.Time
 	var initialized bool
@@ -216,9 +225,15 @@ func (s *Session) WaitForUIStable(timeout time.Duration, pollInterval time.Durat
 }
 
 // WaitStable waits for the UI to stabilize using sensible defaults.
-// Equivalent to WaitForUIStable(2*time.Second, 100*time.Millisecond, 200*time.Millisecond).
+// This is equivalent to WaitForUIStable(10*time.Second, 100*time.Millisecond, 200*time.Millisecond).
+//
+// The 10 second timeout accommodates slow CI environments but returns immediately once
+// the UI stabilizes (typically 300-500ms for test fixtures).
+//
+// Use this method for most testing scenarios. Use WaitForUIStable() directly only if you
+// need custom timing parameters.
 func (s *Session) WaitStable() error {
-	return s.WaitForUIStable(2*time.Second, 100*time.Millisecond, 200*time.Millisecond)
+	return s.WaitForUIStable(10*time.Second, 100*time.Millisecond, 200*time.Millisecond)
 }
 
 // AssertContains immediately checks if the TUI's current content contains the specified text.
@@ -461,20 +476,20 @@ func (s *Session) SelectItemWithKey(predicate func(line string) bool, key string
 			// Move cursor vertically
 			if rowDiff > 0 {
 				for j := 0; j < rowDiff; j++ {
-					if err := s.SendKeys("Down"); err != nil {
+					if err := s.Type("Down"); err != nil {
 						return err
 					}
 				}
 			} else if rowDiff < 0 {
 				for j := 0; j < -rowDiff; j++ {
-					if err := s.SendKeys("Up"); err != nil {
+					if err := s.Type("Up"); err != nil {
 						return err
 					}
 				}
 			}
 
 			// Press the selection key
-			return s.SendKeys(key)
+			return s.Type(key)
 		}
 	}
 

@@ -139,11 +139,30 @@ func ExampleAdvancedTuiNavigation() *harness.Scenario {
 				}
 				ctx.Set("advanced_session", session)
 
+				// First, wait for the TUI to actually start by checking for expected content
+				if err := session.WaitForText("File Browser", 5*time.Second); err != nil {
+					return fmt.Errorf("TUI did not start: %w", err)
+				}
+
 				// OLD WAY: time.Sleep(1 * time.Second)
 				// NEW WAY: Wait for the UI to stop changing content.
 				// This is more reliable than a fixed sleep.
 				fmt.Println("   Waiting for UI to stabilize...")
-				return session.WaitForUIStable(5*time.Second, 100*time.Millisecond, 300*time.Millisecond)
+				if err := session.WaitStable(); err != nil {
+					return err
+				}
+
+				// After stabilizing, verify all items have loaded
+				if err := session.AssertContains("README.md"); err != nil {
+					return err
+				}
+				if err := session.AssertContains("main.go"); err != nil {
+					return err
+				}
+				if err := session.AssertContains("docs/guide.md"); err != nil {
+					return err
+				}
+				return nil
 			}),
 			harness.NewStep("Test FindTextLocation functionality", func(ctx *harness.Context) error {
 				session := ctx.Get("advanced_session").(*tui.Session)
@@ -204,9 +223,22 @@ func ExampleAdvancedTuiNavigation() *harness.Scenario {
 				fmt.Println("   ✓ NavigateToText works for selection-based TUIs!")
 				return nil
 			}),
+			harness.NewStep("Test SelectItem functionality", func(ctx *harness.Context) error {
+				session := ctx.Get("advanced_session").(*tui.Session)
+
+				fmt.Println("   Using SelectItem to choose and select 'README.md'...")
+				if err := session.SelectItem(func(line string) bool {
+					return strings.Contains(line, "README.md")
+				}); err != nil {
+					return fmt.Errorf("failed to select item: %w", err)
+				}
+
+				// Verify the selection was made by checking the output
+				return session.AssertContains("Selected: README.md")
+			}),
 			harness.NewStep("Cleanup", func(ctx *harness.Context) error {
 				session := ctx.Get("advanced_session").(*tui.Session)
-				return session.SendKeys("q")
+				return session.Type("q")
 			}),
 		},
 		true,  // localOnly - TUI tests require tmux
@@ -247,7 +279,7 @@ func ExampleConditionalFlowsAndRecording() *harness.Scenario {
 				fmt.Printf("   📹 Recording session to: %s\n", recordingPath)
 
 				// Wait for menu to appear
-				if err := session.WaitForText("Select action:", 2*time.Second); err != nil {
+				if err := session.WaitForText("Select action:", 5*time.Second); err != nil {
 					return err
 				}
 
@@ -401,7 +433,7 @@ func ExampleFilesystemInteractionScenario() *harness.Scenario {
 			}),
 			harness.NewStep("Cleanup", func(ctx *harness.Context) error {
 				session := ctx.Get("fs_session").(*tui.Session)
-				return session.SendKeys("q")
+				return session.Type("q")
 			}),
 		},
 		true,  // localOnly - TUI tests require tmux

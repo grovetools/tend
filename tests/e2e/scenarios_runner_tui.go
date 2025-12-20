@@ -265,8 +265,7 @@ func testFiltering(ctx *harness.Context) error {
 	}
 
 	// Send Ctrl+U to clear the input line (common bash/readline shortcut)
-	// Then escape - use SendKeys for both since we don't need to wait between them
-	if err := session.SendKeys("C-u"); err != nil {
+	if err := session.Type("C-u"); err != nil {
 		return err
 	}
 	if err := session.Type("Escape"); err != nil {
@@ -337,7 +336,7 @@ func testHelpView(ctx *harness.Context) error {
 	session := ctx.Get("tui_session").(*tui.Session)
 
 	// Open help with '?'
-	if err := session.SendKeys("?"); err != nil {
+	if err := session.Type("?"); err != nil {
 		return fmt.Errorf("failed to open help: %w", err)
 	}
 
@@ -363,7 +362,7 @@ func testHelpView(ctx *harness.Context) error {
 // quitTUI exits the TUI cleanly.
 func quitTUI(ctx *harness.Context) error {
 	session := ctx.Get("tui_session").(*tui.Session)
-	return session.SendKeys("q")
+	return session.Type("q")
 }
 
 // findTendBinary finds the tend binary path.
