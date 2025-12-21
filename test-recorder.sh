@@ -33,7 +33,7 @@ echo "  - test-recording.ansi.xml (with ANSI codes for debugging)"
 echo ""
 read -p "Press ENTER to start recording..."
 
-./bin/tend tui record --out test-recording -- /tmp/list-tui
+./bin/tend record --out test-recording -- /tmp/list-tui
 
 echo ""
 echo "====================================================================="

@@ -21,11 +21,8 @@ func newTuiCmd() *cobra.Command {
 		Use:   "tui",
 		Short: "Launch an interactive TUI for browsing and running tests",
 		Long: `Launch an interactive Terminal User Interface to browse, manage,
-and run 'tend' test scenarios across the ecosystem.
-
-If no subcommand is given, this will launch the test runner TUI.`,
+and run 'tend' test scenarios across the ecosystem.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// This RunE is executed if no subcommand is specified.
 			// Determine initial focus path based on current directory
 			initialFocusPath := findInitialWorkspacePath()
 
@@ -39,13 +36,10 @@ If no subcommand is given, this will launch the test runner TUI.`,
 		},
 	}
 
-	// Add record subcommand
-	cmd.AddCommand(newRecordCmd())
-
 	return cmd
 }
 
-// newRecordCmd creates the `tui record` subcommand.
+// newRecordCmd creates the `record` command.
 func newRecordCmd() *cobra.Command {
 	var outputFile string
 	recordCmd := &cobra.Command{
@@ -66,7 +60,7 @@ Use '--' to separate the recorder's flags from the command you want to record.
 If no command is provided, it will default to launching your default shell ($SHELL).
 
 Example:
-  tend tui record --out my-session -- nb tui
+  tend record --out my-session -- nb tui
   # Creates: my-session.{html,md,ansi.md,xml,ansi.xml}`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			commandToRun := []string{}

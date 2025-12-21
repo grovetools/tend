@@ -78,6 +78,7 @@ Features:
 	rootCmd.AddCommand(newEcosystemCmd())
 	rootCmd.AddCommand(newTuiCmd())
 	rootCmd.AddCommand(newSessionsCmd())
+	rootCmd.AddCommand(newRecordCmd())
 
 	return rootCmd
 }
