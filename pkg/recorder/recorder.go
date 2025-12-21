@@ -2,7 +2,7 @@ package recorder
 
 import (
 	"bytes"
-	"io"
+	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -41,15 +41,22 @@ func (r *Recorder) Run(command []string) ([]Frame, error) {
 	ch <- syscall.SIGWINCH
 	defer signal.Stop(ch)
 
-	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
-	if err != nil {
-		return nil, err
+	// Check if stdin is a terminal before making it raw
+	stdinFd := int(os.Stdin.Fd())
+	if !term.IsTerminal(stdinFd) {
+		return nil, fmt.Errorf("stdin is not a terminal - recording requires an interactive terminal")
 	}
-	defer term.Restore(int(os.Stdin.Fd()), oldState)
+
+	oldState, err := term.MakeRaw(stdinFd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to set terminal to raw mode: %w", err)
+	}
+	defer term.Restore(stdinFd, oldState)
 
 	var frames []Frame
 	startTime := time.Now()
 
+	// Channel for input from user
 	inputChan := make(chan []byte)
 	go func() {
 		for {
@@ -63,38 +70,100 @@ func (r *Recorder) Run(command []string) ([]Frame, error) {
 		}
 	}()
 
-	for {
-		var currentInput bytes.Buffer
-		var currentOutput bytes.Buffer
-
-		input, ok := <-inputChan
-		if !ok {
-			break
-		}
-
-		currentInput.Write(input)
-		ptmx.Write(input)
-		os.Stdout.Write(input)
-
+	// Channel for output from PTY
+	outputChan := make(chan []byte, 10)
+	doneChan := make(chan struct{})
+	go func() {
+		defer close(doneChan)
+		defer close(outputChan)
+		buf := make([]byte, 4096)
 		for {
-			var output bytes.Buffer
-			mw := io.MultiWriter(&output, os.Stdout)
-
-			buffer := make([]byte, 4096)
-			ptmx.SetReadDeadline(time.Now().Add(50 * time.Millisecond))
-			n, err := ptmx.Read(buffer)
+			n, err := ptmx.Read(buf)
 			if n > 0 {
-				mw.Write(buffer[:n])
-				currentOutput.Write(buffer[:n])
+				data := make([]byte, n)
+				copy(data, buf[:n])
+				outputChan <- data
 			}
 			if err != nil {
-				if os.IsTimeout(err) {
-					break
-				}
-				goto end_loop
+				return
 			}
 		}
+	}()
 
+	// Main loop: handle input and output concurrently
+	var currentInput bytes.Buffer
+	var currentOutput bytes.Buffer
+	outputStableTimer := time.NewTimer(0)
+	<-outputStableTimer.C // Drain initial timer
+
+	collectingOutput := false
+
+	for {
+		select {
+		case input, ok := <-inputChan:
+			if !ok {
+				goto end_loop
+			}
+
+			// If we were collecting output for a previous input, save that frame first
+			if collectingOutput && currentInput.Len() > 0 {
+				frames = append(frames, Frame{
+					Timestamp: time.Since(startTime),
+					Input:     string(currentInput.Bytes()),
+					Output:    string(currentOutput.Bytes()),
+				})
+				currentInput.Reset()
+				currentOutput.Reset()
+				collectingOutput = false
+			}
+
+			// Write input to PTY
+			currentInput.Write(input)
+			_, err := ptmx.Write(input)
+			if err != nil {
+				goto end_loop
+			}
+
+			// Start collecting output for this input
+			collectingOutput = true
+			outputStableTimer.Reset(100 * time.Millisecond)
+
+		case output, ok := <-outputChan:
+			if !ok {
+				goto end_loop
+			}
+			// Write output to stdout AND capture it
+			os.Stdout.Write(output)
+
+			if collectingOutput {
+				currentOutput.Write(output)
+				// Reset stability timer - output is still coming
+				outputStableTimer.Reset(100 * time.Millisecond)
+			}
+
+		case <-outputStableTimer.C:
+			// Output has stabilized - save the frame
+			if collectingOutput && currentInput.Len() > 0 {
+				frames = append(frames, Frame{
+					Timestamp: time.Since(startTime),
+					Input:     string(currentInput.Bytes()),
+					Output:    string(currentOutput.Bytes()),
+				})
+				currentInput.Reset()
+				currentOutput.Reset()
+				collectingOutput = false
+			}
+
+		case <-doneChan:
+			// PTY closed (command exited)
+			goto end_loop
+		}
+	}
+
+end_loop:
+
+	// Save any remaining frame
+	if currentInput.Len() > 0 || currentOutput.Len() > 0 {
 		frames = append(frames, Frame{
 			Timestamp: time.Since(startTime),
 			Input:     string(currentInput.Bytes()),
@@ -102,10 +171,7 @@ func (r *Recorder) Run(command []string) ([]Frame, error) {
 		})
 	}
 
-end_loop:
-
-	// Wait for the command to finish, but ignore errors
-	// as the user exiting is expected.
+	// Wait for the command to finish
 	_ = cmd.Wait()
 
 	return frames, nil
