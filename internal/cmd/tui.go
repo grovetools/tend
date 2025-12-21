@@ -50,12 +50,14 @@ func newRecordCmd() *cobra.Command {
 	var outputFile string
 	recordCmd := &cobra.Command{
 		Use:   "record [--out basename] -- <command...>",
-		Short: "Record a manual TUI session to HTML, Markdown, and XML files",
+		Short: "Record a manual TUI session to multiple output formats",
 		Long: `Launches a command within a recordable sub-shell. All keystrokes and
-terminal output are captured and saved to three formats:
-  - Interactive HTML report (for human review)
-  - Markdown report (for LLM consumption, reduced tokens)
-  - XML report (for LLM consumption, structured format)
+terminal output are captured and saved to five formats:
+  - .html:       Interactive HTML report (for human review)
+  - .md:         Markdown report (for LLM consumption, plain text)
+  - .ansi.md:    Markdown with ANSI codes (for color debugging)
+  - .xml:        XML report (for LLM consumption, plain text)
+  - .ansi.xml:   XML with ANSI codes (for color debugging)
 
 This is useful for creating shareable, replayable recordings of a TUI session,
 often for providing context to an LLM for writing automated tests.
@@ -65,7 +67,7 @@ If no command is provided, it will default to launching your default shell ($SHE
 
 Example:
   tend tui record --out my-session -- nb tui
-  # Creates: my-session.html, my-session.md, my-session.xml`,
+  # Creates: my-session.{html,md,ansi.md,xml,ansi.xml}`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			commandToRun := []string{}
 			dashDashIndex := cmd.Flags().ArgsLenAtDash()
@@ -97,7 +99,7 @@ Example:
 				baseName = baseName[:len(baseName)-len(ext)]
 			}
 
-			// Generate all three formats
+			// Generate all five formats
 			formats := []struct {
 				ext       string
 				generator func([]recorder.Frame, io.Writer) error
@@ -105,7 +107,9 @@ Example:
 			}{
 				{".html", recorder.GenerateHTMLReport, "HTML"},
 				{".md", recorder.GenerateMarkdownReport, "Markdown"},
+				{".ansi.md", recorder.GenerateMarkdownReportWithANSI, "Markdown (ANSI)"},
 				{".xml", recorder.GenerateXMLReport, "XML"},
+				{".ansi.xml", recorder.GenerateXMLReportWithANSI, "XML (ANSI)"},
 			}
 
 			var savedFiles []string

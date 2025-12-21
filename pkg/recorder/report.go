@@ -165,6 +165,15 @@ func formatInput(input string) string {
 
 // GenerateMarkdownReport creates a markdown report optimized for LLM consumption.
 func GenerateMarkdownReport(frames []Frame, out io.Writer) error {
+	return generateMarkdownReportInternal(frames, out, false)
+}
+
+// GenerateMarkdownReportWithANSI creates a markdown report with ANSI codes preserved.
+func GenerateMarkdownReportWithANSI(frames []Frame, out io.Writer) error {
+	return generateMarkdownReportInternal(frames, out, true)
+}
+
+func generateMarkdownReportInternal(frames []Frame, out io.Writer, preserveANSI bool) error {
 	state := &vt10x.State{}
 	vt, err := vt10x.New(state, &bytes.Buffer{}, io.Discard)
 	if err != nil {
@@ -174,15 +183,24 @@ func GenerateMarkdownReport(frames []Frame, out io.Writer) error {
 	fmt.Fprintln(out, "# TUI Session Recording")
 	fmt.Fprintln(out)
 	fmt.Fprintf(out, "Total frames: %d\n\n", len(frames))
+	if preserveANSI {
+		fmt.Fprintln(out, "_Note: This version preserves ANSI escape codes for color debugging._")
+		fmt.Fprintln(out)
+	}
 	fmt.Fprintln(out, "---")
 	fmt.Fprintln(out)
 
 	for i, frame := range frames {
-		// Feed the raw ANSI output to the terminal emulator
-		vt.Write([]byte(frame.Output))
-
-		// Get plain text representation
-		snapshot := renderEmulatorToPlainText(state)
+		var snapshot string
+		if preserveANSI {
+			// Just use the raw output with ANSI codes
+			snapshot = frame.Output
+		} else {
+			// Feed the raw ANSI output to the terminal emulator
+			vt.Write([]byte(frame.Output))
+			// Get plain text representation
+			snapshot = renderEmulatorToPlainText(state)
+		}
 
 		fmt.Fprintf(out, "## Frame %d (+%.3fs)\n\n", i+1, frame.Timestamp.Seconds())
 		fmt.Fprintf(out, "**Input:** `%s`\n\n", formatInputPlain(frame.Input))
@@ -198,6 +216,15 @@ func GenerateMarkdownReport(frames []Frame, out io.Writer) error {
 
 // GenerateXMLReport creates an XML report optimized for LLM consumption.
 func GenerateXMLReport(frames []Frame, out io.Writer) error {
+	return generateXMLReportInternal(frames, out, false)
+}
+
+// GenerateXMLReportWithANSI creates an XML report with ANSI codes preserved.
+func GenerateXMLReportWithANSI(frames []Frame, out io.Writer) error {
+	return generateXMLReportInternal(frames, out, true)
+}
+
+func generateXMLReportInternal(frames []Frame, out io.Writer, preserveANSI bool) error {
 	state := &vt10x.State{}
 	vt, err := vt10x.New(state, &bytes.Buffer{}, io.Discard)
 	if err != nil {
@@ -205,14 +232,22 @@ func GenerateXMLReport(frames []Frame, out io.Writer) error {
 	}
 
 	fmt.Fprintln(out, `<?xml version="1.0" encoding="UTF-8"?>`)
+	if preserveANSI {
+		fmt.Fprintln(out, `<!-- This version preserves ANSI escape codes for color debugging -->`)
+	}
 	fmt.Fprintln(out, `<tui-session>`)
 
 	for i, frame := range frames {
-		// Feed the raw ANSI output to the terminal emulator
-		vt.Write([]byte(frame.Output))
-
-		// Get plain text representation
-		snapshot := renderEmulatorToPlainText(state)
+		var snapshot string
+		if preserveANSI {
+			// Just use the raw output with ANSI codes
+			snapshot = frame.Output
+		} else {
+			// Feed the raw ANSI output to the terminal emulator
+			vt.Write([]byte(frame.Output))
+			// Get plain text representation
+			snapshot = renderEmulatorToPlainText(state)
+		}
 
 		fmt.Fprintf(out, `  <frame index="%d" timestamp="%.3f">`, i+1, frame.Timestamp.Seconds())
 		fmt.Fprintln(out)
