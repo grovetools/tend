@@ -162,3 +162,116 @@ func formatInput(input string) string {
 	// Add more replacements for other control characters as needed
 	return html.EscapeString(input)
 }
+
+// GenerateMarkdownReport creates a markdown report optimized for LLM consumption.
+func GenerateMarkdownReport(frames []Frame, out io.Writer) error {
+	state := &vt10x.State{}
+	vt, err := vt10x.New(state, &bytes.Buffer{}, io.Discard)
+	if err != nil {
+		return fmt.Errorf("failed to create terminal emulator: %w", err)
+	}
+
+	fmt.Fprintln(out, "# TUI Session Recording")
+	fmt.Fprintln(out)
+	fmt.Fprintf(out, "Total frames: %d\n\n", len(frames))
+	fmt.Fprintln(out, "---")
+	fmt.Fprintln(out)
+
+	for i, frame := range frames {
+		// Feed the raw ANSI output to the terminal emulator
+		vt.Write([]byte(frame.Output))
+
+		// Get plain text representation
+		snapshot := renderEmulatorToPlainText(state)
+
+		fmt.Fprintf(out, "## Frame %d (+%.3fs)\n\n", i+1, frame.Timestamp.Seconds())
+		fmt.Fprintf(out, "**Input:** `%s`\n\n", formatInputPlain(frame.Input))
+		fmt.Fprintln(out, "**Terminal State:**")
+		fmt.Fprintln(out, "```")
+		fmt.Fprint(out, snapshot)
+		fmt.Fprintln(out, "```")
+		fmt.Fprintln(out)
+	}
+
+	return nil
+}
+
+// GenerateXMLReport creates an XML report optimized for LLM consumption.
+func GenerateXMLReport(frames []Frame, out io.Writer) error {
+	state := &vt10x.State{}
+	vt, err := vt10x.New(state, &bytes.Buffer{}, io.Discard)
+	if err != nil {
+		return fmt.Errorf("failed to create terminal emulator: %w", err)
+	}
+
+	fmt.Fprintln(out, `<?xml version="1.0" encoding="UTF-8"?>`)
+	fmt.Fprintln(out, `<tui-session>`)
+
+	for i, frame := range frames {
+		// Feed the raw ANSI output to the terminal emulator
+		vt.Write([]byte(frame.Output))
+
+		// Get plain text representation
+		snapshot := renderEmulatorToPlainText(state)
+
+		fmt.Fprintf(out, `  <frame index="%d" timestamp="%.3f">`, i+1, frame.Timestamp.Seconds())
+		fmt.Fprintln(out)
+		fmt.Fprintf(out, `    <input>%s</input>`, xmlEscape(formatInputPlain(frame.Input)))
+		fmt.Fprintln(out)
+		fmt.Fprintln(out, `    <terminal-state><![CDATA[`)
+		fmt.Fprint(out, snapshot)
+		fmt.Fprintln(out, `]]></terminal-state>`)
+		fmt.Fprintln(out, `  </frame>`)
+	}
+
+	fmt.Fprintln(out, `</tui-session>`)
+	return nil
+}
+
+// renderEmulatorToPlainText converts the terminal emulator's grid to plain text.
+func renderEmulatorToPlainText(state *vt10x.State) string {
+	var sb strings.Builder
+	rows, cols := state.Size()
+
+	for r := 0; r < rows; r++ {
+		var line strings.Builder
+		for c := 0; c < cols; c++ {
+			ch, _, _ := state.Cell(c, r)
+			line.WriteRune(ch)
+		}
+		// Trim trailing whitespace from each line
+		trimmed := strings.TrimRight(line.String(), " ")
+		sb.WriteString(trimmed)
+		if r < rows-1 {
+			sb.WriteRune('\n')
+		}
+	}
+
+	return strings.TrimRight(sb.String(), "\n")
+}
+
+// formatInputPlain formats input for plain text reports.
+func formatInputPlain(input string) string {
+	input = strings.ReplaceAll(input, "\r", "<Enter>")
+	input = strings.ReplaceAll(input, "\n", "<LF>")
+	input = strings.ReplaceAll(input, "\t", "<Tab>")
+	input = strings.ReplaceAll(input, "\x1b", "<Esc>")
+	// Handle other common control characters
+	for i := 0; i < 32; i++ {
+		if i != 9 && i != 10 && i != 13 && i != 27 {
+			input = strings.ReplaceAll(input, string(rune(i)), fmt.Sprintf("<0x%02x>", i))
+		}
+	}
+	return input
+}
+
+// xmlEscape escapes special XML characters.
+func xmlEscape(s string) string {
+	s = strings.ReplaceAll(s, "&", "&amp;")
+	s = strings.ReplaceAll(s, "<", "&lt;")
+	s = strings.ReplaceAll(s, ">", "&gt;")
+	s = strings.ReplaceAll(s, "\"", "&quot;")
+	s = strings.ReplaceAll(s, "'", "&apos;")
+	return s
+}
+

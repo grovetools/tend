@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -48,19 +49,23 @@ If no subcommand is given, this will launch the test runner TUI.`,
 func newRecordCmd() *cobra.Command {
 	var outputFile string
 	recordCmd := &cobra.Command{
-		Use:   "record [--out file.html] -- <command...>",
-		Short: "Record a manual TUI session to an HTML file",
+		Use:   "record [--out basename] -- <command...>",
+		Short: "Record a manual TUI session to HTML, Markdown, and XML files",
 		Long: `Launches a command within a recordable sub-shell. All keystrokes and
-terminal output are captured and saved to an interactive HTML report.
+terminal output are captured and saved to three formats:
+  - Interactive HTML report (for human review)
+  - Markdown report (for LLM consumption, reduced tokens)
+  - XML report (for LLM consumption, structured format)
 
-This is useful for creating a shareable, replayable recording of a TUI session,
+This is useful for creating shareable, replayable recordings of a TUI session,
 often for providing context to an LLM for writing automated tests.
 
 Use '--' to separate the recorder's flags from the command you want to record.
 If no command is provided, it will default to launching your default shell ($SHELL).
 
 Example:
-  tend tui record --out my-session.html -- nb tui`,
+  tend tui record --out my-session -- nb tui
+  # Creates: my-session.html, my-session.md, my-session.xml`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			commandToRun := []string{}
 			dashDashIndex := cmd.Flags().ArgsLenAtDash()
@@ -86,24 +91,48 @@ Example:
 				return fmt.Errorf("recording session failed: %w", err)
 			}
 
-			// Open output file
-			file, err := os.Create(outputFile)
-			if err != nil {
-				return fmt.Errorf("failed to create output file %s: %w", outputFile, err)
-			}
-			defer file.Close()
-
-			// Generate HTML report
-			if err := recorder.GenerateHTMLReport(frames, file); err != nil {
-				return fmt.Errorf("failed to generate HTML report: %w", err)
+			// Determine base filename (remove extension if provided)
+			baseName := outputFile
+			if ext := filepath.Ext(baseName); ext != "" {
+				baseName = baseName[:len(baseName)-len(ext)]
 			}
 
-			fmt.Printf("\n\nRecording saved to %s\n", outputFile)
+			// Generate all three formats
+			formats := []struct {
+				ext       string
+				generator func([]recorder.Frame, io.Writer) error
+				name      string
+			}{
+				{".html", recorder.GenerateHTMLReport, "HTML"},
+				{".md", recorder.GenerateMarkdownReport, "Markdown"},
+				{".xml", recorder.GenerateXMLReport, "XML"},
+			}
+
+			var savedFiles []string
+			for _, format := range formats {
+				filename := baseName + format.ext
+				file, err := os.Create(filename)
+				if err != nil {
+					return fmt.Errorf("failed to create %s file %s: %w", format.name, filename, err)
+				}
+
+				if err := format.generator(frames, file); err != nil {
+					file.Close()
+					return fmt.Errorf("failed to generate %s report: %w", format.name, err)
+				}
+				file.Close()
+				savedFiles = append(savedFiles, filename)
+			}
+
+			fmt.Printf("\n\nRecordings saved:\n")
+			for _, file := range savedFiles {
+				fmt.Printf("  - %s\n", file)
+			}
 			return nil
 		},
 	}
 
-	recordCmd.Flags().StringVarP(&outputFile, "out", "o", "tend-recording.html", "Output file for the HTML recording")
+	recordCmd.Flags().StringVarP(&outputFile, "out", "o", "tend-recording", "Base filename for output files (without extension)")
 	return recordCmd
 }
 

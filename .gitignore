@@ -49,4 +49,6 @@ build/
 
 # Don't ignore CLAUDE.md
 !CLAUDE.md
-test-recording.html
+# Test recordings
+test-recording.*
+tend-recording.*
