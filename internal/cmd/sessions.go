@@ -127,7 +127,7 @@ func stripANSI(s string) string {
 
 // newSessionsCaptureCmd creates the "sessions capture" command.
 func newSessionsCaptureCmd() *cobra.Command {
-	var stripAnsi bool
+	var withAnsi bool
 	var waitFor string
 	var timeout time.Duration
 
@@ -152,16 +152,16 @@ func newSessionsCaptureCmd() *cobra.Command {
 					}
 
 					checkContent := content
-					if stripAnsi {
+					if !withAnsi {
 						checkContent = stripANSI(content)
 					}
 
 					if strings.Contains(checkContent, waitFor) {
 						// Found it! Print and return
-						if stripAnsi {
-							fmt.Print(stripANSI(content))
-						} else {
+						if withAnsi {
 							fmt.Print(content)
+						} else {
+							fmt.Print(stripANSI(content))
 						}
 						return nil
 					}
@@ -177,16 +177,16 @@ func newSessionsCaptureCmd() *cobra.Command {
 				return err
 			}
 
-			if stripAnsi {
-				fmt.Print(stripANSI(content))
-			} else {
+			if withAnsi {
 				fmt.Print(content)
+			} else {
+				fmt.Print(stripANSI(content))
 			}
 			return nil
 		},
 	}
 
-	cmd.Flags().BoolVar(&stripAnsi, "strip-ansi", false, "Remove ANSI escape codes from output")
+	cmd.Flags().BoolVar(&withAnsi, "with-ansi", false, "Preserve ANSI escape codes in output (default: strip)")
 	cmd.Flags().StringVar(&waitFor, "wait-for", "", "Wait for text to appear before capturing")
 	cmd.Flags().DurationVar(&timeout, "timeout", 5*time.Second, "Timeout when using --wait-for")
 
