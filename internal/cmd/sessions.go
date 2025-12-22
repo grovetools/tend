@@ -4,7 +4,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
+	"strings"
 	"syscall"
+	"time"
 
 	"github.com/mattsolo1/grove-core/pkg/tmux"
 	"github.com/mattsolo1/grove-tend/internal/tui/sessions"
@@ -115,9 +118,20 @@ func newSessionsKillCmd() *cobra.Command {
 	return cmd
 }
 
+// stripANSI removes ANSI escape codes from a string
+func stripANSI(s string) string {
+	// Match ANSI escape sequences
+	ansiRegex := regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
+	return ansiRegex.ReplaceAllString(s, "")
+}
+
 // newSessionsCaptureCmd creates the "sessions capture" command.
 func newSessionsCaptureCmd() *cobra.Command {
-	return &cobra.Command{
+	var stripAnsi bool
+	var waitFor string
+	var timeout time.Duration
+
+	cmd := &cobra.Command{
 		Use:   "capture <session-target>",
 		Short: "Capture the contents of a tmux pane",
 		Args:  cobra.ExactArgs(1),
@@ -127,14 +141,56 @@ func newSessionsCaptureCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+
+			// If --wait-for is specified, poll until text appears or timeout
+			if waitFor != "" {
+				deadline := time.Now().Add(timeout)
+				for time.Now().Before(deadline) {
+					content, err := client.CapturePane(cmd.Context(), target)
+					if err != nil {
+						return err
+					}
+
+					checkContent := content
+					if stripAnsi {
+						checkContent = stripANSI(content)
+					}
+
+					if strings.Contains(checkContent, waitFor) {
+						// Found it! Print and return
+						if stripAnsi {
+							fmt.Print(stripANSI(content))
+						} else {
+							fmt.Print(content)
+						}
+						return nil
+					}
+
+					time.Sleep(200 * time.Millisecond)
+				}
+				return fmt.Errorf("timeout waiting for text: %q", waitFor)
+			}
+
+			// Normal capture without waiting
 			content, err := client.CapturePane(cmd.Context(), target)
 			if err != nil {
 				return err
 			}
-			fmt.Print(content)
+
+			if stripAnsi {
+				fmt.Print(stripANSI(content))
+			} else {
+				fmt.Print(content)
+			}
 			return nil
 		},
 	}
+
+	cmd.Flags().BoolVar(&stripAnsi, "strip-ansi", false, "Remove ANSI escape codes from output")
+	cmd.Flags().StringVar(&waitFor, "wait-for", "", "Wait for text to appear before capturing")
+	cmd.Flags().DurationVar(&timeout, "timeout", 5*time.Second, "Timeout when using --wait-for")
+
+	return cmd
 }
 
 // newSessionsSendKeysCmd creates the "sessions send-keys" command.
