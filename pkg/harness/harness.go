@@ -33,6 +33,7 @@ type Context struct {
 	// State management
 	dirs              map[string]string      // Named directories created during test
 	values            map[string]interface{} // Generic key-value store for step communication
+	assertions        []*AssertionResult     // Log of assertions for the current step
 	UseRealDeps       map[string]bool        // Map of dependencies to use real binaries for
 	mockOverrides     map[string]string      // Map of command name to its mock binary path
 	shellPaneID       string                 // Tmux pane ID for the shell
@@ -110,12 +111,13 @@ type Result struct {
 
 // StepResult represents the outcome of a single step
 type StepResult struct {
-	Name      string
-	Success   bool
-	Error     error
-	StartTime time.Time
-	EndTime   time.Time
-	Duration  time.Duration
+	Name       string
+	Success    bool
+	Error      error
+	StartTime  time.Time
+	EndTime    time.Time
+	Duration   time.Duration
+	Assertions []*AssertionResult
 }
 
 
@@ -342,12 +344,16 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 			}
 		}
 
+		// Before running the step, clear any previous assertion results.
+		testCtx.clearAssertions()
+
 		// Execute step
 		stepResult := h.executeStep(ctx, testCtx, step, ui)
+		stepResult.Assertions = testCtx.getAssertions() // Collect assertions after step execution
 		stepResults = append(stepResults, stepResult)
 
 		if stepResult.Error != nil {
-			ui.StepFailed(step.Name, stepResult.Error, stepResult.Duration)
+			ui.StepFailed(stepResult)
 			result.Success = false
 			result.FailedStep = step.Name
 			result.Error = &StepError{
@@ -372,7 +378,7 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 			return result, result.Error
 		}
 
-		ui.StepSuccess(step.Name, stepResult.Duration)
+		ui.StepSuccess(stepResult)
 	}
 
 	// Success

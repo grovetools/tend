@@ -6,10 +6,11 @@ import (
 	"log"
 	"strings"
 
-	"github.com/mattsolo1/grove-tend/pkg/harness"
 	"github.com/mattsolo1/grove-tend/pkg/command"
 	"github.com/mattsolo1/grove-tend/pkg/fs"
 	"github.com/mattsolo1/grove-tend/pkg/git"
+	"github.com/mattsolo1/grove-tend/pkg/harness"
+	"github.com/mattsolo1/grove-tend/pkg/verify"
 )
 
 func main() {
@@ -116,6 +117,44 @@ func newFeature() {
 				return nil
 			}),
 
+			harness.NewStep("Demonstrate assertion styles", func(ctx *harness.Context) error {
+				fmt.Println("✓ Demonstrating hard (fail-fast) and soft (collecting) assertions.")
+
+				// Example of a successful hard assertion
+				if err := ctx.Check("repository has a clean state", func() error {
+					repo := ctx.Get("repo").(*git.Git)
+					hasChanges, err := repo.HasUncommittedChanges()
+					if err != nil {
+						return err
+					}
+					if hasChanges {
+						return fmt.Errorf("repository should be clean but has uncommitted changes")
+					}
+					return nil
+				}()); err != nil {
+					return err // This would fail the step
+				}
+
+				// Example of soft assertions (collecting multiple failures)
+				// This block will intentionally fail to demonstrate the aggregated error report.
+				err := ctx.Verify(func(v *verify.Collector) {
+					v.Contains("a passing soft assertion", "hello world", "hello")
+					v.Equal("a failing equality check", 1, 2)
+					v.True("a failing boolean check", false)
+					v.Contains("another failing contains check", "foo bar", "baz")
+				})
+
+				if err != nil {
+					fmt.Printf("\nCollected assertion failures (as expected for demo):\n%v\n", err)
+					// In a real test, you would 'return err' here.
+					// We return nil so the demo scenario can continue and pass.
+					return nil
+				}
+
+				// This part should not be reached in the demo.
+				return fmt.Errorf("expected soft assertion block to fail but it passed")
+			}),
+
 			harness.NewStep("Demonstrate step builders", func(ctx *harness.Context) error {
 				// Test conditional step
 				conditional := harness.ConditionalStep("conditional test",
@@ -172,6 +211,7 @@ func newFeature() {
 	fmt.Println("  ✓ Git repository operations")
 	fmt.Println("  ✓ Command execution and output capture")
 	fmt.Println("  ✓ Context state management between steps")
+	fmt.Println("  ✓ Hard and soft assertion styles")
 	fmt.Println("  ✓ Error handling and reporting")
 	fmt.Println("  ✓ Step builder utilities")
 	fmt.Println("  ✓ Automatic cleanup")

@@ -15,6 +15,7 @@ import (
 	"github.com/mattsolo1/grove-tend/pkg/project"
 	"github.com/mattsolo1/grove-tend/pkg/teatest"
 	"github.com/mattsolo1/grove-tend/pkg/tui"
+	"github.com/mattsolo1/grove-tend/pkg/verify"
 )
 
 // contextMutex protects concurrent access to context maps
@@ -400,4 +401,54 @@ func (c *Context) StartTUI(binaryPath string, args []string, opts ...tui.StartOp
 // This is ideal for testing model logic and view output without the overhead of a full TUI session.
 func (c *Context) StartHeadless(model tea.Model) *teatest.HeadlessSession {
 	return teatest.NewHeadlessSession(model)
+}
+
+// AddAssertion logs a new assertion result for the current step.
+func (c *Context) AddAssertion(description string, err error) {
+	contextMutex.Lock()
+	defer contextMutex.Unlock()
+
+	result := &AssertionResult{
+		Description: description,
+		Success:     err == nil,
+	}
+	if err != nil {
+		result.Error = err.Error()
+	}
+	c.assertions = append(c.assertions, result)
+}
+
+// getAssertions retrieves the assertion results for the current step.
+func (c *Context) getAssertions() []*AssertionResult {
+	contextMutex.RLock()
+	defer contextMutex.RUnlock()
+	return c.assertions
+}
+
+// clearAssertions resets the assertion log, called before each new step.
+func (c *Context) clearAssertions() {
+	contextMutex.Lock()
+	defer contextMutex.Unlock()
+	c.assertions = nil
+}
+
+// Check performs a hard assertion. It logs the result and returns an
+// error immediately if the assertion fails, stopping the current step.
+func (c *Context) Check(description string, err error) error {
+	c.AddAssertion(description, err)
+	if err != nil {
+		// Return a wrapped error to preserve the original error's details
+		// while providing the context of the description.
+		return fmt.Errorf("%s: %w", description, err)
+	}
+	return nil
+}
+
+// Verify provides a scope for soft assertions. It collects all failures
+// within the provided function and returns a single aggregated error at the end.
+// All checks, pass or fail, are logged for detailed reporting.
+func (c *Context) Verify(fn func(v *verify.Collector)) error {
+	collector := verify.New(c)
+	fn(collector)
+	return collector.Check()
 }

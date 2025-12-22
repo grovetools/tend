@@ -38,6 +38,16 @@ func main() {
 		FlowMockScenario,
 		MixedDependenciesScenario,
 		EnvironmentSandboxingScenario(),
+
+		// Assertion Scenarios
+		HardAssertionPassScenario(),
+		HardAssertionFailScenario(),
+		SoftAssertionPassScenario(),
+		SoftAssertionFailScenario(),
+		MixedAssertionsScenario(),
+		AssertionDescriptionsScenario(),
+		MultipleVerifyBlocksScenario(),
+		VerifyWithNilValuesScenario(),
 	}
 
 	// Setup signal handling for graceful shutdown.

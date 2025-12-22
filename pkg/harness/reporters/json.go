@@ -36,12 +36,13 @@ type JSONTestResult struct {
 
 // JSONTestStep represents a test step
 type JSONTestStep struct {
-	Name      string    `json:"name"`
-	StartTime time.Time `json:"start_time"`
-	EndTime   time.Time `json:"end_time"`
-	Duration  string    `json:"duration"`
-	Success   bool      `json:"success"`
-	Error     string    `json:"error,omitempty"`
+	Name       string                     `json:"name"`
+	StartTime  time.Time                  `json:"start_time"`
+	EndTime    time.Time                  `json:"end_time"`
+	Duration   string                     `json:"duration"`
+	Success    bool                       `json:"success"`
+	Error      string                     `json:"error,omitempty"`
+	Assertions []*harness.AssertionResult `json:"assertions,omitempty"`
 }
 
 // JSONEnvironment represents test environment info
@@ -125,6 +126,7 @@ func (r *JSONReporter) WriteReport(w io.Writer, results []*harness.Result) error
 				if step.Error != nil {
 					jsonStep.Error = step.Error.Error()
 				}
+				jsonStep.Assertions = step.Assertions
 				jsonResult.Steps = append(jsonResult.Steps, jsonStep)
 			}
 		}

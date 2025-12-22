@@ -237,6 +237,8 @@ func (s *Session) WaitStable() error {
 }
 
 // AssertContains immediately checks if the TUI's current content contains the specified text.
+// NOTE: For better test reporting, it is recommended to use this with the harness context:
+//   err := ctx.Check("should show welcome message", session.AssertContains("Welcome"))
 func (s *Session) AssertContains(text string) error {
 	content, err := s.Capture()
 	if err != nil {
@@ -246,6 +248,8 @@ func (s *Session) AssertContains(text string) error {
 }
 
 // AssertNotContains immediately checks if the TUI's current content does not contain the specified text.
+// NOTE: For better test reporting, it is recommended to use this with the harness context:
+//   err := ctx.Check("should not show error", session.AssertNotContains("Error:"))
 func (s *Session) AssertNotContains(text string) error {
 	content, err := s.Capture()
 	if err != nil {

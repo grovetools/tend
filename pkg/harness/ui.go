@@ -63,19 +63,37 @@ func (ui *UI) ScenarioFailed(name string, err error) {
 
 // StepStart displays the start of a step
 func (ui *UI) StepStart(current, total int, name string) {
-	fmt.Printf("[%d/%d] %s\n", current, total, name)
+	fmt.Printf("\n[%d/%d] %s\n", current, total, name)
 }
 
 // StepSuccess displays step completion
-func (ui *UI) StepSuccess(name string, duration time.Duration) {
+func (ui *UI) StepSuccess(stepResult StepResult) {
 	if ui.verbose {
-		fmt.Printf("✓ Completed in %v\n", duration)
+		fmt.Printf("✓ %s (Completed in %v)\n", stepResult.Name, stepResult.Duration)
+		// Print successful assertions
+		for _, assertion := range stepResult.Assertions {
+			if assertion.Success {
+				fmt.Printf("  ✓ %s\n", assertion.Description)
+			}
+		}
 	}
 }
 
 // StepFailed displays step failure
-func (ui *UI) StepFailed(name string, err error, duration time.Duration) {
-	fmt.Printf("✗ Failed after %v: %v\n", duration, err)
+func (ui *UI) StepFailed(stepResult StepResult) {
+	fmt.Printf("✗ %s (Failed after %v)\n", stepResult.Name, stepResult.Duration)
+
+	// Print successful assertions before the failure
+	for _, assertion := range stepResult.Assertions {
+		if assertion.Success {
+			fmt.Printf("  ✓ %s\n", assertion.Description)
+		}
+	}
+
+	// Print the failure details
+	if stepResult.Error != nil {
+		fmt.Printf("  Error: %v\n", stepResult.Error)
+	}
 }
 
 // WaitForUser prompts the user to continue
