@@ -12,6 +12,7 @@ import (
 	"github.com/mattsolo1/grove-tend/pkg/fs"
 	"github.com/mattsolo1/grove-tend/pkg/harness"
 	"github.com/mattsolo1/grove-tend/pkg/tui"
+	"github.com/mattsolo1/grove-tend/pkg/verify"
 )
 
 // AutoPathMocksScenario demonstrates automatic PATH handling for TUI sessions with mocks.
@@ -153,16 +154,11 @@ func ExampleAdvancedTuiNavigation() *harness.Scenario {
 				}
 
 				// After stabilizing, verify all items have loaded
-				if err := session.AssertContains("README.md"); err != nil {
-					return err
-				}
-				if err := session.AssertContains("main.go"); err != nil {
-					return err
-				}
-				if err := session.AssertContains("docs/guide.md"); err != nil {
-					return err
-				}
-				return nil
+				return ctx.Verify(func(v *verify.Collector) {
+					v.Equal("README.md is visible", nil, session.AssertContains("README.md"))
+					v.Equal("main.go is visible", nil, session.AssertContains("main.go"))
+					v.Equal("docs/guide.md is visible", nil, session.AssertContains("docs/guide.md"))
+				})
 			}),
 			harness.NewStep("Test FindTextLocation functionality", func(ctx *harness.Context) error {
 				session := ctx.Get("advanced_session").(*tui.Session)
@@ -234,7 +230,8 @@ func ExampleAdvancedTuiNavigation() *harness.Scenario {
 				}
 
 				// Verify the selection was made by checking the output
-				return session.AssertContains("Selected: README.md")
+				return ctx.Check("README.md selection confirmed",
+					session.AssertContains("Selected: README.md"))
 			}),
 			harness.NewStep("Cleanup", func(ctx *harness.Context) error {
 				session := ctx.Get("advanced_session").(*tui.Session)
@@ -408,7 +405,8 @@ func ExampleFilesystemInteractionScenario() *harness.Scenario {
 				ctx.Set("fs_session", session)
 
 				// Wait for the TUI to be ready
-				return session.WaitForText("Press 's' to save", 5*time.Second)
+				return ctx.Check("TUI is ready with save prompt",
+					session.WaitForText("Press 's' to save", 5*time.Second))
 			}),
 			harness.NewStep("Save file using 's' key", func(ctx *harness.Context) error {
 				session := ctx.Get("fs_session").(*tui.Session)
@@ -419,17 +417,18 @@ func ExampleFilesystemInteractionScenario() *harness.Scenario {
 				}
 
 				// Wait for confirmation message
-				return session.WaitForText("File saved to output.txt", 2*time.Second)
+				return ctx.Check("file save confirmation appears",
+					session.WaitForText("File saved to output.txt", 2*time.Second))
 			}),
-			harness.NewStep("Verify file was created", func(ctx *harness.Context) error {
+			harness.NewStep("Verify file creation and content", func(ctx *harness.Context) error {
 				session := ctx.Get("fs_session").(*tui.Session)
-				// Verify the file was created and is visible to the session
-				return session.WaitForFile("output.txt", 5*time.Second)
-			}),
-			harness.NewStep("Verify file content", func(ctx *harness.Context) error {
-				session := ctx.Get("fs_session").(*tui.Session)
-				// Assert the file contains the expected content
-				return session.AssertFileContains("output.txt", "saved at")
+
+				return ctx.Verify(func(v *verify.Collector) {
+					v.Equal("output.txt file was created", nil,
+						session.WaitForFile("output.txt", 5*time.Second))
+					v.Equal("file contains expected content", nil,
+						session.AssertFileContains("output.txt", "saved at"))
+				})
 			}),
 			harness.NewStep("Cleanup", func(ctx *harness.Context) error {
 				session := ctx.Get("fs_session").(*tui.Session)

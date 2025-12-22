@@ -8,6 +8,7 @@ import (
 
 	"github.com/mattsolo1/grove-tend/pkg/assert"
 	"github.com/mattsolo1/grove-tend/pkg/harness"
+	"github.com/mattsolo1/grove-tend/pkg/verify"
 )
 
 // GitWorkflowScenario demonstrates mocking git commands
@@ -42,7 +43,8 @@ var GitWorkflowScenario = harness.NewScenario(
 			commitCmd := ctx.Command("git", "commit", "-m", "Initial commit").Dir(repoDir)
 			commitResult := commitCmd.Run()
 			ctx.ShowCommandOutput(commitCmd.String(), commitResult.Stdout, commitResult.Stderr)
-			return assert.Contains(commitResult.Stdout, "Initial commit", "commit message should appear in output")
+			return ctx.Check("commit message appears in output",
+				assert.Contains(commitResult.Stdout, "Initial commit"))
 		}),
 	},
 )
@@ -54,17 +56,19 @@ var DockerScenario = harness.NewScenario(
 	[]string{"docker", "mocking"},
 	[]harness.Step{
 		harness.SetupMocks(harness.Mock{CommandName: "docker"}),
-		harness.NewStep("Check docker version", func(ctx *harness.Context) error {
-			cmd := ctx.Command("docker", "version")
-			result := cmd.Run()
-			ctx.ShowCommandOutput(cmd.String(), result.Stdout, result.Stderr)
-			return assert.Contains(result.Stdout, "Docker version", "should show docker version")
-		}),
-		harness.NewStep("List docker images", func(ctx *harness.Context) error {
-			cmd := ctx.Command("docker", "images")
-			result := cmd.Run()
-			ctx.ShowCommandOutput(cmd.String(), result.Stdout, result.Stderr)
-			return assert.Contains(result.Stdout, "REPOSITORY", "should show image list header")
+		harness.NewStep("Verify docker commands", func(ctx *harness.Context) error {
+			versionCmd := ctx.Command("docker", "version")
+			versionResult := versionCmd.Run()
+			ctx.ShowCommandOutput(versionCmd.String(), versionResult.Stdout, versionResult.Stderr)
+
+			imagesCmd := ctx.Command("docker", "images")
+			imagesResult := imagesCmd.Run()
+			ctx.ShowCommandOutput(imagesCmd.String(), imagesResult.Stdout, imagesResult.Stderr)
+
+			return ctx.Verify(func(v *verify.Collector) {
+				v.Contains("shows docker version", versionResult.Stdout, "Docker version")
+				v.Contains("shows image list header", imagesResult.Stdout, "REPOSITORY")
+			})
 		}),
 	},
 )
@@ -80,7 +84,8 @@ var LLMIntegrationScenario = harness.NewScenario(
 			cmd := ctx.Command("llm", "Tell me about testing")
 			result := cmd.Run()
 			ctx.ShowCommandOutput(cmd.String(), result.Stdout, result.Stderr)
-			return assert.Contains(result.Stdout, "testing", "LLM should respond about testing")
+			return ctx.Check("LLM responds about testing",
+				assert.Contains(result.Stdout, "testing"))
 		}),
 	},
 )
@@ -141,13 +146,12 @@ kubectl version --client=true 2>/dev/null || echo "kubectl mock: ready"
 			cmd := ctx.Command("bash", scriptPath)
 			result := cmd.Run()
 			ctx.ShowCommandOutput(cmd.String(), result.Stdout, result.Stderr)
-			if err := assert.Contains(result.Stdout, "On branch main", "git mock output"); err != nil {
-				return err
-			}
-			if err := assert.Contains(result.Stdout, "Docker version", "docker mock output"); err != nil {
-				return err
-			}
-			return assert.Contains(result.Stdout, "Mock kubectl version", "kubectl mock output")
+
+			return ctx.Verify(func(v *verify.Collector) {
+				v.Contains("git mock output present", result.Stdout, "On branch main")
+				v.Contains("docker mock output present", result.Stdout, "Docker version")
+				v.Contains("kubectl mock output present", result.Stdout, "Mock kubectl version")
+			})
 		}),
 	},
 )

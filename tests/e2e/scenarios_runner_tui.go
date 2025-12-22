@@ -11,6 +11,7 @@ import (
 	"github.com/mattsolo1/grove-tend/pkg/git"
 	"github.com/mattsolo1/grove-tend/pkg/harness"
 	"github.com/mattsolo1/grove-tend/pkg/tui"
+	"github.com/mattsolo1/grove-tend/pkg/verify"
 )
 
 // TendTUIScenario tests the interactive `tend tui` command.
@@ -165,23 +166,12 @@ func launchTUIAndVerify(ctx *harness.Context) error {
 		return fmt.Errorf("TUI did not load: %w\nContent:\n%s", err, content)
 	}
 
-	// Verify both top-level projects are visible
-	if err := session.AssertContains("project-a"); err != nil {
-		content, _ := session.Capture()
-		return fmt.Errorf("project-a not found: %w\nContent:\n%s", err, content)
-	}
-	if err := session.AssertContains("project-b"); err != nil {
-		content, _ := session.Capture()
-		return fmt.Errorf("project-b not found: %w\nContent:\n%s", err, content)
-	}
-
-	// Verify a discovered scenario is visible
-	if err := session.AssertContains("standalone-test"); err != nil {
-		content, _ := session.Capture()
-		return fmt.Errorf("standalone-test scenario not found: %w\nContent:\n%s", err, content)
-	}
-
-	return nil
+	// Verify both top-level projects and scenario are visible
+	return ctx.Verify(func(v *verify.Collector) {
+		v.Equal("project-a is visible", nil, session.AssertContains("project-a"))
+		v.Equal("project-b is visible", nil, session.AssertContains("project-b"))
+		v.Equal("standalone-test is visible", nil, session.AssertContains("standalone-test"))
+	})
 }
 
 // testNavigationAndFolding tests basic UI navigation and expand/collapse.
@@ -215,16 +205,10 @@ func testNavigationAndFolding(ctx *harness.Context) error {
 	}
 
 	// Test that both scenarios are visible
-	if err := session.AssertContains("sub-app-test"); err != nil {
-		content, _ := session.Capture()
-		return fmt.Errorf("sub-app-test should be visible: %w\nContent:\n%s", err, content)
-	}
-	if err := session.AssertContains("standalone-test"); err != nil {
-		content, _ := session.Capture()
-		return fmt.Errorf("standalone-test should be visible: %w\nContent:\n%s", err, content)
-	}
-
-	return nil
+	return ctx.Verify(func(v *verify.Collector) {
+		v.Equal("sub-app-test is visible", nil, session.AssertContains("sub-app-test"))
+		v.Equal("standalone-test is visible", nil, session.AssertContains("standalone-test"))
+	})
 }
 
 // testFiltering tests the search/filter functionality.
@@ -241,16 +225,14 @@ func testFiltering(ctx *harness.Context) error {
 		return fmt.Errorf("failed to type search term: %w", err)
 	}
 
-	// Verify the filtering is working - sub-app-test should be visible
-	if err := session.WaitForText("sub-app-test", 3*time.Second); err != nil {
-		content, _ := session.Capture()
-		return fmt.Errorf("sub-app-test should be visible after search: %w\nContent:\n%s", err, content)
-	}
-
-	// Verify standalone-test is filtered out (not visible)
-	if err := session.AssertNotContains("standalone-test"); err != nil {
-		content, _ := session.Capture()
-		return fmt.Errorf("standalone-test should be filtered out: %w\nContent:\n%s", err, content)
+	// Verify the filtering is working
+	if err := ctx.Verify(func(v *verify.Collector) {
+		v.Equal("sub-app-test is visible after search", nil,
+			session.WaitForText("sub-app-test", 3*time.Second))
+		v.Equal("standalone-test is filtered out", nil,
+			session.AssertNotContains("standalone-test"))
+	}); err != nil {
+		return err
 	}
 
 	// Clear the filter by selecting all text and deleting it
@@ -273,12 +255,8 @@ func testFiltering(ctx *harness.Context) error {
 	}
 
 	// Verify standalone-test reappeared
-	if err := session.WaitForText("standalone-test", 3*time.Second); err != nil {
-		content, _ := session.Capture()
-		return fmt.Errorf("standalone-test should reappear after clearing filter: %w\nContent:\n%s", err, content)
-	}
-
-	return nil
+	return ctx.Check("standalone-test reappears after clearing filter",
+		session.WaitForText("standalone-test", 3*time.Second))
 }
 
 // testFocusing tests the focus functionality.
@@ -311,10 +289,10 @@ func testFocusing(ctx *harness.Context) error {
 		return fmt.Errorf("failed to send focus key: %w", err)
 	}
 
-	// Verify focus header appears (the header shows "Focus: <name>")
-	if err := session.WaitForText("Focus:", 3*time.Second); err != nil {
-		content, _ := session.Capture()
-		return fmt.Errorf("Focus indicator not found: %w\nContent:\n%s", err, content)
+	// Verify focus header appears
+	if err := ctx.Check("focus indicator appears",
+		session.WaitForText("Focus:", 3*time.Second)); err != nil {
+		return err
 	}
 
 	// Clear focus with ctrl+g
@@ -323,12 +301,8 @@ func testFocusing(ctx *harness.Context) error {
 	}
 
 	// Verify project-a is visible again (focus cleared)
-	if err := session.WaitForText("project-a", 3*time.Second); err != nil {
-		content, _ := session.Capture()
-		return fmt.Errorf("project-a should be visible after clearing focus: %w\nContent:\n%s", err, content)
-	}
-
-	return nil
+	return ctx.Check("project-a is visible after clearing focus",
+		session.WaitForText("project-a", 3*time.Second))
 }
 
 // testHelpView tests opening and closing the help dialog.
@@ -340,9 +314,9 @@ func testHelpView(ctx *harness.Context) error {
 		return fmt.Errorf("failed to open help: %w", err)
 	}
 
-	if err := session.WaitForText("Tend Test Runner - Help", 3*time.Second); err != nil {
-		content, _ := session.Capture()
-		return fmt.Errorf("help view did not open: %w\nContent:\n%s", err, content)
+	if err := ctx.Check("help view opens",
+		session.WaitForText("Tend Test Runner - Help", 3*time.Second)); err != nil {
+		return err
 	}
 
 	// Close help with '?' again
@@ -351,12 +325,8 @@ func testHelpView(ctx *harness.Context) error {
 	}
 
 	// Verify main view is back (check for project-a)
-	if err := session.WaitForText("project-a", 3*time.Second); err != nil {
-		content, _ := session.Capture()
-		return fmt.Errorf("main view not restored after closing help: %w\nContent:\n%s", err, content)
-	}
-
-	return nil
+	return ctx.Check("main view restored after closing help",
+		session.WaitForText("project-a", 3*time.Second))
 }
 
 // quitTUI exits the TUI cleanly.

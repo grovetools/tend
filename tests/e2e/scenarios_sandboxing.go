@@ -4,9 +4,9 @@ package main
 import (
 	"fmt"
 
-	"github.com/mattsolo1/grove-tend/pkg/assert"
 	"github.com/mattsolo1/grove-tend/pkg/fs"
 	"github.com/mattsolo1/grove-tend/pkg/harness"
+	"github.com/mattsolo1/grove-tend/pkg/verify"
 )
 
 // EnvironmentSandboxingScenario tests the automatic environment sandboxing via ctx.Command()
@@ -32,31 +32,18 @@ func EnvironmentSandboxingScenario() *harness.Scenario {
 
 				output := result.Stdout
 
-				// Assert that HOME is set to the sandboxed directory
+				// Verify all environment variables are correctly sandboxed
 				expectedHome := fmt.Sprintf("HOME=%s", ctx.HomeDir())
-				if err := assert.Contains(output, expectedHome, "HOME variable was not correctly sandboxed"); err != nil {
-					return err
-				}
-
-				// Assert XDG_CONFIG_HOME
 				expectedConfig := fmt.Sprintf("XDG_CONFIG_HOME=%s", ctx.ConfigDir())
-				if err := assert.Contains(output, expectedConfig, "XDG_CONFIG_HOME was not correctly sandboxed"); err != nil {
-					return err
-				}
-
-				// Assert XDG_DATA_HOME
 				expectedData := fmt.Sprintf("XDG_DATA_HOME=%s", ctx.DataDir())
-				if err := assert.Contains(output, expectedData, "XDG_DATA_HOME was not correctly sandboxed"); err != nil {
-					return err
-				}
-
-				// Assert XDG_CACHE_HOME
 				expectedCache := fmt.Sprintf("XDG_CACHE_HOME=%s", ctx.CacheDir())
-				if err := assert.Contains(output, expectedCache, "XDG_CACHE_HOME was not correctly sandboxed"); err != nil {
-					return err
-				}
 
-				return nil
+				return ctx.Verify(func(v *verify.Collector) {
+					v.Contains("HOME variable is sandboxed", output, expectedHome)
+					v.Contains("XDG_CONFIG_HOME is sandboxed", output, expectedConfig)
+					v.Contains("XDG_DATA_HOME is sandboxed", output, expectedData)
+					v.Contains("XDG_CACHE_HOME is sandboxed", output, expectedCache)
+				})
 			}),
 		},
 	)
