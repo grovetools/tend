@@ -28,17 +28,17 @@ type sessionKilledMsg struct {
 	err         error
 }
 
-// listTendSessionsCmd fetches all tend debug sessions from tmux.
-func listTendSessionsCmd() tea.Msg {
+// ListTendSessions fetches all tend debug sessions from tmux.
+func ListTendSessions() ([]string, error) {
 	// Try main server first
 	client, err := tmux.NewClient()
 	if err != nil {
-		return sessionsListedMsg{err: fmt.Errorf("failed to create tmux client: %w", err)}
+		return nil, fmt.Errorf("failed to create tmux client: %w", err)
 	}
 
 	allSessions, err := client.ListSessions(context.Background())
 	if err != nil {
-		return sessionsListedMsg{err: fmt.Errorf("failed to list sessions: %w", err)}
+		return nil, fmt.Errorf("failed to list sessions: %w", err)
 	}
 
 	// Filter for tend sessions (those starting with "tend_")
@@ -52,7 +52,16 @@ func listTendSessionsCmd() tea.Msg {
 	// TODO: Also check dedicated server (tend-debug) for sessions
 	// This would require checking if the dedicated server exists and listing its sessions
 
-	return sessionsListedMsg{sessions: tendSessions, err: nil}
+	return tendSessions, nil
+}
+
+// listTendSessionsCmd fetches all tend debug sessions from tmux.
+func listTendSessionsCmd() tea.Msg {
+	sessions, err := ListTendSessions()
+	if err != nil {
+		return sessionsListedMsg{err: err}
+	}
+	return sessionsListedMsg{sessions: sessions, err: nil}
 }
 
 // capturePaneCmd captures the content of a session's runner window.
