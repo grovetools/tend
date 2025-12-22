@@ -308,14 +308,22 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 		}
 	}
 
-	// --- SETUP ONLY MODE ---
+	// --- SETUP ONLY MODE (Conditional) ---
 	if h.opts.SetupOnly {
-		ui.Info("Setup Only", "Halting execution after setup phase.")
-		result.Success = true
-		result.EndTime = time.Now()
-		result.Duration = result.EndTime.Sub(result.StartTime)
-		result.StepResults = stepResults
-		return result, nil
+		if len(scenario.Setup) > 0 {
+			// If setup steps were run, halt execution as intended.
+			ui.Info("Setup Only", "Halting execution after setup phase.")
+			result.Success = true
+			result.EndTime = time.Now()
+			result.Duration = result.EndTime.Sub(result.StartTime)
+			result.StepResults = stepResults
+			return result, nil
+		} else {
+			// If NO setup steps exist, switch to interactive mode for the main steps.
+			// This provides a backward-compatible debug experience.
+			ui.Info("Setup Only", "No setup steps found. Switching to interactive mode.")
+			h.opts.Interactive = true
+		}
 	}
 
 	// --- TEST PHASE ---

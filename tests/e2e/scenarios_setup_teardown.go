@@ -496,3 +496,68 @@ func ReusableSetupStepsScenario() *harness.Scenario {
 		},
 	).WithSetup(commonSetup)
 }
+
+// SetupOnlyWithoutSetupStepsScenario tests that --setup-only mode switches to interactive
+// when no setup steps exist (backward compatibility for debugging)
+//
+// This scenario validates the new behavior: when --setup-only is used on a scenario without
+// setup steps, the harness switches to interactive mode instead of exiting.
+// This is a helper scenario used by the setup-only-flag-e2e test.
+func SetupOnlyWithoutSetupStepsScenario() *harness.Scenario {
+	return harness.NewScenarioWithOptions(
+		"setup-only-without-setup-steps",
+		"Helper scenario for testing --setup-only without setup steps (explicit-only)",
+		[]string{"setup", "lifecycle", "helper"},
+		[]harness.Step{
+			harness.NewStep("Mark test step executed", func(ctx *harness.Context) error {
+				// This is a helper scenario that will be used by the E2E test.
+				// When invoked with --setup-only but no setup steps, this should execute.
+				ctx.Set("test_step_executed", true)
+				testFile := filepath.Join(ctx.RootDir, "test-step.txt")
+				if err := fs.WriteString(testFile, "test step ran\n"); err != nil {
+					return fmt.Errorf("failed to create test file: %w", err)
+				}
+				return ctx.Check("test step file created", fs.AssertExists(testFile))
+			}),
+		},
+		false, // localOnly
+		true,  // explicitOnly - this is a helper scenario
+	) // No WithSetup() - this scenario has no setup steps
+}
+
+// SetupOnlyWithSetupStepsScenario tests that --setup-only mode halts after setup
+// when setup steps exist (original behavior)
+//
+// This is a helper scenario that will be used by the E2E test to verify that
+// scenarios WITH setup steps still halt after setup when --setup-only is used.
+func SetupOnlyWithSetupStepsScenario() *harness.Scenario {
+	return harness.NewScenarioWithOptions(
+		"setup-only-with-setup-steps",
+		"Helper scenario for testing --setup-only with setup steps (explicit-only)",
+		[]string{"setup", "lifecycle", "helper"},
+		[]harness.Step{
+			harness.NewStep("This test step should not run with --setup-only", func(ctx *harness.Context) error {
+				// This should NOT execute when --setup-only is used
+				ctx.Set("test_step_executed", true)
+				return fmt.Errorf("test step should not have executed in --setup-only mode")
+			}),
+		},
+		false, // localOnly
+		true,  // explicitOnly - this is a helper scenario
+	).WithSetup(
+		harness.NewStep("Setup step that should run", func(ctx *harness.Context) error {
+			ctx.Set("setup_executed", true)
+			setupFile := filepath.Join(ctx.RootDir, "setup-only-with-setup.txt")
+			if err := fs.WriteString(setupFile, "setup complete\n"); err != nil {
+				return fmt.Errorf("failed to create setup file: %w", err)
+			}
+			return ctx.Check("setup file created", fs.AssertExists(setupFile))
+		}),
+	).WithTeardown(
+		harness.NewStep("Teardown should not run with --setup-only", func(ctx *harness.Context) error {
+			// This should NOT execute when --setup-only is used
+			ctx.Set("teardown_executed", true)
+			return fmt.Errorf("teardown should not have executed in --setup-only mode")
+		}),
+	)
+}
