@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 // UI handles all user interface output (basic implementation)
@@ -59,6 +61,16 @@ func (ui *UI) ScenarioFailed(name string, err error) {
 	if err != nil {
 		fmt.Printf("Error: %v\n\n", err)
 	}
+}
+
+// PhaseStart displays the start of a test phase (e.g., Setup, Test, Teardown).
+func (ui *UI) PhaseStart(name string) {
+	style := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("6")). // Cyan
+		MarginTop(1).
+		MarginBottom(1)
+	fmt.Println(style.Render(fmt.Sprintf("--- %s Phase ---", name)))
 }
 
 // StepStart displays the start of a step

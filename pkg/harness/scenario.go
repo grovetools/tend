@@ -53,3 +53,15 @@ func NewScenarioWithOptions(name, description string, tags []string, steps []Ste
 		Line:         line,
 	}
 }
+
+// WithSetup adds setup steps to the scenario.
+func (s *Scenario) WithSetup(steps ...Step) *Scenario {
+	s.Setup = append(s.Setup, steps...)
+	return s
+}
+
+// WithTeardown adds teardown steps to the scenario.
+func (s *Scenario) WithTeardown(steps ...Step) *Scenario {
+	s.Teardown = append(s.Teardown, steps...)
+	return s
+}

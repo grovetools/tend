@@ -59,7 +59,9 @@ type Scenario struct {
 	Name         string
 	Description  string
 	Tags         []string
+	Setup        []Step
 	Steps        []Step
+	Teardown     []Step
 	LocalOnly    bool // Skips in CI by default
 	ExplicitOnly bool // Skips in "run all"
 	File         string
@@ -88,6 +90,8 @@ type Options struct {
 	TmuxSocket string
 	// TmuxEditorTarget specifies the tmux target for the editor window in debug-session mode.
 	TmuxEditorTarget string
+	// SetupOnly runs only the setup steps of a scenario.
+	SetupOnly bool
 	// RecordTUIDir specifies the directory to save TUI session recordings for failed tests.
 	RecordTUIDir string
 }
@@ -260,6 +264,64 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 
 	// Execute steps
 	var stepResults []StepResult
+
+	// Defer teardown to ensure it runs after setup and test steps, even on failure.
+	defer func() {
+		// Don't run teardown in setup-only mode or if cleanup is disabled.
+		if h.opts.SetupOnly || h.opts.NoCleanup {
+			return
+		}
+		if len(scenario.Teardown) > 0 {
+			ui.PhaseStart("Teardown")
+			for i, step := range scenario.Teardown {
+				// We don't fail the scenario if a teardown step fails, but we log it.
+				ui.StepStart(i+1, len(scenario.Teardown), step.Name)
+				stepResult := h.executeStep(ctx, testCtx, step, ui)
+				if stepResult.Error != nil {
+					ui.Error(fmt.Sprintf("Teardown step '%s' failed", step.Name), stepResult.Error)
+				}
+			}
+		}
+	}()
+
+	// --- SETUP PHASE ---
+	if len(scenario.Setup) > 0 {
+		ui.PhaseStart("Setup")
+		for i, step := range scenario.Setup {
+			ui.StepStart(i+1, len(scenario.Setup), step.Name)
+			testCtx.clearAssertions()
+			stepResult := h.executeStep(ctx, testCtx, step, ui)
+			stepResult.Assertions = testCtx.getAssertions()
+			stepResults = append(stepResults, stepResult)
+
+			if stepResult.Error != nil {
+				ui.StepFailed(stepResult)
+				result.Success = false
+				result.FailedStep = step.Name
+				result.Error = &StepError{StepName: step.Name, Err: stepResult.Error}
+				result.EndTime = time.Now()
+				result.Duration = result.EndTime.Sub(result.StartTime)
+				result.StepResults = stepResults
+				return result, result.Error
+			}
+			ui.StepSuccess(stepResult)
+		}
+	}
+
+	// --- SETUP ONLY MODE ---
+	if h.opts.SetupOnly {
+		ui.Info("Setup Only", "Halting execution after setup phase.")
+		result.Success = true
+		result.EndTime = time.Now()
+		result.Duration = result.EndTime.Sub(result.StartTime)
+		result.StepResults = stepResults
+		return result, nil
+	}
+
+	// --- TEST PHASE ---
+	if len(scenario.Steps) > 0 {
+		ui.PhaseStart("Test")
+	}
 	for i, step := range scenario.Steps {
 		select {
 		case <-ctx.Done():

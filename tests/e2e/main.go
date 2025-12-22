@@ -56,10 +56,11 @@ func main() {
 		// Setup/Teardown E2E Test Scenarios
 		SetupPhaseBasicScenario(),
 		SetupPhaseMultipleStepsScenario(),
-		SetupPhaseFailureScenario(),
+		SetupPhaseFailureHandlingScenario(),
+		SetupPhaseFailureScenario(), // explicit-only: intentionally fails
 		TeardownPhaseBasicScenario(),
 		TeardownPhaseMultipleStepsScenario(),
-		TeardownPhaseAfterFailureScenario(),
+		TeardownPhaseAfterFailureScenario(), // explicit-only: intentionally fails
 		TeardownPhaseFailureScenario(),
 		FullLifecycleScenario(),
 		SetupPhaseAssertionsScenario(),

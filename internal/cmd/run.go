@@ -38,6 +38,7 @@ var (
 	useRealDeps         []string
 	includeLocal        bool
 	explicitOnly        bool
+	setupOnly           bool
 	recordTUIDir        string
 )
 
@@ -83,6 +84,8 @@ Examples:
 	runCmd.Flags().BoolVar(&includeLocal, "include-local", false, "Include local-only scenarios even when in a CI environment")
 	runCmd.Flags().BoolVar(&explicitOnly, "explicit", false, "Run only explicit-only scenarios (automatically enables --no-cleanup)")
 	runCmd.Flags().StringVar(&recordTUIDir, "record-tui", "", "Directory to save TUI session recordings for failed tests")
+	runCmd.Flags().BoolVar(&setupOnly, "setup-only", false, "Internal use: run setup steps only and exit")
+	_ = runCmd.Flags().MarkHidden("setup-only")
 
 	return runCmd
 }
@@ -314,7 +317,8 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 		// The editor target will point to editor_test_steps window
 		editorTarget := sessionName + ":editor_test_steps"
 		newArgs = append(newArgs,
-			"-i", "--no-cleanup", "--very-verbose",
+			"--setup-only",
+			"--no-cleanup", "--very-verbose",
 			"--_test-root-dir="+testRootDir,
 			"--_tmux-editor="+editorTarget,
 		)
@@ -447,6 +451,7 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 		TestRootDir:      testRootDirOverride,
 		TmuxSocket:       tmuxSocketOverride,
 		TmuxEditorTarget: tmuxEditorTarget,
+		SetupOnly:        setupOnly,
 		RecordTUIDir:     recordTUIDir,
 	}
 	
