@@ -48,6 +48,24 @@ func main() {
 		AssertionDescriptionsScenario(),
 		MultipleVerifyBlocksScenario(),
 		VerifyWithNilValuesScenario(),
+
+		// Setup/Teardown Demo Scenarios
+		SetupDemoScenario(),
+		SetupDemoWithTeardownScenario(),
+
+		// Setup/Teardown E2E Test Scenarios
+		SetupPhaseBasicScenario(),
+		SetupPhaseMultipleStepsScenario(),
+		SetupPhaseFailureScenario(),
+		TeardownPhaseBasicScenario(),
+		TeardownPhaseMultipleStepsScenario(),
+		TeardownPhaseAfterFailureScenario(),
+		TeardownPhaseFailureScenario(),
+		FullLifecycleScenario(),
+		SetupPhaseAssertionsScenario(),
+		TeardownWithNoCleanupScenario(),
+		SetupOnlyModeScenario(),
+		ReusableSetupStepsScenario(),
 	}
 
 	// Setup signal handling for graceful shutdown.
