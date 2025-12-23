@@ -22,6 +22,7 @@ func main() {
 		// TestKeywordFilteringScenario(),
 		LocalOnlyScenario(),
 		ExplicitOnlyScenario(),
+		RunStepsFlagE2EScenario(),
 		SetupOnlyFlagE2EScenario(),
 
 		// TUI Scenarios

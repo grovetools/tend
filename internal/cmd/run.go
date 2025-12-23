@@ -39,6 +39,7 @@ var (
 	includeLocal        bool
 	explicitOnly        bool
 	setupOnly           bool
+	runSteps            string
 	recordTUIDir        string
 )
 
@@ -85,6 +86,7 @@ Examples:
 	runCmd.Flags().BoolVar(&explicitOnly, "explicit", false, "Run only explicit-only scenarios (automatically enables --no-cleanup)")
 	runCmd.Flags().StringVar(&recordTUIDir, "record-tui", "", "Directory to save TUI session recordings for failed tests")
 	runCmd.Flags().BoolVar(&setupOnly, "setup-only", false, "Internal use: run setup steps only and exit")
+	runCmd.Flags().StringVar(&runSteps, "run-steps", "", "Run specific steps at startup then pause (e.g., 'setup', '1,2,3', 'setup,1,2')")
 	_ = runCmd.Flags().MarkHidden("setup-only")
 
 	return runCmd
@@ -452,6 +454,7 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 		TmuxSocket:       tmuxSocketOverride,
 		TmuxEditorTarget: tmuxEditorTarget,
 		SetupOnly:        setupOnly,
+		RunSteps:         runSteps,
 		RecordTUIDir:     recordTUIDir,
 	}
 	

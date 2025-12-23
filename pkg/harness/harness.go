@@ -92,6 +92,9 @@ type Options struct {
 	TmuxEditorTarget string
 	// SetupOnly runs only the setup steps of a scenario.
 	SetupOnly bool
+	// RunSteps specifies which steps to run at startup before pausing.
+	// Format: "setup" runs all setup steps, "1,2,3" runs test steps 1-3, "setup,1,2" runs setup then test steps 1-2
+	RunSteps string
 	// RecordTUIDir specifies the directory to save TUI session recordings for failed tests.
 	RecordTUIDir string
 }
@@ -308,21 +311,43 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 		}
 	}
 
-	// --- SETUP ONLY MODE (Conditional) ---
+	// --- SETUP ONLY MODE ---
+	// When --setup-only is used, we only care about the setup phase.
+	// If setup exists, we've run it and halt. If not, we exit successfully.
 	if h.opts.SetupOnly {
 		if len(scenario.Setup) > 0 {
-			// If setup steps were run, halt execution as intended.
 			ui.Info("Setup Only", "Halting execution after setup phase.")
-			result.Success = true
-			result.EndTime = time.Now()
-			result.Duration = result.EndTime.Sub(result.StartTime)
-			result.StepResults = stepResults
-			return result, nil
 		} else {
-			// If NO setup steps exist, switch to interactive mode for the main steps.
-			// This provides a backward-compatible debug experience.
-			ui.Info("Setup Only", "No setup steps found. Switching to interactive mode.")
-			h.opts.Interactive = true
+			ui.Info("Setup Only", "No setup steps to run. Exiting successfully.")
+		}
+		result.Success = true
+		result.EndTime = time.Now()
+		result.Duration = result.EndTime.Sub(result.StartTime)
+		result.StepResults = stepResults
+		return result, nil
+	}
+
+	// --- RUN STEPS MODE ---
+	// Parse --run-steps to determine which steps to run automatically before pausing
+	var runTestSteps []int
+	if h.opts.RunSteps != "" {
+		// Enable interactive mode whenever --run-steps is used
+		// We'll auto-run the specified steps then pause
+		h.opts.Interactive = true
+
+		parts := strings.Split(h.opts.RunSteps, ",")
+		for _, part := range parts {
+			part = strings.TrimSpace(part)
+			if part == "setup" {
+				// "setup" means we already ran setup phase above
+				// Nothing additional needed here
+			} else {
+				// Parse as test step number
+				var stepNum int
+				if _, err := fmt.Sscanf(part, "%d", &stepNum); err == nil {
+					runTestSteps = append(runTestSteps, stepNum)
+				}
+			}
 		}
 	}
 
@@ -385,8 +410,16 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 			}
 		}
 
-		// Interactive pause
-		if h.opts.Interactive {
+		// Interactive pause (unless this step should be auto-run)
+		shouldAutoRun := false
+		for _, autoRunStep := range runTestSteps {
+			if autoRunStep == i+1 { // Step numbers are 1-indexed
+				shouldAutoRun = true
+				break
+			}
+		}
+
+		if h.opts.Interactive && !shouldAutoRun {
 			action := ui.WaitForUser()
 			switch action {
 			case "quit":
