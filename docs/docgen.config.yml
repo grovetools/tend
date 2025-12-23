@@ -1,11 +1,15 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/mattsolo1/grove-docgen/main/schema/docgen.config.schema.json
 enabled: true
-title: grove-tend
-description: A scenario-based, workspace-aware testing framework for Go CLIs and TUIs.
-category: Testing
+title: "Grove Tend"
+description: "A Go library for creating powerful, scenario-based end-to-end testing frameworks."
+category: "Core Libraries"
 settings:
+  output_dir: docs
+  rules_file: docs.rules
+  structured_output_file: pkg/docs/docs.json
+  system_prompt: default
   model: gemini-2.5-pro
-  output_dir: docs/generated
+  regeneration_mode: reference
 sections:
   - name: introduction
     title: Introduction
@@ -73,6 +77,7 @@ sections:
     prompt: prompts/13-project-integration.md
     output: 13-project-integration.md
 readme:
+  generate_toc: true
   template: docs/README.md.tpl
   output: README.md
   source_section: introduction
