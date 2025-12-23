@@ -1,5 +1,15 @@
-<!-- DOCGEN:OVERVIEW:START -->
-<!-- DOCGEN:OVERVIEW:END -->
+# grove-tend
 
-<!-- DOCGEN:TOC:START -->
-<!-- DOCGEN:TOC:END -->
+> {{ .Description }}
+
+<!-- DOCGEN:INTRODUCTION:START -->
+<!-- This content will be replaced by the generated introduction. -->
+<!-- DOCGEN:INTRODUCTION:END -->
+
+## Documentation
+
+See the [documentation](docs/generated/) for detailed usage instructions.
+
+## License
+
+MIT

@@ -1,1 +1,6 @@
 *.go
+
+@a:grove-flow @find: "tend-tester"
+@a:grove-flow @find: "tui-explorer"
+@a:grove-docgen::dev-no-tests
+
