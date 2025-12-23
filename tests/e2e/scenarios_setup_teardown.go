@@ -497,21 +497,21 @@ func ReusableSetupStepsScenario() *harness.Scenario {
 	).WithSetup(commonSetup)
 }
 
-// SetupOnlyWithoutSetupStepsScenario tests that --setup-only mode switches to interactive
+// RunSetupWithoutSetupStepsScenario tests that --run-setup mode switches to interactive
 // when no setup steps exist (backward compatibility for debugging)
 //
-// This scenario validates the new behavior: when --setup-only is used on a scenario without
+// This scenario validates the behavior: when --run-setup is used on a scenario without
 // setup steps, the harness switches to interactive mode instead of exiting.
-// This is a helper scenario used by the setup-only-flag-e2e test.
-func SetupOnlyWithoutSetupStepsScenario() *harness.Scenario {
+// This is a helper scenario used by the run-setup-flag-e2e test.
+func RunSetupWithoutSetupStepsScenario() *harness.Scenario {
 	return harness.NewScenarioWithOptions(
-		"setup-only-without-setup-steps",
-		"Helper scenario for testing --setup-only without setup steps (explicit-only)",
+		"run-setup-without-setup-steps",
+		"Helper scenario for testing --run-setup without setup steps (explicit-only)",
 		[]string{"setup", "lifecycle", "helper"},
 		[]harness.Step{
 			harness.NewStep("Mark test step executed", func(ctx *harness.Context) error {
 				// This is a helper scenario that will be used by the E2E test.
-				// When invoked with --setup-only but no setup steps, this should execute.
+				// When invoked with --run-setup but no setup steps, this should execute.
 				ctx.Set("test_step_executed", true)
 				testFile := filepath.Join(ctx.RootDir, "test-step.txt")
 				if err := fs.WriteString(testFile, "test step ran\n"); err != nil {
@@ -525,21 +525,21 @@ func SetupOnlyWithoutSetupStepsScenario() *harness.Scenario {
 	) // No WithSetup() - this scenario has no setup steps
 }
 
-// SetupOnlyWithSetupStepsScenario tests that --setup-only mode halts after setup
+// RunSetupWithSetupStepsScenario tests that --run-setup mode halts after setup
 // when setup steps exist (original behavior)
 //
 // This is a helper scenario that will be used by the E2E test to verify that
-// scenarios WITH setup steps still halt after setup when --setup-only is used.
-func SetupOnlyWithSetupStepsScenario() *harness.Scenario {
+// scenarios WITH setup steps still halt after setup when --run-setup is used.
+func RunSetupWithSetupStepsScenario() *harness.Scenario {
 	return harness.NewScenarioWithOptions(
-		"setup-only-with-setup-steps",
-		"Helper scenario for testing --setup-only with setup steps (explicit-only)",
+		"run-setup-with-setup-steps",
+		"Helper scenario for testing --run-setup with setup steps (explicit-only)",
 		[]string{"setup", "lifecycle", "helper"},
 		[]harness.Step{
-			harness.NewStep("This test step should not run with --setup-only", func(ctx *harness.Context) error {
-				// This should NOT execute when --setup-only is used
+			harness.NewStep("This test step should not run with --run-setup", func(ctx *harness.Context) error {
+				// This should NOT execute when --run-setup is used
 				ctx.Set("test_step_executed", true)
-				return fmt.Errorf("test step should not have executed in --setup-only mode")
+				return fmt.Errorf("test step should not have executed in --run-setup mode")
 			}),
 		},
 		false, // localOnly

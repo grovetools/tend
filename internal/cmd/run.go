@@ -38,7 +38,7 @@ var (
 	useRealDeps         []string
 	includeLocal        bool
 	explicitOnly        bool
-	setupOnly           bool
+	runSetup            bool
 	runSteps            string
 	recordTUIDir        string
 )
@@ -85,9 +85,9 @@ Examples:
 	runCmd.Flags().BoolVar(&includeLocal, "include-local", false, "Include local-only scenarios even when in a CI environment")
 	runCmd.Flags().BoolVar(&explicitOnly, "explicit", false, "Run only explicit-only scenarios (automatically enables --no-cleanup)")
 	runCmd.Flags().StringVar(&recordTUIDir, "record-tui", "", "Directory to save TUI session recordings for failed tests")
-	runCmd.Flags().BoolVar(&setupOnly, "setup-only", false, "Internal use: run setup steps only and exit")
-	runCmd.Flags().StringVar(&runSteps, "run-steps", "", "Run specific steps at startup then pause (e.g., 'setup', '1,2,3', 'setup,1,2')")
-	_ = runCmd.Flags().MarkHidden("setup-only")
+	runCmd.Flags().BoolVar(&runSetup, "run-setup", false, "Run setup phase then pause (or switch to interactive if no setup)")
+	runCmd.Flags().StringVar(&runSteps, "run-steps", "", "Run specific test steps at startup then pause (e.g., '1,2,3')")
+	_ = runCmd.Flags().MarkHidden("run-setup")
 
 	return runCmd
 }
@@ -311,15 +311,25 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 
 		// 3. Reconstruct the command, replacing --debug-session with interactive flags
 		newArgs := []string{}
+		hasRunSteps := false
 		for _, arg := range os.Args[1:] {
 			if arg != "--debug-session" {
 				newArgs = append(newArgs, arg)
+				// Check if user provided --run-steps
+				if strings.HasPrefix(arg, "--run-steps") {
+					hasRunSteps = true
+				}
 			}
 		}
 		// The editor target will point to editor_test_steps window
 		editorTarget := sessionName + ":editor_test_steps"
+
+		// If user didn't provide --run-steps, default to --run-setup behavior
+		if !hasRunSteps {
+			newArgs = append(newArgs, "--run-setup") // Run setup then halt, or switch to interactive if no setup
+		}
+
 		newArgs = append(newArgs,
-			"--setup-only",
 			"--no-cleanup", "--very-verbose",
 			"--_test-root-dir="+testRootDir,
 			"--_tmux-editor="+editorTarget,
@@ -453,7 +463,7 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 		TestRootDir:      testRootDirOverride,
 		TmuxSocket:       tmuxSocketOverride,
 		TmuxEditorTarget: tmuxEditorTarget,
-		SetupOnly:        setupOnly,
+		RunSetup:         runSetup,
 		RunSteps:         runSteps,
 		RecordTUIDir:     recordTUIDir,
 	}

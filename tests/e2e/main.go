@@ -23,7 +23,7 @@ func main() {
 		LocalOnlyScenario(),
 		ExplicitOnlyScenario(),
 		RunStepsFlagE2EScenario(),
-		SetupOnlyFlagE2EScenario(),
+		RunSetupFlagE2EScenario(),
 
 		// TUI Scenarios
 		// AutoPathMocksScenario(), // Commented out due to shell-specific tmux issues
@@ -69,8 +69,8 @@ func main() {
 		TeardownWithNoCleanupScenario(),
 		SetupOnlyModeScenario(),
 		ReusableSetupStepsScenario(),
-		SetupOnlyWithoutSetupStepsScenario(),
-		SetupOnlyWithSetupStepsScenario(),
+		RunSetupWithoutSetupStepsScenario(),
+		RunSetupWithSetupStepsScenario(),
 	}
 
 	// Setup signal handling for graceful shutdown.

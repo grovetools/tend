@@ -158,26 +158,26 @@ func RunStepsFlagE2EScenario() *harness.Scenario {
 	)
 }
 
-// SetupOnlyFlagE2EScenario tests the --setup-only flag behavior end-to-end
-func SetupOnlyFlagE2EScenario() *harness.Scenario {
+// RunSetupFlagE2EScenario tests the --run-setup flag behavior end-to-end
+func RunSetupFlagE2EScenario() *harness.Scenario {
 	return harness.NewScenario(
-		"setup-only-flag-e2e",
-		"Tests the --setup-only flag with both scenarios with and without setup steps",
+		"run-setup-flag-e2e",
+		"Tests the --run-setup flag with both scenarios with and without setup steps",
 		[]string{"cli", "setup", "e2e"},
 		[]harness.Step{
-			harness.NewStep("Test --setup-only with a scenario that has setup steps", func(ctx *harness.Context) error {
+			harness.NewStep("Test --run-setup with a scenario that has setup steps", func(ctx *harness.Context) error {
 				// Explicitly use the tend-e2e binary which has the helper scenarios
 				tendE2EBinary := ctx.ProjectRoot + "/bin/tend-e2e"
 
-				// Run with --setup-only on a scenario that has setup steps
+				// Run with --run-setup on a scenario that has setup steps
 				// This should halt after setup and return success
-				result := command.New(tendE2EBinary, "run", "setup-only-with-setup-steps", "--setup-only").
+				result := command.New(tendE2EBinary, "run", "run-setup-with-setup-steps", "--run-setup").
 					Dir(ctx.ProjectRoot).
 					Run()
 
 				// Should succeed (setup runs successfully and halts)
 				if result.Error != nil {
-					return fmt.Errorf("--setup-only with setup steps failed: %w\nStdout: %s\nStderr: %s",
+					return fmt.Errorf("--run-setup with setup steps failed: %w\nStdout: %s\nStderr: %s",
 						result.Error, result.Stdout, result.Stderr)
 				}
 
@@ -187,41 +187,42 @@ func SetupOnlyFlagE2EScenario() *harness.Scenario {
 				}
 
 				// Verify test step did NOT run
-				if strings.Contains(result.Stdout, "This test step should not run with --setup-only") {
-					return fmt.Errorf("test step should not have executed with --setup-only")
+				if strings.Contains(result.Stdout, "This test step should not run with --run-setup") {
+					return fmt.Errorf("test step should not have executed with --run-setup")
 				}
 
-				ctx.ShowCommandOutput("tend-e2e run setup-only-with-setup-steps --setup-only", result.Stdout, result.Stderr)
+				ctx.ShowCommandOutput("tend-e2e run run-setup-with-setup-steps --run-setup", result.Stdout, result.Stderr)
 				return nil
 			}),
 
-			harness.NewStep("Test --setup-only with a scenario that has NO setup steps", func(ctx *harness.Context) error {
+			harness.NewStep("Test --run-setup with a scenario that has NO setup steps", func(ctx *harness.Context) error {
 				// Explicitly use the tend-e2e binary which has the helper scenarios
 				tendE2EBinary := ctx.ProjectRoot + "/bin/tend-e2e"
 
-				// Run with --setup-only on a scenario WITHOUT setup steps
-				// This should just exit successfully without running tests
-				result := command.New(tendE2EBinary, "run", "setup-only-without-setup-steps", "--setup-only").
+				// Run with --run-setup on a scenario WITHOUT setup steps
+				// This should switch to interactive mode and run the test when we send ENTER
+				result := command.New("sh", "-c",
+					fmt.Sprintf("echo '' | %s run run-setup-without-setup-steps --run-setup", tendE2EBinary)).
 					Dir(ctx.ProjectRoot).
 					Run()
 
-				// Should succeed
+				// Should succeed after we send ENTER
 				if result.Error != nil {
-					return fmt.Errorf("--setup-only without setup steps failed: %w\nStdout: %s\nStderr: %s",
+					return fmt.Errorf("--run-setup without setup steps failed: %w\nStdout: %s\nStderr: %s",
 						result.Error, result.Stdout, result.Stderr)
 				}
 
-				// Verify it shows "No setup steps to run. Exiting successfully."
-				if !strings.Contains(result.Stdout, "No setup steps to run. Exiting successfully") {
-					return fmt.Errorf("expected 'No setup steps to run. Exiting successfully' in output, got:\n%s", result.Stdout)
+				// Verify it shows "No setup steps found. Switching to interactive mode."
+				if !strings.Contains(result.Stdout, "No setup steps found. Switching to interactive mode") {
+					return fmt.Errorf("expected 'No setup steps found. Switching to interactive mode' in output, got:\n%s", result.Stdout)
 				}
 
-				// Verify the test step did NOT execute (since we exited after setup phase)
-				if strings.Contains(result.Stdout, "Mark test step executed") {
-					return fmt.Errorf("test step should not have executed with --setup-only")
+				// Verify the test step DID execute (after we pressed ENTER in interactive mode)
+				if !strings.Contains(result.Stdout, "Mark test step executed") {
+					return fmt.Errorf("test step should have executed in interactive mode")
 				}
 
-				ctx.ShowCommandOutput("tend-e2e run setup-only-without-setup-steps --setup-only", result.Stdout, result.Stderr)
+				ctx.ShowCommandOutput("echo '' | tend-e2e run run-setup-without-setup-steps --run-setup", result.Stdout, result.Stderr)
 				return nil
 			}),
 		},
