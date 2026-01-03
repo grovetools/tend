@@ -10,6 +10,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	corecommand "github.com/mattsolo1/grove-core/command"
 	"github.com/mattsolo1/grove-core/pkg/tmux"
 	"github.com/mattsolo1/grove-tend/pkg/command"
 	"github.com/mattsolo1/grove-tend/pkg/project"
@@ -152,6 +153,13 @@ func (c *Context) DataDir() string {
 // CacheDir returns the path to the sandboxed XDG_CACHE_HOME directory.
 func (c *Context) CacheDir() string {
 	return c.cacheDir
+}
+
+// CommandExecutor creates a new TestExecutor configured with the current context.
+// This is the preferred way to get a command executor within a test step, as it
+// encapsulates all necessary test environment setup.
+func (c *Context) CommandExecutor() corecommand.Executor {
+	return NewTestExecutor(c)
 }
 
 // Command creates a new command with the test's mock-aware PATH.
