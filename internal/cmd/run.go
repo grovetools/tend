@@ -540,8 +540,10 @@ func runScenariosSequential(ctx context.Context, h *harness.Harness, scenarios [
 }
 
 func runScenariosParallel(ctx context.Context, h *harness.Harness, scenarios []*harness.Scenario, renderer *ui.Renderer, projectRoot string) ([]*harness.Result, error) {
-	model := prunner.New(scenarios, projectRoot)
-	p := tea.NewProgram(model)
+	model := prunner.New(scenarios, projectRoot, jobs)
+	// Use stdin/stdout instead of trying to open /dev/tty
+	// This allows the TUI to work in various contexts (tmux, pipes, etc.)
+	p := tea.NewProgram(model, tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
 
 	finalModel, err := p.Run()
 	if err != nil {

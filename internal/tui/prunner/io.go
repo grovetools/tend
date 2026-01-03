@@ -9,17 +9,22 @@ import (
 )
 
 // startRunCmd starts the parallel test execution.
-func startRunCmd(scenarios []*ScenarioState, projectRoot string) tea.Cmd {
+func startRunCmd(scenarios []*ScenarioState, projectRoot string, numJobs int) tea.Cmd {
 	return func() tea.Msg {
 		var s []*harness.Scenario
 		for _, state := range scenarios {
 			s = append(s, state.scenario)
 		}
-		// Use half the available CPUs, similar to other test runners
-		numWorkers := runtime.NumCPU() / 2
-		if numWorkers < 1 {
-			numWorkers = 1
+		// Use the specified number of jobs, or default to half the available CPUs
+		numWorkers := numJobs
+		if numWorkers <= 0 {
+			numWorkers = runtime.NumCPU() / 2
+			if numWorkers < 1 {
+				numWorkers = 1
+			}
 		}
+		// Debug: print the number of workers
+		// fmt.Fprintf(os.Stderr, "DEBUG: Starting parallel runner with %d workers (numJobs=%d)\n", numWorkers, numJobs)
 		eventsChan := Run(context.Background(), s, projectRoot, numWorkers)
 		return eventsChan
 	}

@@ -1,9 +1,13 @@
 package prunner
 
 import (
+	"time"
+
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 )
+
+type quitMsg struct{}
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -53,12 +57,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		if m.success+m.failed == len(m.scenarios) {
 			m.finished = true
-			return m, tea.Quit
+			// Wait a moment for the final view to render before quitting
+			return m, func() tea.Msg {
+				time.Sleep(100 * time.Millisecond)
+				return quitMsg{}
+			}
 		}
 		return m, waitForEventCmd(m.eventsChan)
 
 	case nil: // Channel closed
 		m.finished = true
+		// Wait a moment for the final view to render before quitting
+		return m, func() tea.Msg {
+			time.Sleep(100 * time.Millisecond)
+			return quitMsg{}
+		}
+
+	case quitMsg:
 		return m, tea.Quit
 	}
 

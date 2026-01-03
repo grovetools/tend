@@ -46,10 +46,11 @@ type Model struct {
 	results      []*harness.Result
 	eventsChan   <-chan Event
 	projectRoot  string
+	numJobs      int
 }
 
 // New creates a new parallel runner TUI model.
-func New(scenarios []*harness.Scenario, projectRoot string) Model {
+func New(scenarios []*harness.Scenario, projectRoot string, numJobs int) Model {
 	var states []*ScenarioState
 	items := make([]list.Item, len(scenarios))
 	for i, s := range scenarios {
@@ -72,6 +73,7 @@ func New(scenarios []*harness.Scenario, projectRoot string) Model {
 		list:        l,
 		spinner:     s,
 		projectRoot: projectRoot,
+		numJobs:     numJobs,
 	}
 }
 
@@ -79,7 +81,7 @@ func New(scenarios []*harness.Scenario, projectRoot string) Model {
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(
 		m.spinner.Tick,
-		startRunCmd(m.scenarios, m.projectRoot),
+		startRunCmd(m.scenarios, m.projectRoot, m.numJobs),
 	)
 }
 

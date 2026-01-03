@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="Grove Tend Tests" tests="4" failures="2" errors="0" time="0.30242">
+  <testsuite name="Grove Tend Tests" tests="4" failures="2" errors="0" time="0.30242" timestamp="2026-01-03T12:17:23-05:00">
+    <properties>
+      <property name="go.version" value="go1.25.5"></property>
+      <property name="os.name" value="darwin"></property>
+      <property name="os.arch" value="arm64"></property>
+    </properties>
+    <testcase name="fixture-failing-1" classname="tend.scenarios" time="0.05053">
+      <failure type="AssertionError" message="step &#39;This step will fail&#39; failed: intentional failure in fixture-failing-1">Failed at step: This step will fail&#xA;Error: step &#39;This step will fail&#39; failed: intentional failure in fixture-failing-1</failure>
+    </testcase>
+    <testcase name="fixture-failing-2" classname="tend.scenarios" time="0.050386">
+      <failure type="AssertionError" message="step &#39;Second step fails&#39; failed: intentional failure in step 2">Failed at step: Second step fails&#xA;Error: step &#39;Second step fails&#39; failed: intentional failure in step 2</failure>
+    </testcase>
+    <testcase name="fixture-passing-2" classname="tend.scenarios" time="0.10031"></testcase>
+    <testcase name="fixture-passing-1" classname="tend.scenarios" time="0.101194"></testcase>
+  </testsuite>
+</testsuites>

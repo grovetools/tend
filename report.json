@@ -1,0 +1,54 @@
+{
+  "timestamp": "2026-01-03T12:17:23.181161-05:00",
+  "duration": "302.42ms",
+  "total_tests": 4,
+  "passed": 2,
+  "failed": 2,
+  "success_rate": 50,
+  "results": [
+    {
+      "name": "fixture-failing-1",
+      "success": false,
+      "duration": "50.53ms",
+      "start_time": "2026-01-03T12:17:22.97639-05:00",
+      "end_time": "2026-01-03T12:17:23.02692-05:00",
+      "failed_step": "This step will fail",
+      "error": "step 'This step will fail' failed: intentional failure in fixture-failing-1"
+    },
+    {
+      "name": "fixture-failing-2",
+      "success": false,
+      "duration": "50.386ms",
+      "start_time": "2026-01-03T12:17:22.977834-05:00",
+      "end_time": "2026-01-03T12:17:23.02822-05:00",
+      "failed_step": "Second step fails",
+      "error": "step 'Second step fails' failed: intentional failure in step 2"
+    },
+    {
+      "name": "fixture-passing-2",
+      "success": true,
+      "duration": "100.31ms",
+      "start_time": "2026-01-03T12:17:22.977757-05:00",
+      "end_time": "2026-01-03T12:17:23.078067-05:00"
+    },
+    {
+      "name": "fixture-passing-1",
+      "success": true,
+      "duration": "101.194ms",
+      "start_time": "2026-01-03T12:17:22.976786-05:00",
+      "end_time": "2026-01-03T12:17:23.07798-05:00"
+    }
+  ],
+  "environment": {
+    "go_version": "go1.25.5",
+    "os": "darwin",
+    "arch": "arm64",
+    "grove_binary": "",
+    "variables": {
+      "CI": "",
+      "GITHUB_ACTIONS": "",
+      "GITHUB_RUN_ID": "",
+      "GITHUB_SHA": ""
+    }
+  }
+}
