@@ -71,6 +71,24 @@ func main() {
 		ReusableSetupStepsScenario(),
 		RunSetupWithoutSetupStepsScenario(),
 		RunSetupWithSetupStepsScenario(),
+
+		// Parallel Runner Test Fixtures (explicit-only)
+		PassingScenario1(),
+		PassingScenario2(),
+		PassingScenario3(),
+		FailingScenario1(),
+		FailingScenario2(),
+		SlowScenario1(),
+		SlowScenario2(),
+		SlowScenario3(),
+		SlowScenario4(),
+
+		// Parallel Runner E2E Tests
+		ParallelRunAllPassingScenario(),
+		ParallelRunWithFailuresScenario(),
+		ParallelRunJobsFlagScenario(),
+		ParallelRunInteractiveQuitScenario(),
+		ParallelRunNoScenariosScenario(),
 	}
 
 	// Setup signal handling for graceful shutdown.

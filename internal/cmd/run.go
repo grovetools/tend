@@ -18,6 +18,8 @@ import (
 	"github.com/mattsolo1/grove-tend/pkg/harness"
 	"github.com/mattsolo1/grove-tend/pkg/harness/reporters"
 	"github.com/mattsolo1/grove-tend/pkg/ui"
+	"github.com/mattsolo1/grove-tend/internal/tui/prunner"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 var (
@@ -41,6 +43,7 @@ var (
 	runSetup            bool
 	runSteps            string
 	recordTUIDir        string
+	jobs                int
 )
 
 // newRunCmd creates the run command with the provided scenarios
@@ -65,6 +68,7 @@ Examples:
 	}
 
 	runCmd.Flags().BoolVarP(&parallel, "parallel", "p", false, "Run scenarios in parallel")
+	runCmd.Flags().IntVarP(&jobs, "jobs", "j", 0, "Number of parallel jobs (default: half of CPU cores)")
 	runCmd.Flags().DurationVar(&timeout, "timeout", 10*time.Minute, "Timeout for scenario execution")
 	runCmd.Flags().BoolVar(&noCleanup, "no-cleanup", false, "Skip cleanup after scenario execution")
 	runCmd.Flags().StringVar(&outputFormat, "format", "text", "Output format (text, json, junit)")
@@ -483,7 +487,7 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 	var err error
 	
 	if parallel {
-		results, err = runScenariosParallel(ctx, h, selectedScenarios, renderer)
+		results, err = runScenariosParallel(ctx, h, selectedScenarios, renderer, rootDir)
 	} else {
 		results, err = runScenariosSequential(ctx, h, selectedScenarios, renderer)
 	}
@@ -504,9 +508,12 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 	if err := writeReports(results); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to write reports: %v\n", err)
 	}
-	
+
 	// Display summary
-	renderFinalSummary(renderer, results, totalSuccess, len(selectedScenarios))
+	// In parallel mode, the TUI already provides a summary.
+	if !parallel {
+		renderFinalSummary(renderer, results, totalSuccess, len(selectedScenarios))
+	}
 	
 	// Exit with error code if any scenarios failed
 	if totalSuccess < len(selectedScenarios) {
@@ -532,11 +539,18 @@ func runScenariosSequential(ctx context.Context, h *harness.Harness, scenarios [
 	return results, nil
 }
 
-func runScenariosParallel(ctx context.Context, h *harness.Harness, scenarios []*harness.Scenario, renderer *ui.Renderer) ([]*harness.Result, error) {
-	// For now, implement as sequential since parallel execution requires more complex coordination
-	// TODO: Implement true parallel execution with goroutines and channels
-	renderer.RenderInfo("Parallel execution not yet implemented, running sequentially")
-	return runScenariosSequential(ctx, h, scenarios, renderer)
+func runScenariosParallel(ctx context.Context, h *harness.Harness, scenarios []*harness.Scenario, renderer *ui.Renderer, projectRoot string) ([]*harness.Result, error) {
+	model := prunner.New(scenarios, projectRoot)
+	p := tea.NewProgram(model)
+
+	finalModel, err := p.Run()
+	if err != nil {
+		return nil, fmt.Errorf("error running parallel test runner: %w", err)
+	}
+
+	// The TUI has finished, get the results from the final model
+	results := finalModel.(prunner.Model).Results()
+	return results, nil
 }
 
 func runSingleScenario(ctx context.Context, h *harness.Harness, scenario *harness.Scenario, renderer *ui.Renderer) (*harness.Result, error) {
