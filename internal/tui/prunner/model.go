@@ -33,6 +33,12 @@ func (s ScenarioState) Title() string       { return s.scenario.Name }
 func (s ScenarioState) Description() string { return "" }
 func (s ScenarioState) FilterValue() string { return s.scenario.Name }
 
+// Getters for accessing scenario state fields
+func (s *ScenarioState) Scenario() *harness.Scenario { return s.scenario }
+func (s *ScenarioState) Status() Status              { return s.status }
+func (s *ScenarioState) Duration() time.Duration     { return s.duration }
+func (s *ScenarioState) Output() string              { return s.output }
+
 // Model is the main Bubble Tea model for the parallel runner.
 type Model struct {
 	scenarios    []*ScenarioState
@@ -88,4 +94,9 @@ func (m Model) Init() tea.Cmd {
 // Results returns the final test results.
 func (m Model) Results() []*harness.Result {
 	return m.results
+}
+
+// ScenarioStates returns the final states of all scenarios.
+func (m Model) ScenarioStates() []*ScenarioState {
+	return m.scenarios
 }

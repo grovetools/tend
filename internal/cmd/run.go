@@ -483,44 +483,79 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 	
 	// Run scenarios
 	var results []*harness.Result
+	var scenarioStates []*prunner.ScenarioState
 	var totalSuccess int
 	var err error
-	
+
 	if parallel {
-		results, err = runScenariosParallel(ctx, h, selectedScenarios, renderer, rootDir)
+		results, scenarioStates, err = runScenariosParallel(ctx, h, selectedScenarios, renderer, rootDir)
 	} else {
 		results, err = runScenariosSequential(ctx, h, selectedScenarios, renderer)
 	}
-	
+
 	if err != nil {
 		renderer.RenderError(err)
 		return err
 	}
-	
+
 	// Count successes
 	for _, result := range results {
 		if result.Success {
 			totalSuccess++
 		}
 	}
-	
+
 	// Write reports
 	if err := writeReports(results); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to write reports: %v\n", err)
 	}
 
 	// Display summary
-	// In parallel mode, the TUI already provides a summary.
+	// In parallel mode, show summary table then detailed failures
 	if !parallel {
 		renderFinalSummary(renderer, results, totalSuccess, len(selectedScenarios))
+	} else {
+		// For parallel mode, show summary and then detailed failures
+		renderFinalSummary(renderer, results, totalSuccess, len(selectedScenarios))
+		if totalSuccess < len(selectedScenarios) {
+			printParallelFailureDetails(scenarioStates)
+		}
 	}
-	
+
 	// Exit with error code if any scenarios failed
 	if totalSuccess < len(selectedScenarios) {
 		os.Exit(1)
 	}
-	
+
 	return nil
+}
+
+func printParallelFailureDetails(states []*prunner.ScenarioState) {
+	var failedScenarios []*prunner.ScenarioState
+	for _, s := range states {
+		if s.Status() == prunner.StatusFailure {
+			failedScenarios = append(failedScenarios, s)
+		}
+	}
+
+	if len(failedScenarios) == 0 {
+		return
+	}
+
+	fmt.Println()
+	fmt.Println(strings.Repeat("=", 80))
+	fmt.Printf("❌ Test run failed: %d/%d scenarios failed\n", len(failedScenarios), len(states))
+	fmt.Println(strings.Repeat("=", 80))
+
+	for _, s := range failedScenarios {
+		fmt.Println()
+		fmt.Printf("❌ %s (failed in %v)\n", s.Scenario().Name, s.Duration().Round(time.Millisecond))
+		fmt.Println(strings.Repeat("-", 80))
+		if s.Output() != "" {
+			// Trim leading/trailing whitespace from output for cleaner presentation
+			fmt.Println(strings.TrimSpace(s.Output()))
+		}
+	}
 }
 
 func runScenariosSequential(ctx context.Context, h *harness.Harness, scenarios []*harness.Scenario, renderer *ui.Renderer) ([]*harness.Result, error) {
@@ -539,7 +574,7 @@ func runScenariosSequential(ctx context.Context, h *harness.Harness, scenarios [
 	return results, nil
 }
 
-func runScenariosParallel(ctx context.Context, h *harness.Harness, scenarios []*harness.Scenario, renderer *ui.Renderer, projectRoot string) ([]*harness.Result, error) {
+func runScenariosParallel(ctx context.Context, h *harness.Harness, scenarios []*harness.Scenario, renderer *ui.Renderer, projectRoot string) ([]*harness.Result, []*prunner.ScenarioState, error) {
 	model := prunner.New(scenarios, projectRoot, jobs)
 	// Use stdin/stdout instead of trying to open /dev/tty
 	// This allows the TUI to work in various contexts (tmux, pipes, etc.)
@@ -547,12 +582,14 @@ func runScenariosParallel(ctx context.Context, h *harness.Harness, scenarios []*
 
 	finalModel, err := p.Run()
 	if err != nil {
-		return nil, fmt.Errorf("error running parallel test runner: %w", err)
+		return nil, nil, fmt.Errorf("error running parallel test runner: %w", err)
 	}
 
 	// The TUI has finished, get the results from the final model
-	results := finalModel.(prunner.Model).Results()
-	return results, nil
+	runnerModel := finalModel.(prunner.Model)
+	results := runnerModel.Results()
+	states := runnerModel.ScenarioStates()
+	return results, states, nil
 }
 
 func runSingleScenario(ctx context.Context, h *harness.Harness, scenario *harness.Scenario, renderer *ui.Renderer) (*harness.Result, error) {

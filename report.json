@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-01-03T12:17:23.181161-05:00",
-  "duration": "302.42ms",
+  "timestamp": "2026-01-03T13:00:56.033352-05:00",
+  "duration": "304.381ms",
   "total_tests": 4,
   "passed": 2,
   "failed": 2,
@@ -9,34 +9,34 @@
     {
       "name": "fixture-failing-1",
       "success": false,
-      "duration": "50.53ms",
-      "start_time": "2026-01-03T12:17:22.97639-05:00",
-      "end_time": "2026-01-03T12:17:23.02692-05:00",
+      "duration": "50.821ms",
+      "start_time": "2026-01-03T13:00:55.82862-05:00",
+      "end_time": "2026-01-03T13:00:55.879441-05:00",
       "failed_step": "This step will fail",
       "error": "step 'This step will fail' failed: intentional failure in fixture-failing-1"
     },
     {
       "name": "fixture-failing-2",
       "success": false,
-      "duration": "50.386ms",
-      "start_time": "2026-01-03T12:17:22.977834-05:00",
-      "end_time": "2026-01-03T12:17:23.02822-05:00",
+      "duration": "50.863ms",
+      "start_time": "2026-01-03T13:00:55.829122-05:00",
+      "end_time": "2026-01-03T13:00:55.879985-05:00",
       "failed_step": "Second step fails",
       "error": "step 'Second step fails' failed: intentional failure in step 2"
     },
     {
-      "name": "fixture-passing-2",
-      "success": true,
-      "duration": "100.31ms",
-      "start_time": "2026-01-03T12:17:22.977757-05:00",
-      "end_time": "2026-01-03T12:17:23.078067-05:00"
-    },
-    {
       "name": "fixture-passing-1",
       "success": true,
-      "duration": "101.194ms",
-      "start_time": "2026-01-03T12:17:22.976786-05:00",
-      "end_time": "2026-01-03T12:17:23.07798-05:00"
+      "duration": "101.338ms",
+      "start_time": "2026-01-03T13:00:55.82863-05:00",
+      "end_time": "2026-01-03T13:00:55.929968-05:00"
+    },
+    {
+      "name": "fixture-passing-2",
+      "success": true,
+      "duration": "101.359ms",
+      "start_time": "2026-01-03T13:00:55.828607-05:00",
+      "end_time": "2026-01-03T13:00:55.929966-05:00"
     }
   ],
   "environment": {
