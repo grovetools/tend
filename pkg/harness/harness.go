@@ -40,6 +40,7 @@ type Context struct {
 	editorPaneID      string                 // Tmux pane ID for the editor
 	currentEditorFile string                 // The file currently open in the editor pane
 	recordTUIDir      string                 // Directory to save TUI session recordings
+	tmuxSocket        string                 // Socket name for isolated tmux server for test TUI sessions
 
 	// UI for displaying command output
 	ui *UI
@@ -198,12 +199,22 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 			ui.Cleanup()
 			// Clean up all TUI sessions if testCtx was initialized
 			if testCtx != nil {
-				sessions := testCtx.GetStringSlice("tui_sessions")
-				if len(sessions) > 0 {
-					tmuxClient, err := tmux.NewClient()
+				// If using an isolated tmux server, kill the entire server
+				// This cleans up all sessions and the server in one operation
+				if testCtx.tmuxSocket != "" {
+					client, err := tmux.NewClientWithSocket(testCtx.tmuxSocket)
 					if err == nil {
-						for _, sessionName := range sessions {
-							_ = tmuxClient.KillSession(context.Background(), sessionName)
+						_ = client.KillServer(context.Background())
+					}
+				} else {
+					// Fallback: kill individual sessions on the default tmux server
+					sessions := testCtx.GetStringSlice("tui_sessions")
+					if len(sessions) > 0 {
+						tmuxClient, err := tmux.NewClient()
+						if err == nil {
+							for _, sessionName := range sessions {
+								_ = tmuxClient.KillSession(context.Background(), sessionName)
+							}
 						}
 					}
 				}
@@ -223,7 +234,11 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 	}
 	// Generate a unique test ID based on the temp directory
 	testID := filepath.Base(tempMgr.BaseDir())
-	
+
+	// Generate unique socket name for isolated TUI test server
+	// Using testID makes it traceable (matches temp directory name)
+	socketName := fmt.Sprintf("tend-test-%s", testID)
+
 	// Populate the map for real dependencies
 	realDepsMap := make(map[string]bool)
 	if len(h.opts.UseRealDeps) > 0 {
@@ -251,6 +266,7 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 		UseRealDeps:   realDepsMap,
 		mockOverrides: make(map[string]string),
 		recordTUIDir:  h.opts.RecordTUIDir,
+		tmuxSocket:    socketName,
 		ui:            ui,
 	}
 	

@@ -310,6 +310,12 @@ func (c *Context) StartTUI(binaryPath string, args []string, opts ...tui.StartOp
 		fmt.Sprintf("XDG_CACHE_HOME=%s", c.cacheDir),
 	)
 
+	// If using isolated tmux socket, pass it to spawned processes
+	// This ensures any tmux operations inside the TUI use the same isolated server
+	if c.tmuxSocket != "" {
+		config.Env = append(config.Env, fmt.Sprintf("GROVE_TMUX_SOCKET=%s", c.tmuxSocket))
+	}
+
 	// Set default color env vars so TUIs render colors in test sessions
 	// These work with grove-core's tui.InitializeTUI() to enable colors
 	colorEnvSet := false
@@ -327,7 +333,15 @@ func (c *Context) StartTUI(binaryPath string, args []string, opts ...tui.StartOp
 		)
 	}
 
-	tmuxClient, err := tmux.NewClient()
+	// Create tmux client - use isolated socket if configured, otherwise default
+	var tmuxClient *tmux.Client
+	var err error
+
+	if c.tmuxSocket != "" {
+		tmuxClient, err = tmux.NewClientWithSocket(c.tmuxSocket)
+	} else {
+		tmuxClient, err = tmux.NewClient()
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tmux client for TUI session: %w", err)
 	}
