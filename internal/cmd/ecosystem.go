@@ -6,12 +6,15 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mattsolo1/grove-core/tui/components/table"
 	"github.com/mattsolo1/grove-core/tui/theme"
+	"github.com/mattsolo1/grove-tend/internal/tui/e_runner"
 	"github.com/mattsolo1/grove-tend/pkg/command"
 	"github.com/mattsolo1/grove-tend/pkg/harness/reporters"
 	"github.com/mattsolo1/grove-tend/pkg/ui"
@@ -30,6 +33,9 @@ func newEcosystemCmd() *cobra.Command {
 		RunE:  runEcosystemTests,
 	}
 
+	runCmd.Flags().BoolP("parallel", "p", false, "Run ecosystem tests in parallel using a TUI")
+	runCmd.Flags().IntP("jobs", "j", 0, "Number of parallel jobs (default: half of CPU cores)")
+
 	cmd.AddCommand(runCmd)
 	return cmd
 }
@@ -39,6 +45,7 @@ type testResult struct {
 	Success     bool
 	ReportPath  string
 	Error       error
+	Duration    time.Duration
 }
 
 func runEcosystemTests(cmd *cobra.Command, args []string) error {
@@ -64,9 +71,50 @@ func runEcosystemTests(cmd *cobra.Command, args []string) error {
 
 	renderer.RenderInfo(fmt.Sprintf("Found %d test suites to run.", len(testSuites)))
 
+	parallel, _ := cmd.Flags().GetBool("parallel")
+	jobs, _ := cmd.Flags().GetInt("jobs")
+
+	var allResults []*testResult
+	var allPassed bool
+
+	if parallel {
+		allResults, err = runEcosystemTestsParallel(testSuites, jobs)
+		if err != nil {
+			return err
+		}
+	} else {
+		allResults, err = runEcosystemTestsSequential(testSuites)
+		if err != nil {
+			return err
+		}
+	}
+
+	allPassed = true
+	for _, res := range allResults {
+		if !res.Success {
+			allPassed = false
+			break
+		}
+	}
+
+	if err := aggregateAndDisplayResults(allResults); err != nil {
+		renderer.RenderError(fmt.Errorf("error processing results: %w", err))
+		return err
+	}
+
+	if !allPassed {
+		// Error already displayed in the summary, just exit with non-zero status
+		os.Exit(1)
+	}
+
+	renderer.RenderSuccess("All ecosystem tests passed!")
+	return nil
+}
+
+func runEcosystemTestsSequential(testSuites map[string]string) ([]*testResult, error) {
 	resultsDir, err := os.MkdirTemp("", "tend-ecosystem-results-*")
 	if err != nil {
-		return fmt.Errorf("failed to create temporary results directory: %w", err)
+		return nil, fmt.Errorf("failed to create temporary results directory: %w", err)
 	}
 	defer os.RemoveAll(resultsDir)
 
@@ -86,7 +134,9 @@ func runEcosystemTests(cmd *cobra.Command, args []string) error {
 			makeArgs := fmt.Sprintf("ARGS=--json %s", reportPath)
 
 			cmd := command.New("make", target).Dir(path).Env(makeArgs).Timeout(5 * time.Minute)
+			startTime := time.Now()
 			result := cmd.Run()
+			duration := time.Since(startTime)
 
 			success := result.ExitCode == 0
 			if !success {
@@ -99,6 +149,7 @@ func runEcosystemTests(cmd *cobra.Command, args []string) error {
 				Success:     success,
 				ReportPath:  reportPath,
 				Error:       result.Error,
+				Duration:    duration,
 			}
 		}(projectPath, makeTarget)
 	}
@@ -106,19 +157,50 @@ func runEcosystemTests(cmd *cobra.Command, args []string) error {
 	wg.Wait()
 	close(resultsChan)
 
-	allPassed, err := aggregateAndDisplayResults(resultsDir, resultsChan)
+	var allResults []*testResult
+	for res := range resultsChan {
+		allResults = append(allResults, &res)
+	}
+	return allResults, nil
+}
+
+func runEcosystemTestsParallel(testSuites map[string]string, numJobs int) ([]*testResult, error) {
+	model := e_runner.New(testSuites, numJobs)
+	p := tea.NewProgram(model, tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
+
+	finalModel, err := p.Run()
 	if err != nil {
-		renderer.RenderError(fmt.Errorf("error processing results: %w", err))
-		return err
+		return nil, fmt.Errorf("error running parallel test runner: %w", err)
 	}
 
-	if !allPassed {
-		// Error already displayed in the summary, just exit with non-zero status
-		os.Exit(1)
+	runnerModel := finalModel.(e_runner.Model)
+	eRunnerResults := runnerModel.Results()
+
+	var allResults []*testResult
+	for _, res := range eRunnerResults {
+		allResults = append(allResults, &testResult{
+			ProjectName: res.ProjectName,
+			Success:     res.Success,
+			ReportPath:  res.ReportPath,
+			Error:       res.Error,
+			Duration:    res.Duration,
+		})
 	}
 
-	renderer.RenderSuccess("All ecosystem tests passed!")
-	return nil
+	// Print detailed failures after the TUI closes
+	if len(eRunnerResults) > 0 {
+		var failedProjects []*e_runner.ProjectState
+		for _, s := range runnerModel.ProjectStates() {
+			if s.Status() == e_runner.StatusFailure {
+				failedProjects = append(failedProjects, s)
+			}
+		}
+		if len(failedProjects) > 0 {
+			printEcosystemFailureDetails(failedProjects)
+		}
+	}
+
+	return allResults, nil
 }
 
 func findEcosystemRoot() (string, error) {
@@ -178,13 +260,11 @@ func discoverTestSuites(root string, packages []string) map[string]string {
 	return suites
 }
 
-func aggregateAndDisplayResults(resultsDir string, resultsChan <-chan testResult) (bool, error) {
+func aggregateAndDisplayResults(results []*testResult) error {
 	var allReports []reporters.JSONReport
-	var failedProjects []testResult
-	projectResults := make(map[string]testResult)
+	var failedProjects []*testResult
 
-	for res := range resultsChan {
-		projectResults[res.ProjectName] = res
+	for _, res := range results {
 		if !res.Success {
 			failedProjects = append(failedProjects, res)
 		}
@@ -214,42 +294,50 @@ func aggregateAndDisplayResults(resultsDir string, resultsChan <-chan testResult
 
 	fmt.Println("\n--- Ecosystem Test Summary ---")
 	tbl := table.NewStyledTable().Headers("Project", "Status", "Duration", "Passed", "Failed")
-	allPassed := len(failedProjects) == 0
 
-	// Add all projects with reports
-	for _, report := range allReports {
-		if len(report.Results) == 0 {
-			continue
-		}
-		res := report.Results[0]
-		status := theme.DefaultTheme.Success.Render("✅ PASS")
-		if !res.Success || report.Failed > 0 {
-			status = theme.DefaultTheme.Error.Render("❌ FAIL")
-			allPassed = false
-		}
-		tbl.Row(res.Name, status, res.Duration, fmt.Sprintf("%d", report.Passed), fmt.Sprintf("%d", report.Failed))
+	var allProjects []string
+	projectResultMap := make(map[string]*testResult)
+	for _, r := range results {
+		allProjects = append(allProjects, r.ProjectName)
+		projectResultMap[r.ProjectName] = r
 	}
+	sort.Strings(allProjects)
 
-	// Add failed projects without reports
-	for _, failed := range failedProjects {
-		hasReport := false
-		for _, report := range allReports {
-			if len(report.Results) > 0 && report.Results[0].Name == failed.ProjectName {
-				hasReport = true
+	for _, projectName := range allProjects {
+		res := projectResultMap[projectName]
+		status := theme.DefaultTheme.Success.Render("✅ PASS")
+		var passed, failed string
+		var durationStr string
+
+		var reportForProject *reporters.JSONReport
+		for _, r := range allReports {
+			if len(r.Results) > 0 && r.Results[0].Name == projectName {
+				reportForProject = &r
 				break
 			}
 		}
-		if !hasReport {
-			status := theme.DefaultTheme.Error.Render("❌ FAIL")
-			errorMsg := "Build/Make failed"
-			if failed.Error != nil {
-				errorMsg = failed.Error.Error()
-				if len(errorMsg) > 30 {
-					errorMsg = errorMsg[:30] + "..."
-				}
-			}
-			tbl.Row(failed.ProjectName, status, errorMsg, "0", "0")
+
+		if !res.Success {
+			status = theme.DefaultTheme.Error.Render("❌ FAIL")
 		}
+
+		if reportForProject != nil {
+			passed = fmt.Sprintf("%d", reportForProject.Passed)
+			failed = fmt.Sprintf("%d", reportForProject.Failed)
+			if d, err := time.ParseDuration(reportForProject.Duration); err == nil {
+				durationStr = d.Round(time.Millisecond).String()
+			}
+		} else {
+			passed = "0"
+			failed = "0"
+			durationStr = res.Duration.Round(time.Millisecond).String()
+		}
+
+		if !res.Success && failed == "0" {
+			failed = "1" // Mark as at least one failure if the run failed but no report was parsed
+		}
+
+		tbl.Row(projectName, status, durationStr, passed, failed)
 	}
 
 	fmt.Println(tbl)
@@ -264,30 +352,33 @@ func aggregateAndDisplayResults(resultsDir string, resultsChan <-chan testResult
 			}
 
 			fmt.Printf("%s %s\n", theme.DefaultTheme.Error.Render("❌"), theme.DefaultTheme.Title.Render(proj.ProjectName))
-			reportPath := filepath.Join(resultsDir, proj.ProjectName+".json")
+			var reportForProject *reporters.JSONReport
+			for _, r := range allReports {
+				if len(r.Results) > 0 && r.Results[0].Name == proj.ProjectName {
+					reportForProject = &r
+					break
+				}
+			}
 
-			if data, err := os.ReadFile(reportPath); err == nil {
-				var report reporters.JSONReport
-				if json.Unmarshal(data, &report) == nil {
-					failedScenarios := 0
-					for _, res := range report.Results {
-						if !res.Success {
-							failedScenarios++
-							if failedScenarios > 1 {
-								fmt.Println()
-							}
-							fmt.Printf("   %s %s\n", theme.DefaultTheme.Muted.Render("Scenario:"), res.Name)
-							fmt.Printf("   %s %s\n", theme.DefaultTheme.Muted.Render("Step:    "), res.FailedStep)
-							// Only show first line of error
-							errorLines := strings.Split(res.Error, "\n")
-							if len(errorLines) > 0 {
-								fmt.Printf("   %s %s\n", theme.DefaultTheme.Muted.Render("Error:   "), errorLines[0])
-							}
+			if reportForProject != nil {
+				failedScenarios := 0
+				for _, res := range reportForProject.Results {
+					if !res.Success {
+						failedScenarios++
+						if failedScenarios > 1 {
+							fmt.Println()
+						}
+						fmt.Printf("   %s %s\n", theme.DefaultTheme.Muted.Render("Scenario:"), res.Name)
+						fmt.Printf("   %s %s\n", theme.DefaultTheme.Muted.Render("Step:    "), res.FailedStep)
+						// Only show first line of error
+						errorLines := strings.Split(res.Error, "\n")
+						if len(errorLines) > 0 {
+							fmt.Printf("   %s %s\n", theme.DefaultTheme.Muted.Render("Error:   "), errorLines[0])
 						}
 					}
-					if failedScenarios == 0 {
-						fmt.Printf("   %s\n", theme.DefaultTheme.Muted.Render("Build/test runner failed (no detailed failure info available)"))
-					}
+				}
+				if failedScenarios == 0 {
+					fmt.Printf("   %s\n", theme.DefaultTheme.Muted.Render("Build/test runner failed (no detailed failure info available)"))
 				}
 			} else if proj.Error != nil {
 				// Clean up error message - only show first line
@@ -301,5 +392,26 @@ func aggregateAndDisplayResults(resultsDir string, resultsChan <-chan testResult
 		fmt.Println()
 	}
 
-	return allPassed, nil
+	return nil
+}
+
+func printEcosystemFailureDetails(states []*e_runner.ProjectState) {
+	if len(states) == 0 {
+		return
+	}
+
+	fmt.Println()
+	fmt.Println(strings.Repeat("=", 80))
+	fmt.Printf("❌ Test run failed: %d projects failed\n", len(states))
+	fmt.Println(strings.Repeat("=", 80))
+
+	for _, s := range states {
+		fmt.Println()
+		fmt.Printf("❌ %s (failed in %v)\n", s.Title(), s.Duration().Round(time.Millisecond))
+		fmt.Println(strings.Repeat("-", 80))
+		if s.Output() != "" {
+			// Trim leading/trailing whitespace from output for cleaner presentation
+			fmt.Println(strings.TrimSpace(s.Output()))
+		}
+	}
 }
