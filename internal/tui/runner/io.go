@@ -11,6 +11,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mattsolo1/grove-core/pkg/workspace"
+	"github.com/mattsolo1/grove-core/tui/theme"
 	"github.com/mattsolo1/grove-tend/internal/tui/scanner"
 	"github.com/mattsolo1/grove-tend/pkg/harness"
 	"github.com/sirupsen/logrus"
@@ -98,7 +99,7 @@ func runTestInPaneCmd(node *DisplayNode) tea.Cmd {
 		if cmdErr != nil {
 			return testOutputMsg{
 				nodeID:   nodeID,
-				output:   outputStr + fmt.Sprintf("\n\n❌ Failed: %v", cmdErr),
+				output:   outputStr + fmt.Sprintf("\n\n%s Failed: %v", theme.IconError, cmdErr),
 				jsonPath: jsonPath,
 				done:     true,
 				err:      cmdErr,
@@ -106,7 +107,7 @@ func runTestInPaneCmd(node *DisplayNode) tea.Cmd {
 		}
 		return testOutputMsg{
 			nodeID:   nodeID,
-			output:   outputStr + "\n\n✅ Completed",
+			output:   outputStr + "\n\n" + theme.IconSuccess + " Completed",
 			jsonPath: jsonPath,
 			done:     true,
 		}

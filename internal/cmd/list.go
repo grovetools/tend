@@ -81,12 +81,12 @@ func listScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sc
 		// Format local and explicit indicators
 		localIndicator := ""
 		if scenario.LocalOnly {
-			localIndicator = "✅"
+			localIndicator = theme.IconSuccess
 		}
-		
+
 		explicitIndicator := ""
 		if scenario.ExplicitOnly {
-			explicitIndicator = "✅"
+			explicitIndicator = theme.IconSuccess
 		}
 		
 		row := []string{
@@ -152,13 +152,13 @@ func displayScenarioDetails(renderer *ui.Renderer, scenario *harness.Scenario) {
 	// Show LocalOnly warning
 	if scenario.LocalOnly {
 		fmt.Printf("  %s This scenario is marked as local-only and will be skipped in CI environments\n",
-			theme.DefaultTheme.Warning.Render("⚠"))
+			theme.DefaultTheme.Warning.Render(theme.IconWarning))
 	}
 
 	// Show ExplicitOnly warning
 	if scenario.ExplicitOnly {
 		fmt.Printf("  %s This scenario must be run explicitly by name (skipped during 'tend run')\n",
-			theme.DefaultTheme.Warning.Render("⚠"))
+			theme.DefaultTheme.Warning.Render(theme.IconWarning))
 	}
 
 	// Tags

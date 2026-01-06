@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattsolo1/grove-core/tui/theme"
 )
 
 // UI handles all user interface output (basic implementation)
@@ -41,7 +42,7 @@ func NewUI(interactive, verbose, veryVerbose bool) *UI {
 
 // ScenarioStart displays the start of a scenario
 func (ui *UI) ScenarioStart(name, description string) {
-	fmt.Printf("\n🧪 Scenario: %s\n", name)
+	fmt.Printf("\n%s Scenario: %s\n", theme.IconTestTube, name)
 	if description != "" {
 		fmt.Printf("   %s\n", description)
 	}
@@ -51,13 +52,13 @@ func (ui *UI) ScenarioStart(name, description string) {
 // ScenarioSuccess displays scenario completion
 func (ui *UI) ScenarioSuccess(name string, duration time.Duration) {
 	fmt.Println(strings.Repeat("-", 60))
-	fmt.Printf("✅ Scenario completed successfully in %v\n\n", duration)
+	fmt.Printf("%s Scenario completed successfully in %v\n\n", theme.IconSuccess, duration)
 }
 
 // ScenarioFailed displays scenario failure
 func (ui *UI) ScenarioFailed(name string, err error) {
 	fmt.Println(strings.Repeat("-", 60))
-	fmt.Printf("❌ Scenario failed: %s\n", name)
+	fmt.Printf("%s Scenario failed: %s\n", theme.IconError, name)
 	if err != nil {
 		fmt.Printf("Error: %v\n\n", err)
 	}
@@ -81,11 +82,11 @@ func (ui *UI) StepStart(current, total int, name string) {
 // StepSuccess displays step completion
 func (ui *UI) StepSuccess(stepResult StepResult) {
 	if ui.verbose {
-		fmt.Printf("✓ %s (Completed in %v)\n", stepResult.Name, stepResult.Duration)
+		fmt.Printf("%s %s (Completed in %v)\n", theme.IconSuccess, stepResult.Name, stepResult.Duration)
 		// Print successful assertions
 		for _, assertion := range stepResult.Assertions {
 			if assertion.Success {
-				fmt.Printf("  ✓ %s\n", assertion.Description)
+				fmt.Printf("  %s %s\n", theme.IconSuccess, assertion.Description)
 			}
 		}
 	}
@@ -93,12 +94,12 @@ func (ui *UI) StepSuccess(stepResult StepResult) {
 
 // StepFailed displays step failure
 func (ui *UI) StepFailed(stepResult StepResult) {
-	fmt.Printf("✗ %s (Failed after %v)\n", stepResult.Name, stepResult.Duration)
+	fmt.Printf("%s %s (Failed after %v)\n", theme.IconError, stepResult.Name, stepResult.Duration)
 
 	// Print successful assertions before the failure
 	for _, assertion := range stepResult.Assertions {
 		if assertion.Success {
-			fmt.Printf("  ✓ %s\n", assertion.Description)
+			fmt.Printf("  %s %s\n", theme.IconSuccess, assertion.Description)
 		}
 	}
 
@@ -115,7 +116,7 @@ func (ui *UI) WaitForUser() string {
 		return "continue"
 	}
 
-	fmt.Print("▶ Press ENTER to continue, 'a' to attach, 'q' to quit: ")
+	fmt.Printf("%s Press ENTER to continue, 'a' to attach, 'q' to quit: ", theme.IconSelect)
 	input, err := ui.reader.ReadString('\n')
 	if err != nil {
 		return "quit"
@@ -142,7 +143,7 @@ func (ui *UI) RenderTUICapture(content string) {
 // Cleanup displays cleanup message
 func (ui *UI) Cleanup() {
 	if ui.verbose {
-		fmt.Println("🧹 Cleaning up temporary files...")
+		fmt.Printf("%s Cleaning up temporary files...\n", theme.IconFolderRemove)
 	}
 }
 
@@ -252,7 +253,7 @@ func (ui *UI) handleContainerUpdate(containers []ContainerInfo) {
 
 // printDockerTable prints the Docker container table inline
 func (ui *UI) printDockerTable(containers []ContainerInfo) {
-	fmt.Println("\n🐳 Docker Container Update:")
+	fmt.Printf("\n%s Docker Container Update:\n", theme.IconSync)
 	
 	if len(containers) == 0 {
 		fmt.Println("  No agent containers running")
@@ -304,7 +305,7 @@ func (ui *UI) ShowDockerStatus() {
 		return
 	}
 	
-	fmt.Println("\n📦 Docker Containers (grove-related):")
+	fmt.Printf("\n%s Docker Containers (grove-related):\n", theme.IconFolder)
 	fmt.Printf("%-30s %-20s %s\n", "IMAGE", "CREATED", "NAMES")
 	fmt.Println(strings.Repeat("-", 70))
 	
@@ -318,7 +319,7 @@ func (ui *UI) ShowDockerStatus() {
 
 // Info displays an info message
 func (ui *UI) Info(title, message string) {
-	fmt.Printf("ℹ %s", title)
+	fmt.Printf("%s %s", theme.IconInfo, title)
 	if message != "" {
 		fmt.Printf(": %s", message)
 	}
@@ -327,7 +328,7 @@ func (ui *UI) Info(title, message string) {
 
 // Error displays an error message
 func (ui *UI) Error(title string, err error) {
-	fmt.Printf("✗ %s", title)
+	fmt.Printf("%s %s", theme.IconError, title)
 	if err != nil {
 		fmt.Printf(": %v", err)
 	}

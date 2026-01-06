@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/mattsolo1/grove-core/tui/theme"
 	"github.com/mattsolo1/grove-tend/pkg/harness"
 )
 
@@ -73,14 +74,14 @@ func (r *GitHubReporter) writeSummary(results []*harness.Result, passed, failed 
 		successRate = float64(passed) / float64(total) * 100
 	}
 
-	// Status emoji
-	statusEmoji := "✅"
+	// Status icon
+	statusIcon := theme.IconSuccess
 	if failed > 0 {
-		statusEmoji = "❌"
+		statusIcon = theme.IconError
 	}
 
 	fmt.Fprintf(file, "%s **%d/%d tests passed** (%.1f%% success rate)\n\n",
-		statusEmoji, passed, total, successRate)
+		statusIcon, passed, total, successRate)
 
 	// Results table
 	fmt.Fprintln(file, "### Test Results")
@@ -89,11 +90,11 @@ func (r *GitHubReporter) writeSummary(results []*harness.Result, passed, failed 
 	fmt.Fprintln(file, "|------|--------|----------|---------|")
 
 	for _, result := range results {
-		status := "✅ Passed"
+		status := theme.IconSuccess + " Passed"
 		details := "-"
 
 		if !result.Success {
-			status = "❌ Failed"
+			status = theme.IconError + " Failed"
 			details = result.FailedStep
 			if result.Error != nil {
 				// Escape markdown special characters
@@ -114,8 +115,8 @@ func (r *GitHubReporter) writeSummary(results []*harness.Result, passed, failed 
 
 	// Add run information
 	if runID := os.Getenv("GITHUB_RUN_ID"); runID != "" {
-		fmt.Fprintf(file, "🔗 [View full logs](https://github.com/%s/actions/runs/%s)\n",
-			os.Getenv("GITHUB_REPOSITORY"), runID)
+		fmt.Fprintf(file, "%s [View full logs](https://github.com/%s/actions/runs/%s)\n",
+			theme.IconGithubAction, os.Getenv("GITHUB_REPOSITORY"), runID)
 	}
 
 	return nil

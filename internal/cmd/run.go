@@ -544,12 +544,12 @@ func printParallelFailureDetails(states []*prunner.ScenarioState) {
 
 	fmt.Println()
 	fmt.Println(strings.Repeat("=", 80))
-	fmt.Printf("❌ Test run failed: %d/%d scenarios failed\n", len(failedScenarios), len(states))
+	fmt.Printf("%s Test run failed: %d/%d scenarios failed\n", theme.IconError, len(failedScenarios), len(states))
 	fmt.Println(strings.Repeat("=", 80))
 
 	for _, s := range failedScenarios {
 		fmt.Println()
-		fmt.Printf("❌ %s (failed in %v)\n", s.Scenario().Name, s.Duration().Round(time.Millisecond))
+		fmt.Printf("%s %s (failed in %v)\n", theme.IconError, s.Scenario().Name, s.Duration().Round(time.Millisecond))
 		fmt.Println(strings.Repeat("-", 80))
 		if s.Output() != "" {
 			// Trim leading/trailing whitespace from output for cleaner presentation
@@ -662,10 +662,10 @@ func renderFinalSummary(renderer *ui.Renderer, results []*harness.Result, succes
 	var rows [][]string
 	
 	for _, result := range results {
-		status := "✅ PASS"
+		status := theme.IconSuccess + " PASS"
 		statusStyle := theme.DefaultTheme.Success
 		if !result.Success {
-			status = "❌ FAIL"
+			status = theme.IconError + " FAIL"
 			statusStyle = theme.DefaultTheme.Error
 		}
 

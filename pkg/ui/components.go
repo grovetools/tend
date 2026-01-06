@@ -9,16 +9,16 @@ import (
 	"github.com/mattsolo1/grove-core/tui/theme"
 )
 
-// Status icons
-const (
-	IconPending = "⏳"
-	IconRunning = "🔄"
-	IconSuccess = "✅"
-	IconError   = "❌"
-	IconWarning = "⚠️"
-	IconInfo    = "ℹ️"
-	IconArrow   = "→"
-	IconBullet  = "•"
+// Status icons - using grove-core theme icons
+var (
+	IconPending = theme.IconPending
+	IconRunning = theme.IconRunning
+	IconSuccess = theme.IconSuccess
+	IconError   = theme.IconError
+	IconWarning = theme.IconWarning
+	IconInfo    = theme.IconInfo
+	IconArrow   = theme.IconArrow
+	IconBullet  = theme.IconBullet
 )
 
 // Header renders a styled header with title and description

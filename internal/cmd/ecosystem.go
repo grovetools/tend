@@ -140,9 +140,9 @@ func runEcosystemTestsSequential(testSuites map[string]string) ([]*testResult, e
 
 			success := result.ExitCode == 0
 			if !success {
-				fmt.Printf("❌ %s\n", theme.DefaultTheme.Error.Render(projectName))
+				fmt.Printf("%s %s\n", theme.IconError, theme.DefaultTheme.Error.Render(projectName))
 			} else {
-				fmt.Printf("✅ %s\n", theme.DefaultTheme.Success.Render(projectName))
+				fmt.Printf("%s %s\n", theme.IconSuccess, theme.DefaultTheme.Success.Render(projectName))
 			}
 			resultsChan <- testResult{
 				ProjectName: projectName,
@@ -305,7 +305,7 @@ func aggregateAndDisplayResults(results []*testResult) error {
 
 	for _, projectName := range allProjects {
 		res := projectResultMap[projectName]
-		status := theme.DefaultTheme.Success.Render("✅ PASS")
+		status := theme.DefaultTheme.Success.Render(theme.IconSuccess + " PASS")
 		var passed, failed string
 		var durationStr string
 
@@ -318,7 +318,7 @@ func aggregateAndDisplayResults(results []*testResult) error {
 		}
 
 		if !res.Success {
-			status = theme.DefaultTheme.Error.Render("❌ FAIL")
+			status = theme.DefaultTheme.Error.Render(theme.IconError + " FAIL")
 		}
 
 		if reportForProject != nil {
@@ -351,7 +351,7 @@ func aggregateAndDisplayResults(results []*testResult) error {
 				fmt.Println()
 			}
 
-			fmt.Printf("%s %s\n", theme.DefaultTheme.Error.Render("❌"), theme.DefaultTheme.Title.Render(proj.ProjectName))
+			fmt.Printf("%s %s\n", theme.DefaultTheme.Error.Render(theme.IconError), theme.DefaultTheme.Title.Render(proj.ProjectName))
 			var reportForProject *reporters.JSONReport
 			for _, r := range allReports {
 				if len(r.Results) > 0 && r.Results[0].Name == proj.ProjectName {
@@ -402,12 +402,12 @@ func printEcosystemFailureDetails(states []*e_runner.ProjectState) {
 
 	fmt.Println()
 	fmt.Println(strings.Repeat("=", 80))
-	fmt.Printf("❌ Test run failed: %d projects failed\n", len(states))
+	fmt.Printf("%s Test run failed: %d projects failed\n", theme.IconError, len(states))
 	fmt.Println(strings.Repeat("=", 80))
 
 	for _, s := range states {
 		fmt.Println()
-		fmt.Printf("❌ %s (failed in %v)\n", s.Title(), s.Duration().Round(time.Millisecond))
+		fmt.Printf("%s %s (failed in %v)\n", theme.IconError, s.Title(), s.Duration().Round(time.Millisecond))
 		fmt.Println(strings.Repeat("-", 80))
 		if s.Output() != "" {
 			// Trim leading/trailing whitespace from output for cleaner presentation

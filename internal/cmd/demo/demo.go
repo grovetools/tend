@@ -6,6 +6,7 @@ import (
 	"log"
 	"strings"
 
+	"github.com/mattsolo1/grove-core/tui/theme"
 	"github.com/mattsolo1/grove-tend/pkg/command"
 	"github.com/mattsolo1/grove-tend/pkg/fs"
 	"github.com/mattsolo1/grove-tend/pkg/git"
@@ -14,7 +15,7 @@ import (
 )
 
 func main() {
-	fmt.Println("🚀 Grove Tend Framework Demo")
+	fmt.Printf("%s Grove Tend Framework Demo\n", theme.IconDebugStart)
 	fmt.Println("=" + string(make([]rune, 50)))
 
 	// Create a sample scenario that demonstrates the framework capabilities
@@ -113,12 +114,12 @@ func newFeature() {
 					return fmt.Errorf("repository has uncommitted changes")
 				}
 
-				fmt.Printf("✓ Repository is on branch '%s' with clean state\n", branch)
+				fmt.Printf("%s Repository is on branch '%s' with clean state\n", theme.IconSuccess, branch)
 				return nil
 			}),
 
 			harness.NewStep("Demonstrate assertion styles", func(ctx *harness.Context) error {
-				fmt.Println("✓ Demonstrating hard (fail-fast) and soft (collecting) assertions.")
+				fmt.Printf("%s Demonstrating hard (fail-fast) and soft (collecting) assertions.\n", theme.IconSuccess)
 
 				// Example of a successful hard assertion
 				if err := ctx.Check("repository has a clean state", func() error {
@@ -162,7 +163,7 @@ func newFeature() {
 						return ctx.HasKey("workspace")
 					},
 					func(ctx *harness.Context) error {
-						fmt.Println("✓ Conditional step executed successfully")
+						fmt.Printf("%s Conditional step executed successfully\n", theme.IconSuccess)
 						return nil
 					})
 
@@ -177,7 +178,7 @@ func newFeature() {
 					if retryCounter < 2 {
 						return fmt.Errorf("attempt %d failed", retryCounter)
 					}
-					fmt.Printf("✓ Retry step succeeded on attempt %d\n", retryCounter)
+					fmt.Printf("%s Retry step succeeded on attempt %d\n", theme.IconSuccess, retryCounter)
 					return nil
 				})
 
@@ -198,27 +199,27 @@ func newFeature() {
 		log.Fatalf("Demo scenario failed: %v", err)
 	}
 
-	fmt.Printf("\n🎉 Demo completed successfully!\n")
+	fmt.Printf("\n%s Demo completed successfully!\n", theme.IconStatusCompleted)
 	fmt.Printf("   Duration: %v\n", result.Duration)
 	fmt.Printf("   Steps executed: %d\n", len(result.StepResults))
 
 	// Show capabilities summary
-	fmt.Println("\n📋 Framework Capabilities Demonstrated:")
-	fmt.Println("  ✓ Scenario definition and execution")
-	fmt.Println("  ✓ Step-by-step progress tracking")
-	fmt.Println("  ✓ Temporary directory management")
-	fmt.Println("  ✓ Filesystem operations")
-	fmt.Println("  ✓ Git repository operations")
-	fmt.Println("  ✓ Command execution and output capture")
-	fmt.Println("  ✓ Context state management between steps")
-	fmt.Println("  ✓ Hard and soft assertion styles")
-	fmt.Println("  ✓ Error handling and reporting")
-	fmt.Println("  ✓ Step builder utilities")
-	fmt.Println("  ✓ Automatic cleanup")
-	
-	fmt.Println("\n🔧 Ready for:")
-	fmt.Println("  • Converting existing bash test scripts")
-	fmt.Println("  • Building complex multi-step scenarios")
-	fmt.Println("  • Interactive debugging mode")
-	fmt.Println("  • CI integration and reporting")
+	fmt.Printf("\n%s Framework Capabilities Demonstrated:\n", theme.IconChecklist)
+	fmt.Printf("  %s Scenario definition and execution\n", theme.IconSuccess)
+	fmt.Printf("  %s Step-by-step progress tracking\n", theme.IconSuccess)
+	fmt.Printf("  %s Temporary directory management\n", theme.IconSuccess)
+	fmt.Printf("  %s Filesystem operations\n", theme.IconSuccess)
+	fmt.Printf("  %s Git repository operations\n", theme.IconSuccess)
+	fmt.Printf("  %s Command execution and output capture\n", theme.IconSuccess)
+	fmt.Printf("  %s Context state management between steps\n", theme.IconSuccess)
+	fmt.Printf("  %s Hard and soft assertion styles\n", theme.IconSuccess)
+	fmt.Printf("  %s Error handling and reporting\n", theme.IconSuccess)
+	fmt.Printf("  %s Step builder utilities\n", theme.IconSuccess)
+	fmt.Printf("  %s Automatic cleanup\n", theme.IconSuccess)
+
+	fmt.Printf("\n%s Ready for:\n", theme.IconBuild)
+	fmt.Printf("  %s Converting existing bash test scripts\n", theme.IconBullet)
+	fmt.Printf("  %s Building complex multi-step scenarios\n", theme.IconBullet)
+	fmt.Printf("  %s Interactive debugging mode\n", theme.IconBullet)
+	fmt.Printf("  %s CI integration and reporting\n", theme.IconBullet)
 }

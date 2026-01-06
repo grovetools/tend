@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mattsolo1/grove-core/tui/theme"
 	"github.com/mattsolo1/grove-tend/pkg/command"
 	"github.com/mattsolo1/grove-tend/pkg/harness"
 	"github.com/mattsolo1/grove-tend/pkg/harness/reporters"
@@ -227,7 +228,7 @@ func ParallelRunAllPassingScenario() *harness.Scenario {
 				}
 
 				// Wait for all tests to complete by checking for the success checkmarks
-				if err := session.WaitForText("✅", 30*time.Second); err != nil {
+				if err := session.WaitForText(theme.IconSuccess, 30*time.Second); err != nil {
 					content, _ := session.Capture()
 					return fmt.Errorf("parallel runner did not show completed tests: %w\nContent:\n%s", err, content)
 				}
@@ -248,7 +249,7 @@ func ParallelRunAllPassingScenario() *harness.Scenario {
 				// Count the number of checkmarks to verify all tests completed
 				successCount := 0
 				for _, line := range strings.Split(content, "\n") {
-					if strings.Contains(line, "✅") {
+					if strings.Contains(line, theme.IconSuccess) {
 						successCount++
 					}
 				}
@@ -322,7 +323,7 @@ func ParallelRunWithFailuresScenario() *harness.Scenario {
 				}
 
 				// Wait for completion by checking for test completion markers
-				if err := session.WaitForText("✅", 30*time.Second); err != nil {
+				if err := session.WaitForText(theme.IconSuccess, 30*time.Second); err != nil {
 					content, _ := session.Capture()
 					return fmt.Errorf("parallel runner did not show completed tests: %w\nContent:\n%s", err, content)
 				}
@@ -344,10 +345,10 @@ func ParallelRunWithFailuresScenario() *harness.Scenario {
 				successCount := 0
 				failCount := 0
 				for _, line := range strings.Split(content, "\n") {
-					if strings.Contains(line, "✅") {
+					if strings.Contains(line, theme.IconSuccess) {
 						successCount++
 					}
-					if strings.Contains(line, "❌") {
+					if strings.Contains(line, theme.IconError) {
 						failCount++
 					}
 				}
@@ -443,7 +444,7 @@ func ParallelRunJobsFlagScenario() *harness.Scenario {
 				}
 
 				// Wait for completion by checking for test completion markers
-				if err := session.WaitForText("✅", 15*time.Second); err != nil {
+				if err := session.WaitForText(theme.IconSuccess, 15*time.Second); err != nil {
 					content, _ := session.Capture()
 					return fmt.Errorf("parallel runner did not show completed tests: %w\nContent:\n%s", err, content)
 				}
@@ -484,7 +485,7 @@ func ParallelRunJobsFlagScenario() *harness.Scenario {
 				}
 
 				// Wait for completion by checking for test completion markers
-				if err := session.WaitForText("✅", 10*time.Second); err != nil {
+				if err := session.WaitForText(theme.IconSuccess, 10*time.Second); err != nil {
 					content, _ := session.Capture()
 					return fmt.Errorf("parallel runner did not show completed tests: %w\nContent:\n%s", err, content)
 				}

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mattsolo1/grove-core/pkg/tmux"
+	"github.com/mattsolo1/grove-core/tui/theme"
 	"github.com/mattsolo1/grove-tend/pkg/command"
 	"github.com/mattsolo1/grove-tend/pkg/fs"
 	"github.com/mattsolo1/grove-tend/pkg/project"
@@ -524,7 +525,7 @@ func (h *Harness) RunAll(ctx context.Context, scenarios []*Scenario) ([]*Result,
 	results := make([]*Result, 0, len(scenarios))
 	ui := NewUI(h.opts.Interactive, h.opts.Verbose || h.opts.VeryVerbose, h.opts.VeryVerbose)
 
-	fmt.Printf("\n🚀 Running %d scenarios\n", len(scenarios))
+	fmt.Printf("\n%s Running %d scenarios\n", theme.IconDebugStart, len(scenarios))
 	fmt.Println(strings.Repeat("=", 60))
 
 	for i, scenario := range scenarios {
@@ -558,11 +559,11 @@ func (h *Harness) RunAll(ctx context.Context, scenarios []*Scenario) ([]*Result,
 
 	fmt.Println(strings.Repeat("=", 60))
 	if failed == 0 {
-		fmt.Printf("✅ All %d scenarios passed!\n", len(results))
+		fmt.Printf("%s All %d scenarios passed!\n", theme.IconSuccess, len(results))
 	} else {
-		fmt.Printf("❌ %d/%d scenarios failed\n", failed, len(results))
-		fmt.Printf("✓ Passed: %d\n", passed)
-		fmt.Printf("✗ Failed: %d\n", failed)
+		fmt.Printf("%s %d/%d scenarios failed\n", theme.IconError, failed, len(results))
+		fmt.Printf("%s Passed: %d\n", theme.IconSuccess, passed)
+		fmt.Printf("%s Failed: %d\n", theme.IconError, failed)
 	}
 
 	if failed > 0 {

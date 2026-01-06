@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mattsolo1/grove-core/tui/theme"
 	"github.com/mattsolo1/grove-tend/pkg/command"
 	"github.com/mattsolo1/grove-tend/pkg/harness"
 )
@@ -78,7 +79,7 @@ func ExplicitOnlyScenario() *harness.Scenario {
 		[]string{"integration", "expensive"},
 		[]harness.Step{
 			harness.NewStep("Simulate expensive operation", func(ctx *harness.Context) error {
-				fmt.Println("⚠️  Running explicit-only test...")
+				fmt.Printf("%s  Running explicit-only test...\n", theme.IconWarning)
 				time.Sleep(100 * time.Millisecond)
 				ctx.Set("expensive_operation_completed", true)
 				return nil

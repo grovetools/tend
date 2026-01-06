@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mattsolo1/grove-core/tui/theme"
 	"github.com/mattsolo1/grove-tend/pkg/fs"
 	"github.com/mattsolo1/grove-tend/pkg/harness"
 	"github.com/mattsolo1/grove-tend/pkg/tui"
@@ -311,11 +312,11 @@ func ExampleConditionalFlowsAndRecording() *harness.Scenario {
 				// Handle based on result
 				switch result {
 				case "✓ Success":
-					fmt.Println("   ✅ Operation completed successfully!")
+					fmt.Printf("   %s Operation completed successfully!\n", theme.IconSuccess)
 				case "✗ Failed":
-					fmt.Println("   ❌ Operation failed!")
+					fmt.Printf("   %s Operation failed!\n", theme.IconError)
 				case "⚠ Warning":
-					fmt.Println("   ⚠️  Operation completed with warnings")
+					fmt.Printf("   %s  Operation completed with warnings\n", theme.IconWarning)
 				}
 
 				return nil
@@ -351,7 +352,7 @@ func ExampleConditionalFlowsAndRecording() *harness.Scenario {
 				if err := session.TakeScreenshot(screenshotPath); err != nil {
 					return fmt.Errorf("failed to take screenshot: %w", err)
 				}
-				fmt.Printf("   📸 Screenshot saved to: %s\n", screenshotPath)
+				fmt.Printf("   %s Screenshot saved to: %s\n", theme.IconFile, screenshotPath)
 
 				// Stop recording
 				if err := session.StopRecording(); err != nil {
@@ -363,7 +364,7 @@ func ExampleConditionalFlowsAndRecording() *harness.Scenario {
 				fmt.Printf("   Key history: %v\n", history)
 
 				recordingPath := filepath.Join(ctx.RootDir, "session-recording")
-				fmt.Printf("   📊 Recording saved to:\n")
+				fmt.Printf("   %s Recording saved to:\n", theme.IconChart)
 				fmt.Printf("      - HTML: %s.html\n", recordingPath)
 				fmt.Printf("      - JSON: %s.json\n", recordingPath)
 

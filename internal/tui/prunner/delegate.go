@@ -36,14 +36,14 @@ func (d delegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
 
 	switch s.status {
 	case StatusPending:
-		statusIcon = theme.DefaultTheme.Muted.Render("⋯")
+		statusIcon = theme.DefaultTheme.Muted.Render(theme.IconPending)
 	case StatusRunning:
 		statusIcon = d.spinner.View()
 	case StatusSuccess:
-		statusIcon = theme.DefaultTheme.Success.Render("✅")
+		statusIcon = theme.DefaultTheme.Success.Render(theme.IconSuccess)
 		durationStr = theme.DefaultTheme.Muted.Render(fmt.Sprintf("(%v)", s.duration.Round(time.Millisecond)))
 	case StatusFailure:
-		statusIcon = theme.DefaultTheme.Error.Render("❌")
+		statusIcon = theme.DefaultTheme.Error.Render(theme.IconError)
 		durationStr = theme.DefaultTheme.Muted.Render(fmt.Sprintf("(%v)", s.duration.Round(time.Millisecond)))
 	}
 
