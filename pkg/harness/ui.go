@@ -2,7 +2,6 @@ package harness
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -46,7 +45,6 @@ func NewUI(interactive, verbose, veryVerbose bool) *UI {
 
 // ScenarioStart displays the start of a scenario
 func (ui *UI) ScenarioStart(name, description string) {
-	ctx := context.Background()
 	prettyMsg := fmt.Sprintf("\n%s Scenario: %s", theme.IconTestTube, name)
 	if description != "" {
 		prettyMsg += fmt.Sprintf("\n   %s", description)
@@ -57,22 +55,20 @@ func (ui *UI) ScenarioStart(name, description string) {
 		Field("name", name).
 		Field("description", description).
 		Pretty(prettyMsg).
-		Log(ctx)
+		Emit()
 }
 
 // ScenarioSuccess displays scenario completion
 func (ui *UI) ScenarioSuccess(name string, duration time.Duration) {
-	ctx := context.Background()
 	ulog.Success("Scenario completed").
 		Field("name", name).
 		Field("duration", duration).
 		Pretty(strings.Repeat("-", 60) + fmt.Sprintf("\n%s Scenario completed successfully in %v\n", theme.IconSuccess, duration)).
-		Log(ctx)
+		Emit()
 }
 
 // ScenarioFailed displays scenario failure
 func (ui *UI) ScenarioFailed(name string, err error) {
-	ctx := context.Background()
 	prettyMsg := strings.Repeat("-", 60) + fmt.Sprintf("\n%s Scenario failed: %s", theme.IconError, name)
 	if err != nil {
 		prettyMsg += fmt.Sprintf("\nError: %v\n", err)
@@ -82,12 +78,11 @@ func (ui *UI) ScenarioFailed(name string, err error) {
 		Field("name", name).
 		Err(err).
 		Pretty(prettyMsg).
-		Log(ctx)
+		Emit()
 }
 
 // PhaseStart displays the start of a test phase (e.g., Setup, Test, Teardown).
 func (ui *UI) PhaseStart(name string) {
-	ctx := context.Background()
 	style := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("6")). // Cyan
@@ -97,24 +92,22 @@ func (ui *UI) PhaseStart(name string) {
 	ulog.Info("Phase started").
 		Field("phase", name).
 		Pretty(style.Render(fmt.Sprintf("--- %s Phase ---", name))).
-		Log(ctx)
+		Emit()
 }
 
 // StepStart displays the start of a step
 func (ui *UI) StepStart(current, total int, name string) {
-	ctx := context.Background()
 	ulog.Progress("Step started").
 		Field("current", current).
 		Field("total", total).
 		Field("name", name).
 		Pretty(fmt.Sprintf("\n[%d/%d] %s", current, total, name)).
-		Log(ctx)
+		Emit()
 }
 
 // StepSuccess displays step completion
 func (ui *UI) StepSuccess(stepResult StepResult) {
 	if ui.verbose {
-		ctx := context.Background()
 		prettyMsg := fmt.Sprintf("%s %s (Completed in %v)", theme.IconSuccess, stepResult.Name, stepResult.Duration)
 		// Print successful assertions
 		for _, assertion := range stepResult.Assertions {
@@ -128,13 +121,12 @@ func (ui *UI) StepSuccess(stepResult StepResult) {
 			Field("duration", stepResult.Duration).
 			Field("assertions_count", len(stepResult.Assertions)).
 			Pretty(prettyMsg).
-			Log(ctx)
+			Emit()
 	}
 }
 
 // StepFailed displays step failure
 func (ui *UI) StepFailed(stepResult StepResult) {
-	ctx := context.Background()
 	prettyMsg := fmt.Sprintf("%s %s (Failed after %v)", theme.IconError, stepResult.Name, stepResult.Duration)
 
 	// Print successful assertions before the failure
@@ -154,7 +146,7 @@ func (ui *UI) StepFailed(stepResult StepResult) {
 		Field("duration", stepResult.Duration).
 		Err(stepResult.Error).
 		Pretty(prettyMsg).
-		Log(ctx)
+		Emit()
 }
 
 // WaitForUser prompts the user to continue
@@ -164,11 +156,10 @@ func (ui *UI) WaitForUser() string {
 		return "continue"
 	}
 
-	ctx := context.Background()
 	ulog.Info("Waiting for user input").
 		Pretty(theme.IconSelect + " Press ENTER to continue, 'a' to attach, 'q' to quit: ").
 		PrettyOnly().
-		Log(ctx)
+		Emit()
 
 	input, err := ui.reader.ReadString('\n')
 	if err != nil {
@@ -189,21 +180,19 @@ func (ui *UI) WaitForUser() string {
 // RenderTUICapture displays the captured content of a TUI session
 func (ui *UI) RenderTUICapture(content string) {
 	if ui.verbose {
-		ctx := context.Background()
 		ulog.Info("TUI capture").
 			Pretty(content).
 			PrettyOnly().
-			Log(ctx)
+			Emit()
 	}
 }
 
 // Cleanup displays cleanup message
 func (ui *UI) Cleanup() {
 	if ui.verbose {
-		ctx := context.Background()
 		ulog.Info("Cleaning up").
 			Pretty(theme.IconFolderRemove + " Cleaning up temporary files...").
-			Log(ctx)
+			Emit()
 	}
 }
 
@@ -313,7 +302,6 @@ func (ui *UI) handleContainerUpdate(containers []ContainerInfo) {
 
 // printDockerTable prints the Docker container table inline
 func (ui *UI) printDockerTable(containers []ContainerInfo) {
-	ctx := context.Background()
 	prettyMsg := fmt.Sprintf("\n%s Docker Container Update:\n", theme.IconSync)
 
 	if len(containers) == 0 {
@@ -356,12 +344,11 @@ func (ui *UI) printDockerTable(containers []ContainerInfo) {
 	ulog.Info("Docker container update").
 		Field("container_count", len(containers)).
 		Pretty(prettyMsg).
-		Log(ctx)
+		Emit()
 }
 
 // ShowDockerStatus displays current Docker container status
 func (ui *UI) ShowDockerStatus() {
-	ctx := context.Background()
 	containers, err := GetContainerSnapshot("name=grove")
 	if err != nil {
 		return
@@ -384,12 +371,11 @@ func (ui *UI) ShowDockerStatus() {
 	ulog.Info("Docker status").
 		Field("container_count", len(containers)).
 		Pretty(prettyMsg).
-		Log(ctx)
+		Emit()
 }
 
 // Info displays an info message
 func (ui *UI) Info(title, message string) {
-	ctx := context.Background()
 	prettyMsg := theme.IconInfo + " " + title
 	if message != "" {
 		prettyMsg += ": " + message
@@ -398,12 +384,11 @@ func (ui *UI) Info(title, message string) {
 	ulog.Info(title).
 		Field("message", message).
 		Pretty(prettyMsg).
-		Log(ctx)
+		Emit()
 }
 
 // Error displays an error message
 func (ui *UI) Error(title string, err error) {
-	ctx := context.Background()
 	prettyMsg := theme.IconError + " " + title
 	if err != nil {
 		prettyMsg += fmt.Sprintf(": %v", err)
@@ -412,7 +397,7 @@ func (ui *UI) Error(title string, err error) {
 	ulog.Error(title).
 		Err(err).
 		Pretty(prettyMsg).
-		Log(ctx)
+		Emit()
 }
 
 // CommandOutput displays command output in verbose mode, mimicking terminal experience
@@ -426,7 +411,6 @@ func (ui *UI) CommandOutput(command, stdout, stderr string) {
 		return
 	}
 
-	ctx := context.Background()
 
 	// ANSI color codes
 	cyan := "\033[36m"    // Cyan for box borders
@@ -475,5 +459,5 @@ func (ui *UI) CommandOutput(command, stdout, stderr string) {
 		Field("has_stdout", stdout != "").
 		Field("has_stderr", stderr != "").
 		Pretty(prettyMsg).
-		Log(ctx)
+		Emit()
 }

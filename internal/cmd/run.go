@@ -545,7 +545,6 @@ func printParallelFailureDetails(states []*prunner.ScenarioState) {
 		return
 	}
 
-	ctx := context.Background()
 	prettyMsg := "\n" + strings.Repeat("=", 80) + "\n"
 	prettyMsg += fmt.Sprintf("%s Test run failed: %d/%d scenarios failed\n", theme.IconError, len(failedScenarios), len(states))
 	prettyMsg += strings.Repeat("=", 80)
@@ -554,7 +553,7 @@ func printParallelFailureDetails(states []*prunner.ScenarioState) {
 		Field("failed_count", len(failedScenarios)).
 		Field("total_count", len(states)).
 		Pretty(prettyMsg).
-		Log(ctx)
+		Emit()
 
 	for _, s := range failedScenarios {
 		prettyMsg := fmt.Sprintf("\n%s %s (failed in %v)\n%s",
@@ -570,7 +569,7 @@ func printParallelFailureDetails(states []*prunner.ScenarioState) {
 			Field("scenario", s.Scenario().Name).
 			Field("duration", s.Duration()).
 			Pretty(prettyMsg).
-			Log(ctx)
+			Emit()
 	}
 }
 
@@ -662,11 +661,10 @@ func filterScenarios(scenarios []*harness.Scenario, names []string, tags []strin
 }
 
 func renderFinalSummary(renderer *ui.Renderer, results []*harness.Result, success, total int) {
-	ctx := context.Background()
 	ulogRun.Info("Final summary separator").
 		Pretty("").
 		PrettyOnly().
-		Log(ctx)
+		Emit()
 
 	if success == total {
 		renderer.RenderSuccess(fmt.Sprintf("All %d scenario(s) passed!", total))
@@ -678,7 +676,7 @@ func renderFinalSummary(renderer *ui.Renderer, results []*harness.Result, succes
 	ulogRun.Info("Results table separator").
 		Pretty("").
 		PrettyOnly().
-		Log(ctx)
+		Emit()
 	
 	// Build table data
 	headers := []string{"STATUS", "SCENARIO", "DURATION", "DETAILS"}
@@ -734,7 +732,7 @@ func renderFinalSummary(renderer *ui.Renderer, results []*harness.Result, succes
 		Field("total_count", total).
 		Pretty(t.String()).
 		PrettyOnly().
-		Log(ctx)
+		Emit()
 }
 
 // writeReports writes test results in various formats

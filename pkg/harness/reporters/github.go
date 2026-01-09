@@ -1,7 +1,6 @@
 package reporters
 
 import (
-	"context"
 	grovelogging "github.com/mattsolo1/grove-core/logging"
 	"fmt"
 	"io"
@@ -134,5 +133,5 @@ func EmitGroupStart(name string) {
 
 // EmitGroupEnd emits a group end marker
 func EmitGroupEnd() {
- ulog.Info("::endgroup::").Pretty("::endgroup::").PrettyOnly().Log(context.Background())
+ ulog.Info("::endgroup::").Pretty("::endgroup::").PrettyOnly().Emit()
 }

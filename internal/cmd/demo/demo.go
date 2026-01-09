@@ -18,10 +18,9 @@ import (
 var ulog = grovelogging.NewUnifiedLogger("grove-tend.cmd.demo")
 
 func main() {
-	ctx := context.Background()
 	ulog.Info("Grove Tend Framework Demo").
 		Pretty(theme.IconDebugStart + " Grove Tend Framework Demo\n" + "=" + string(make([]rune, 50))).
-		Log(ctx)
+		Emit()
 
 	// Create a sample scenario that demonstrates the framework capabilities
 	scenario := harness.NewScenario(
@@ -96,7 +95,7 @@ func newFeature() {
 				ulog.Info("Directory listing completed").
 					Field("line_count", lineCount).
 					Pretty(fmt.Sprintf("Directory listing shows %d lines of output", lineCount)).
-					Log(context.Background())
+					Emit()
 				return nil
 			}),
 
@@ -126,14 +125,14 @@ func newFeature() {
 				ulog.Success("Repository validation passed").
 					Field("branch", branch).
 					Pretty(theme.IconSuccess + fmt.Sprintf(" Repository is on branch '%s' with clean state", branch)).
-					Log(context.Background())
+					Emit()
 				return nil
 			}),
 
 			harness.NewStep("Demonstrate assertion styles", func(ctx *harness.Context) error {
 				ulog.Info("Demonstrating assertion styles").
 					Pretty(theme.IconSuccess + " Demonstrating hard (fail-fast) and soft (collecting) assertions.").
-					Log(context.Background())
+					Emit()
 
 				// Example of a successful hard assertion
 				if err := ctx.Check("repository has a clean state", func() error {
@@ -163,7 +162,7 @@ func newFeature() {
 					ulog.Info("Collected assertion failures").
 						Err(err).
 						Pretty(fmt.Sprintf("\nCollected assertion failures (as expected for demo):\n%v", err)).
-						Log(context.Background())
+						Emit()
 					// In a real test, you would 'return err' here.
 					// We return nil so the demo scenario can continue and pass.
 					return nil
@@ -182,7 +181,7 @@ func newFeature() {
 					func(ctx *harness.Context) error {
 						ulog.Success("Conditional step executed").
 							Pretty(theme.IconSuccess + " Conditional step executed successfully").
-							Log(context.Background())
+							Emit()
 						return nil
 					})
 
@@ -200,7 +199,7 @@ func newFeature() {
 					ulog.Success("Retry step succeeded").
 						Field("attempt", retryCounter).
 						Pretty(theme.IconSuccess + fmt.Sprintf(" Retry step succeeded on attempt %d", retryCounter)).
-						Log(context.Background())
+						Emit()
 					return nil
 				})
 
@@ -226,7 +225,7 @@ func newFeature() {
 		Field("steps_executed", len(result.StepResults)).
 		Pretty(fmt.Sprintf("\n%s Demo completed successfully!\n   Duration: %v\n   Steps executed: %d",
 			theme.IconStatusCompleted, result.Duration, len(result.StepResults))).
-		Log(ctx)
+		Emit()
 
 	// Show capabilities summary
 	capabilitiesSummary := fmt.Sprintf(`
@@ -258,5 +257,5 @@ func newFeature() {
 	ulog.Info("Framework capabilities summary").
 		Pretty(capabilitiesSummary).
 		PrettyOnly().
-		Log(ctx)
+		Emit()
 }

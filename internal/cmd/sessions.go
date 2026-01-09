@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	grovelogging "github.com/mattsolo1/grove-core/logging"
 	"fmt"
 	"os"
@@ -69,7 +68,7 @@ func newSessionsListCmd() *cobra.Command {
 				return err
 			}
 			if len(sessionNames) == 0 {
-    ulogSessions.Info("No active tend sessions found.").Pretty("No active tend sessions found.").PrettyOnly().Log(context.Background())
+    ulogSessions.Info("No active tend sessions found.").Pretty("No active tend sessions found.").PrettyOnly().Emit()
 				return nil
 			}
 			for _, name := range sessionNames {
@@ -99,7 +98,7 @@ func newSessionsKillCmd() *cobra.Command {
 					return err
 				}
 				if len(sessionsToKill) == 0 {
-     ulogSessions.Info("No active tend sessions to kill.").Pretty("No active tend sessions to kill.").PrettyOnly().Log(context.Background())
+     ulogSessions.Info("No active tend sessions to kill.").Pretty("No active tend sessions to kill.").PrettyOnly().Emit()
 					return nil
 				}
 			} else {

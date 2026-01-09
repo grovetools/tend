@@ -531,7 +531,7 @@ func (h *Harness) RunAll(ctx context.Context, scenarios []*Scenario) ([]*Result,
 	ulogHarness.Info("Starting scenario batch").
 		Field("count", len(scenarios)).
 		Pretty(fmt.Sprintf("\n%s Running %d scenarios\n%s", theme.IconDebugStart, len(scenarios), strings.Repeat("=", 60))).
-		Log(ctx)
+		Emit()
 
 	for i, scenario := range scenarios {
 		select {
@@ -545,7 +545,7 @@ func (h *Harness) RunAll(ctx context.Context, scenarios []*Scenario) ([]*Result,
 			Field("total", len(scenarios)).
 			Field("name", scenario.Name).
 			Pretty(fmt.Sprintf("\n[%d/%d] Running %s...", i+1, len(scenarios), scenario.Name)).
-			Log(ctx)
+			Emit()
 
 		result, err := h.Run(ctx, scenario)
 		results = append(results, result)
@@ -573,7 +573,7 @@ func (h *Harness) RunAll(ctx context.Context, scenarios []*Scenario) ([]*Result,
 		ulogHarness.Success("All scenarios passed").
 			Field("total", len(results)).
 			Pretty(prettyMsg).
-			Log(ctx)
+			Emit()
 	} else {
 		prettyMsg += fmt.Sprintf("%s %d/%d scenarios failed\n", theme.IconError, failed, len(results))
 		prettyMsg += fmt.Sprintf("%s Passed: %d\n", theme.IconSuccess, passed)
@@ -583,7 +583,7 @@ func (h *Harness) RunAll(ctx context.Context, scenarios []*Scenario) ([]*Result,
 			Field("failed", failed).
 			Field("total", len(results)).
 			Pretty(prettyMsg).
-			Log(ctx)
+			Emit()
 	}
 
 	if failed > 0 {

@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -143,19 +142,18 @@ func runEcosystemTestsSequential(testSuites map[string]string) ([]*testResult, e
 			duration := time.Since(startTime)
 
 			success := result.ExitCode == 0
-			ctx := context.Background()
 			if !success {
 				ulog.Error("Test failed").
 					Field("project", projectName).
 					Field("duration", duration).
 					Pretty(theme.IconError + " " + theme.DefaultTheme.Error.Render(projectName)).
-					Log(ctx)
+					Emit()
 			} else {
 				ulog.Success("Test passed").
 					Field("project", projectName).
 					Field("duration", duration).
 					Pretty(theme.IconSuccess + " " + theme.DefaultTheme.Success.Render(projectName)).
-					Log(ctx)
+					Emit()
 			}
 			resultsChan <- testResult{
 				ProjectName: projectName,
@@ -289,23 +287,21 @@ func aggregateAndDisplayResults(results []*testResult) error {
 
 		data, err := os.ReadFile(res.ReportPath)
 		if err != nil {
-			ctx := context.Background()
 			ulog.Warn("Could not read report").
 				Field("project", res.ProjectName).
 				Err(err).
 				Pretty(fmt.Sprintf("Warning: could not read report for %s: %v", res.ProjectName, err)).
-				Log(ctx)
+				Emit()
 			continue
 		}
 
 		var report reporters.JSONReport
 		if err := json.Unmarshal(data, &report); err != nil {
-			ctx := context.Background()
 			ulog.Warn("Could not parse report").
 				Field("project", res.ProjectName).
 				Err(err).
 				Pretty(fmt.Sprintf("Warning: could not parse report for %s: %v", res.ProjectName, err)).
-				Log(ctx)
+				Emit()
 			continue
 		}
 		// Add project name to the report for context
@@ -315,11 +311,10 @@ func aggregateAndDisplayResults(results []*testResult) error {
 		allReports = append(allReports, report)
 	}
 
-	ctx := context.Background()
 	ulog.Info("Ecosystem test summary").
 		Pretty("\n--- Ecosystem Test Summary ---").
 		PrettyOnly().
-		Log(ctx)
+		Emit()
 
 	tbl := table.NewStyledTable().Headers("Project", "Status", "Duration", "Passed", "Failed")
 
@@ -371,26 +366,26 @@ func aggregateAndDisplayResults(results []*testResult) error {
 	ulog.Info("Test results table").
 		Pretty(tbl.String()).
 		PrettyOnly().
-		Log(ctx)
+		Emit()
 
 	if len(failedProjects) > 0 {
 		ulog.Info("Failure details").
 			Pretty("\n" + theme.DefaultTheme.Title.Render("Failure Details")).
 			PrettyOnly().
-			Log(ctx)
+			Emit()
 
 		for i, proj := range failedProjects {
 			if i > 0 {
 				ulog.Info("Failure details separator").
 					Pretty("").
 					PrettyOnly().
-					Log(ctx)
+					Emit()
 			}
 
 			ulog.Error("Failed project").
 				Field("project", proj.ProjectName).
 				Pretty(theme.DefaultTheme.Error.Render(theme.IconError) + " " + theme.DefaultTheme.Title.Render(proj.ProjectName)).
-				Log(ctx)
+				Emit()
 			var reportForProject *reporters.JSONReport
 			for _, r := range allReports {
 				if len(r.Results) > 0 && r.Results[0].Name == proj.ProjectName {
@@ -408,7 +403,7 @@ func aggregateAndDisplayResults(results []*testResult) error {
 							ulog.Info("Failed scenario separator").
 								Pretty("").
 								PrettyOnly().
-								Log(ctx)
+								Emit()
 						}
 						prettyMsg := fmt.Sprintf("   %s %s\n   %s %s",
 							theme.DefaultTheme.Muted.Render("Scenario:"), res.Name,
@@ -425,14 +420,14 @@ func aggregateAndDisplayResults(results []*testResult) error {
 							Field("scenario", res.Name).
 							Field("failed_step", res.FailedStep).
 							Pretty(prettyMsg).
-							Log(ctx)
+							Emit()
 					}
 				}
 				if failedScenarios == 0 {
 					ulog.Info("No scenario details").
 						Pretty("   " + theme.DefaultTheme.Muted.Render("Build/test runner failed (no detailed failure info available)")).
 						PrettyOnly().
-						Log(ctx)
+						Emit()
 				}
 			} else if proj.Error != nil {
 				// Clean up error message - only show first line
@@ -443,14 +438,14 @@ func aggregateAndDisplayResults(results []*testResult) error {
 						Err(proj.Error).
 						Pretty(fmt.Sprintf("   %s %s",
 							theme.DefaultTheme.Muted.Render("Error:"), errLines[0])).
-						Log(ctx)
+						Emit()
 				}
 			}
 		}
 		ulog.Info("Failure details end").
 			Pretty("").
 			PrettyOnly().
-			Log(ctx)
+			Emit()
 	}
 
 	return nil
@@ -461,7 +456,6 @@ func printEcosystemFailureDetails(states []*e_runner.ProjectState) {
 		return
 	}
 
-	ctx := context.Background()
 	prettyMsg := "\n" + strings.Repeat("=", 80) + "\n"
 	prettyMsg += fmt.Sprintf("%s Test run failed: %d projects failed\n", theme.IconError, len(states))
 	prettyMsg += strings.Repeat("=", 80)
@@ -469,7 +463,7 @@ func printEcosystemFailureDetails(states []*e_runner.ProjectState) {
 	ulog.Error("Ecosystem test run failed").
 		Field("failed_count", len(states)).
 		Pretty(prettyMsg).
-		Log(ctx)
+		Emit()
 
 	for _, s := range states {
 		prettyMsg := fmt.Sprintf("\n%s %s (failed in %v)\n%s",
@@ -485,6 +479,6 @@ func printEcosystemFailureDetails(states []*e_runner.ProjectState) {
 			Field("project", s.Title()).
 			Field("duration", s.Duration()).
 			Pretty(prettyMsg).
-			Log(ctx)
+			Emit()
 	}
 }

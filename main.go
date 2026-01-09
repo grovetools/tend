@@ -60,7 +60,7 @@ func main() {
 
 	go func() {
 		<-sigChan
-  ulog.Info("\nReceived interrupt signal, shutting down...").Pretty("\nReceived interrupt signal, shutting down...").PrettyOnly().Log(context.Background())
+  ulog.Info("\nReceived interrupt signal, shutting down...").Pretty("\nReceived interrupt signal, shutting down...").PrettyOnly().Emit()
 		cancel()
 	}()
 

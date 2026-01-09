@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
@@ -63,11 +62,10 @@ func listScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sc
 	}
 	
 	// Display header
-	ctx := context.Background()
 	ulogList.Info("Listing scenarios").
 		Field("count", len(filteredScenarios)).
 		Pretty(fmt.Sprintf("Available scenarios (%d):\n", len(filteredScenarios))).
-		Log(ctx)
+		Emit()
 	
 	// Build table data
 	headers := []string{"NAME", "DESCRIPTION", "LOCAL", "EXPLICIT", "TAGS", "STEPS"}
@@ -137,14 +135,14 @@ func listScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sc
 	ulogList.Info("Scenario list table").
 		Pretty(t.String()).
 		PrettyOnly().
-		Log(ctx)
+		Emit()
 
 	// If verbose, show detailed step information for each scenario
 	if verbose {
 		ulogList.Info("Detailed scenario information").
 			Pretty("\nDetailed scenario information:").
 			PrettyOnly().
-			Log(ctx)
+			Emit()
 		for _, scenario := range filteredScenarios {
 			displayScenarioDetails(renderer, scenario)
 		}
@@ -154,7 +152,6 @@ func listScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sc
 }
 
 func displayScenarioDetails(renderer *ui.Renderer, scenario *harness.Scenario) {
-	ctx := context.Background()
 
 	// Scenario name and description
 	prettyMsg := fmt.Sprintf("\n%s %s",
@@ -194,7 +191,7 @@ func displayScenarioDetails(renderer *ui.Renderer, scenario *harness.Scenario) {
 		Field("name", scenario.Name).
 		Field("steps_count", len(scenario.Steps)).
 		Pretty(prettyMsg).
-		Log(ctx)
+		Emit()
 
 	// If verbose, show step details
 	if verbose {

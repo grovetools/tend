@@ -1,7 +1,6 @@
 package harness
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"time"
@@ -71,7 +70,7 @@ func SetupCIEnvironment() {
 	switch provider {
 	case CIProviderGitHubActions:
 		// GitHub Actions specific setup
-  ulog.Info("::notice::Grove Tend tests starting").Pretty("::notice::Grove Tend tests starting").PrettyOnly().Log(context.Background())
+  ulog.Info("::notice::Grove Tend tests starting").Pretty("::notice::Grove Tend tests starting").PrettyOnly().Emit()
 
 	case CIProviderJenkins:
 		// Jenkins specific setup
