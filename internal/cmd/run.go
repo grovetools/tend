@@ -11,6 +11,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
+	grovelogging "github.com/mattsolo1/grove-core/logging"
 	"github.com/mattsolo1/grove-core/pkg/tmux"
 	"github.com/mattsolo1/grove-core/tui/theme"
 	"github.com/spf13/cobra"
@@ -21,6 +22,8 @@ import (
 	"github.com/mattsolo1/grove-tend/internal/tui/prunner"
 	tea "github.com/charmbracelet/bubbletea"
 )
+
+var ulogRun = grovelogging.NewUnifiedLogger("grove-tend.cmd.run")
 
 var (
 	parallel            bool
@@ -542,19 +545,32 @@ func printParallelFailureDetails(states []*prunner.ScenarioState) {
 		return
 	}
 
-	fmt.Println()
-	fmt.Println(strings.Repeat("=", 80))
-	fmt.Printf("%s Test run failed: %d/%d scenarios failed\n", theme.IconError, len(failedScenarios), len(states))
-	fmt.Println(strings.Repeat("=", 80))
+	ctx := context.Background()
+	prettyMsg := "\n" + strings.Repeat("=", 80) + "\n"
+	prettyMsg += fmt.Sprintf("%s Test run failed: %d/%d scenarios failed\n", theme.IconError, len(failedScenarios), len(states))
+	prettyMsg += strings.Repeat("=", 80)
+
+	ulogRun.Error("Test run failed").
+		Field("failed_count", len(failedScenarios)).
+		Field("total_count", len(states)).
+		Pretty(prettyMsg).
+		Log(ctx)
 
 	for _, s := range failedScenarios {
-		fmt.Println()
-		fmt.Printf("%s %s (failed in %v)\n", theme.IconError, s.Scenario().Name, s.Duration().Round(time.Millisecond))
-		fmt.Println(strings.Repeat("-", 80))
+		prettyMsg := fmt.Sprintf("\n%s %s (failed in %v)\n%s",
+			theme.IconError, s.Scenario().Name, s.Duration().Round(time.Millisecond),
+			strings.Repeat("-", 80))
+
 		if s.Output() != "" {
 			// Trim leading/trailing whitespace from output for cleaner presentation
-			fmt.Println(strings.TrimSpace(s.Output()))
+			prettyMsg += "\n" + strings.TrimSpace(s.Output())
 		}
+
+		ulogRun.Error("Scenario failed").
+			Field("scenario", s.Scenario().Name).
+			Field("duration", s.Duration()).
+			Pretty(prettyMsg).
+			Log(ctx)
 	}
 }
 
@@ -646,16 +662,23 @@ func filterScenarios(scenarios []*harness.Scenario, names []string, tags []strin
 }
 
 func renderFinalSummary(renderer *ui.Renderer, results []*harness.Result, success, total int) {
-	fmt.Println()
-	
+	ctx := context.Background()
+	ulogRun.Info("Final summary separator").
+		Pretty("").
+		PrettyOnly().
+		Log(ctx)
+
 	if success == total {
 		renderer.RenderSuccess(fmt.Sprintf("All %d scenario(s) passed!", total))
 	} else {
 		renderer.RenderError(fmt.Errorf("%d of %d scenario(s) failed", total-success, total))
 	}
-	
+
 	// Create results table
-	fmt.Println()
+	ulogRun.Info("Results table separator").
+		Pretty("").
+		PrettyOnly().
+		Log(ctx)
 	
 	// Build table data
 	headers := []string{"STATUS", "SCENARIO", "DURATION", "DETAILS"}
@@ -705,8 +728,13 @@ func renderFinalSummary(renderer *ui.Renderer, results []*harness.Result, succes
 		// Apply base style to all cells
 		return baseStyle
 	})
-	
-	fmt.Println(t)
+
+	ulogRun.Info("Test results").
+		Field("success_count", success).
+		Field("total_count", total).
+		Pretty(t.String()).
+		PrettyOnly().
+		Log(ctx)
 }
 
 // writeReports writes test results in various formats

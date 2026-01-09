@@ -2,6 +2,7 @@ package harness
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -9,8 +10,11 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	grovelogging "github.com/mattsolo1/grove-core/logging"
 	"github.com/mattsolo1/grove-core/tui/theme"
 )
+
+var ulog = grovelogging.NewUnifiedLogger("grove-tend.harness.ui")
 
 // UI handles all user interface output (basic implementation)
 type UI struct {
@@ -42,71 +46,115 @@ func NewUI(interactive, verbose, veryVerbose bool) *UI {
 
 // ScenarioStart displays the start of a scenario
 func (ui *UI) ScenarioStart(name, description string) {
-	fmt.Printf("\n%s Scenario: %s\n", theme.IconTestTube, name)
+	ctx := context.Background()
+	prettyMsg := fmt.Sprintf("\n%s Scenario: %s", theme.IconTestTube, name)
 	if description != "" {
-		fmt.Printf("   %s\n", description)
+		prettyMsg += fmt.Sprintf("\n   %s", description)
 	}
-	fmt.Println(strings.Repeat("-", 60))
+	prettyMsg += "\n" + strings.Repeat("-", 60)
+
+	ulog.Info("Scenario started").
+		Field("name", name).
+		Field("description", description).
+		Pretty(prettyMsg).
+		Log(ctx)
 }
 
 // ScenarioSuccess displays scenario completion
 func (ui *UI) ScenarioSuccess(name string, duration time.Duration) {
-	fmt.Println(strings.Repeat("-", 60))
-	fmt.Printf("%s Scenario completed successfully in %v\n\n", theme.IconSuccess, duration)
+	ctx := context.Background()
+	ulog.Success("Scenario completed").
+		Field("name", name).
+		Field("duration", duration).
+		Pretty(strings.Repeat("-", 60) + fmt.Sprintf("\n%s Scenario completed successfully in %v\n", theme.IconSuccess, duration)).
+		Log(ctx)
 }
 
 // ScenarioFailed displays scenario failure
 func (ui *UI) ScenarioFailed(name string, err error) {
-	fmt.Println(strings.Repeat("-", 60))
-	fmt.Printf("%s Scenario failed: %s\n", theme.IconError, name)
+	ctx := context.Background()
+	prettyMsg := strings.Repeat("-", 60) + fmt.Sprintf("\n%s Scenario failed: %s", theme.IconError, name)
 	if err != nil {
-		fmt.Printf("Error: %v\n\n", err)
+		prettyMsg += fmt.Sprintf("\nError: %v\n", err)
 	}
+
+	ulog.Error("Scenario failed").
+		Field("name", name).
+		Err(err).
+		Pretty(prettyMsg).
+		Log(ctx)
 }
 
 // PhaseStart displays the start of a test phase (e.g., Setup, Test, Teardown).
 func (ui *UI) PhaseStart(name string) {
+	ctx := context.Background()
 	style := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("6")). // Cyan
 		MarginTop(1).
 		MarginBottom(1)
-	fmt.Println(style.Render(fmt.Sprintf("--- %s Phase ---", name)))
+
+	ulog.Info("Phase started").
+		Field("phase", name).
+		Pretty(style.Render(fmt.Sprintf("--- %s Phase ---", name))).
+		Log(ctx)
 }
 
 // StepStart displays the start of a step
 func (ui *UI) StepStart(current, total int, name string) {
-	fmt.Printf("\n[%d/%d] %s\n", current, total, name)
+	ctx := context.Background()
+	ulog.Progress("Step started").
+		Field("current", current).
+		Field("total", total).
+		Field("name", name).
+		Pretty(fmt.Sprintf("\n[%d/%d] %s", current, total, name)).
+		Log(ctx)
 }
 
 // StepSuccess displays step completion
 func (ui *UI) StepSuccess(stepResult StepResult) {
 	if ui.verbose {
-		fmt.Printf("%s %s (Completed in %v)\n", theme.IconSuccess, stepResult.Name, stepResult.Duration)
+		ctx := context.Background()
+		prettyMsg := fmt.Sprintf("%s %s (Completed in %v)", theme.IconSuccess, stepResult.Name, stepResult.Duration)
 		// Print successful assertions
 		for _, assertion := range stepResult.Assertions {
 			if assertion.Success {
-				fmt.Printf("  %s %s\n", theme.IconSuccess, assertion.Description)
+				prettyMsg += fmt.Sprintf("\n  %s %s", theme.IconSuccess, assertion.Description)
 			}
 		}
+
+		ulog.Success("Step completed").
+			Field("name", stepResult.Name).
+			Field("duration", stepResult.Duration).
+			Field("assertions_count", len(stepResult.Assertions)).
+			Pretty(prettyMsg).
+			Log(ctx)
 	}
 }
 
 // StepFailed displays step failure
 func (ui *UI) StepFailed(stepResult StepResult) {
-	fmt.Printf("%s %s (Failed after %v)\n", theme.IconError, stepResult.Name, stepResult.Duration)
+	ctx := context.Background()
+	prettyMsg := fmt.Sprintf("%s %s (Failed after %v)", theme.IconError, stepResult.Name, stepResult.Duration)
 
 	// Print successful assertions before the failure
 	for _, assertion := range stepResult.Assertions {
 		if assertion.Success {
-			fmt.Printf("  %s %s\n", theme.IconSuccess, assertion.Description)
+			prettyMsg += fmt.Sprintf("\n  %s %s", theme.IconSuccess, assertion.Description)
 		}
 	}
 
 	// Print the failure details
 	if stepResult.Error != nil {
-		fmt.Printf("  Error: %v\n", stepResult.Error)
+		prettyMsg += fmt.Sprintf("\n  Error: %v", stepResult.Error)
 	}
+
+	ulog.Error("Step failed").
+		Field("name", stepResult.Name).
+		Field("duration", stepResult.Duration).
+		Err(stepResult.Error).
+		Pretty(prettyMsg).
+		Log(ctx)
 }
 
 // WaitForUser prompts the user to continue
@@ -116,7 +164,12 @@ func (ui *UI) WaitForUser() string {
 		return "continue"
 	}
 
-	fmt.Printf("%s Press ENTER to continue, 'a' to attach, 'q' to quit: ", theme.IconSelect)
+	ctx := context.Background()
+	ulog.Info("Waiting for user input").
+		Pretty(theme.IconSelect + " Press ENTER to continue, 'a' to attach, 'q' to quit: ").
+		PrettyOnly().
+		Log(ctx)
+
 	input, err := ui.reader.ReadString('\n')
 	if err != nil {
 		return "quit"
@@ -136,14 +189,21 @@ func (ui *UI) WaitForUser() string {
 // RenderTUICapture displays the captured content of a TUI session
 func (ui *UI) RenderTUICapture(content string) {
 	if ui.verbose {
-		fmt.Println(content)
+		ctx := context.Background()
+		ulog.Info("TUI capture").
+			Pretty(content).
+			PrettyOnly().
+			Log(ctx)
 	}
 }
 
 // Cleanup displays cleanup message
 func (ui *UI) Cleanup() {
 	if ui.verbose {
-		fmt.Printf("%s Cleaning up temporary files...\n", theme.IconFolderRemove)
+		ctx := context.Background()
+		ulog.Info("Cleaning up").
+			Pretty(theme.IconFolderRemove + " Cleaning up temporary files...").
+			Log(ctx)
 	}
 }
 
@@ -253,15 +313,16 @@ func (ui *UI) handleContainerUpdate(containers []ContainerInfo) {
 
 // printDockerTable prints the Docker container table inline
 func (ui *UI) printDockerTable(containers []ContainerInfo) {
-	fmt.Printf("\n%s Docker Container Update:\n", theme.IconSync)
-	
+	ctx := context.Background()
+	prettyMsg := fmt.Sprintf("\n%s Docker Container Update:\n", theme.IconSync)
+
 	if len(containers) == 0 {
-		fmt.Println("  No agent containers running")
+		prettyMsg += "  No agent containers running"
 	} else {
 		// Table header
-		fmt.Printf("  %-40s %-30s %-20s\n", "NAMES", "IMAGE", "CREATED")
-		fmt.Printf("  %s\n", strings.Repeat("-", 92))
-		
+		prettyMsg += fmt.Sprintf("  %-40s %-30s %-20s\n", "NAMES", "IMAGE", "CREATED")
+		prettyMsg += fmt.Sprintf("  %s\n", strings.Repeat("-", 92))
+
 		// Container rows
 		for _, c := range containers {
 			// Truncate long names
@@ -269,12 +330,12 @@ func (ui *UI) printDockerTable(containers []ContainerInfo) {
 			if len(name) > 40 {
 				name = name[:37] + "..."
 			}
-			
+
 			image := c.Image
 			if len(image) > 30 {
 				image = image[:27] + "..."
 			}
-			
+
 			// Format created time to be shorter
 			created := c.Created
 			if len(created) > 20 {
@@ -287,52 +348,71 @@ func (ui *UI) printDockerTable(containers []ContainerInfo) {
 			if len(created) > 20 {
 				created = created[:17] + "..."
 			}
-			
-			fmt.Printf("  %-40s %-30s %-20s\n", name, image, created)
+
+			prettyMsg += fmt.Sprintf("  %-40s %-30s %-20s\n", name, image, created)
 		}
 	}
-	fmt.Println()
+
+	ulog.Info("Docker container update").
+		Field("container_count", len(containers)).
+		Pretty(prettyMsg).
+		Log(ctx)
 }
 
 // ShowDockerStatus displays current Docker container status
 func (ui *UI) ShowDockerStatus() {
+	ctx := context.Background()
 	containers, err := GetContainerSnapshot("name=grove")
 	if err != nil {
 		return
 	}
-	
+
 	if len(containers) == 0 {
 		return
 	}
-	
-	fmt.Printf("\n%s Docker Containers (grove-related):\n", theme.IconFolder)
-	fmt.Printf("%-30s %-20s %s\n", "IMAGE", "CREATED", "NAMES")
-	fmt.Println(strings.Repeat("-", 70))
-	
+
+	prettyMsg := fmt.Sprintf("\n%s Docker Containers (grove-related):\n", theme.IconFolder)
+	prettyMsg += fmt.Sprintf("%-30s %-20s %s\n", "IMAGE", "CREATED", "NAMES")
+	prettyMsg += strings.Repeat("-", 70) + "\n"
+
 	for _, c := range containers {
 		if strings.Contains(c.Names, "grove") {
-			fmt.Printf("%-30s %-20s %s\n", c.Image, c.Created, c.Names)
+			prettyMsg += fmt.Sprintf("%-30s %-20s %s\n", c.Image, c.Created, c.Names)
 		}
 	}
-	fmt.Println()
+
+	ulog.Info("Docker status").
+		Field("container_count", len(containers)).
+		Pretty(prettyMsg).
+		Log(ctx)
 }
 
 // Info displays an info message
 func (ui *UI) Info(title, message string) {
-	fmt.Printf("%s %s", theme.IconInfo, title)
+	ctx := context.Background()
+	prettyMsg := theme.IconInfo + " " + title
 	if message != "" {
-		fmt.Printf(": %s", message)
+		prettyMsg += ": " + message
 	}
-	fmt.Println()
+
+	ulog.Info(title).
+		Field("message", message).
+		Pretty(prettyMsg).
+		Log(ctx)
 }
 
 // Error displays an error message
 func (ui *UI) Error(title string, err error) {
-	fmt.Printf("%s %s", theme.IconError, title)
+	ctx := context.Background()
+	prettyMsg := theme.IconError + " " + title
 	if err != nil {
-		fmt.Printf(": %v", err)
+		prettyMsg += fmt.Sprintf(": %v", err)
 	}
-	fmt.Println()
+
+	ulog.Error(title).
+		Err(err).
+		Pretty(prettyMsg).
+		Log(ctx)
 }
 
 // CommandOutput displays command output in verbose mode, mimicking terminal experience
@@ -340,51 +420,60 @@ func (ui *UI) CommandOutput(command, stdout, stderr string) {
 	if !ui.verbose {
 		return
 	}
-	
+
 	// Only show output if there's something to display
 	if stdout == "" && stderr == "" && !ui.veryVerbose {
 		return
 	}
-	
+
+	ctx := context.Background()
+
 	// ANSI color codes
 	cyan := "\033[36m"    // Cyan for box borders
 	green := "\033[32m"   // Green for command prompt
 	red := "\033[31m"     // Red for stderr
 	reset := "\033[0m"    // Reset colors
-	
+
 	// Terminal-like separator with colored borders
-	fmt.Printf("  %s┌─────────────────────────────────────────────%s\n", cyan, reset)
-	
+	prettyMsg := fmt.Sprintf("  %s┌─────────────────────────────────────────────%s\n", cyan, reset)
+
 	// Show command as if typed in terminal (only in very verbose mode)
 	if command != "" && ui.veryVerbose {
 		// Special handling for PATH logging to make it less noisy
 		if strings.HasPrefix(command, "PATH for") {
-			fmt.Printf("  %s│%s %sDebug:%s %s\n", cyan, reset, green, reset, command)
+			prettyMsg += fmt.Sprintf("  %s│%s %sDebug:%s %s\n", cyan, reset, green, reset, command)
 		} else {
-			fmt.Printf("  %s│%s %s$%s %s\n", cyan, reset, green, reset, command)
+			prettyMsg += fmt.Sprintf("  %s│%s %s$%s %s\n", cyan, reset, green, reset, command)
 		}
 	}
-	
+
 	// Show stdout exactly as user would see it
 	if stdout != "" {
 		lines := strings.Split(strings.TrimSuffix(stdout, "\n"), "\n")
 		for _, line := range lines {
 			// Special handling for PATH logging to make it less noisy
 			if strings.HasPrefix(command, "PATH for") {
-				fmt.Printf("  %s│%s   %s\n", cyan, reset, line)
+				prettyMsg += fmt.Sprintf("  %s│%s   %s\n", cyan, reset, line)
 			} else {
-				fmt.Printf("  %s│%s %s\n", cyan, reset, line)
+				prettyMsg += fmt.Sprintf("  %s│%s %s\n", cyan, reset, line)
 			}
 		}
 	}
-	
+
 	// Show stderr with different styling
 	if stderr != "" {
 		lines := strings.Split(strings.TrimSuffix(stderr, "\n"), "\n")
 		for _, line := range lines {
-			fmt.Printf("  %s│%s %s%s%s\n", cyan, reset, red, line, reset)
+			prettyMsg += fmt.Sprintf("  %s│%s %s%s%s\n", cyan, reset, red, line, reset)
 		}
 	}
-	
-	fmt.Printf("  %s└─────────────────────────────────────────────%s\n", cyan, reset)
+
+	prettyMsg += fmt.Sprintf("  %s└─────────────────────────────────────────────%s", cyan, reset)
+
+	ulog.Debug("Command output").
+		Field("command", command).
+		Field("has_stdout", stdout != "").
+		Field("has_stderr", stderr != "").
+		Pretty(prettyMsg).
+		Log(ctx)
 }

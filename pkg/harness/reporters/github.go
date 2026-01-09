@@ -1,6 +1,8 @@
 package reporters
 
 import (
+	"context"
+	grovelogging "github.com/mattsolo1/grove-core/logging"
 	"fmt"
 	"io"
 	"os"
@@ -9,6 +11,9 @@ import (
 	"github.com/mattsolo1/grove-core/tui/theme"
 	"github.com/mattsolo1/grove-tend/pkg/harness"
 )
+
+
+var ulog = grovelogging.NewUnifiedLogger("grove-tend.reporters/github")
 
 // GitHubReporter outputs GitHub Actions annotations
 type GitHubReporter struct {
@@ -129,5 +134,5 @@ func EmitGroupStart(name string) {
 
 // EmitGroupEnd emits a group end marker
 func EmitGroupEnd() {
-	fmt.Println("::endgroup::")
+ ulog.Info("::endgroup::").Pretty("::endgroup::").PrettyOnly().Log(context.Background())
 }

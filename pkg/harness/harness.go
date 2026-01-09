@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	grovelogging "github.com/mattsolo1/grove-core/logging"
 	"github.com/mattsolo1/grove-core/pkg/tmux"
 	"github.com/mattsolo1/grove-core/tui/theme"
 	"github.com/mattsolo1/grove-tend/pkg/command"
@@ -16,6 +17,8 @@ import (
 	"github.com/mattsolo1/grove-tend/pkg/project"
 	"github.com/mattsolo1/grove-tend/pkg/tui"
 )
+
+var ulogHarness = grovelogging.NewUnifiedLogger("grove-tend.harness")
 
 // Context carries state through a scenario execution
 type Context struct {
@@ -525,8 +528,10 @@ func (h *Harness) RunAll(ctx context.Context, scenarios []*Scenario) ([]*Result,
 	results := make([]*Result, 0, len(scenarios))
 	ui := NewUI(h.opts.Interactive, h.opts.Verbose || h.opts.VeryVerbose, h.opts.VeryVerbose)
 
-	fmt.Printf("\n%s Running %d scenarios\n", theme.IconDebugStart, len(scenarios))
-	fmt.Println(strings.Repeat("=", 60))
+	ulogHarness.Info("Starting scenario batch").
+		Field("count", len(scenarios)).
+		Pretty(fmt.Sprintf("\n%s Running %d scenarios\n%s", theme.IconDebugStart, len(scenarios), strings.Repeat("=", 60))).
+		Log(ctx)
 
 	for i, scenario := range scenarios {
 		select {
@@ -535,7 +540,12 @@ func (h *Harness) RunAll(ctx context.Context, scenarios []*Scenario) ([]*Result,
 		default:
 		}
 
-		fmt.Printf("\n[%d/%d] Running %s...\n", i+1, len(scenarios), scenario.Name)
+		ulogHarness.Progress("Running scenario").
+			Field("current", i+1).
+			Field("total", len(scenarios)).
+			Field("name", scenario.Name).
+			Pretty(fmt.Sprintf("\n[%d/%d] Running %s...", i+1, len(scenarios), scenario.Name)).
+			Log(ctx)
 
 		result, err := h.Run(ctx, scenario)
 		results = append(results, result)
@@ -557,13 +567,23 @@ func (h *Harness) RunAll(ctx context.Context, scenarios []*Scenario) ([]*Result,
 		}
 	}
 
-	fmt.Println(strings.Repeat("=", 60))
+	prettyMsg := strings.Repeat("=", 60) + "\n"
 	if failed == 0 {
-		fmt.Printf("%s All %d scenarios passed!\n", theme.IconSuccess, len(results))
+		prettyMsg += fmt.Sprintf("%s All %d scenarios passed!", theme.IconSuccess, len(results))
+		ulogHarness.Success("All scenarios passed").
+			Field("total", len(results)).
+			Pretty(prettyMsg).
+			Log(ctx)
 	} else {
-		fmt.Printf("%s %d/%d scenarios failed\n", theme.IconError, failed, len(results))
-		fmt.Printf("%s Passed: %d\n", theme.IconSuccess, passed)
-		fmt.Printf("%s Failed: %d\n", theme.IconError, failed)
+		prettyMsg += fmt.Sprintf("%s %d/%d scenarios failed\n", theme.IconError, failed, len(results))
+		prettyMsg += fmt.Sprintf("%s Passed: %d\n", theme.IconSuccess, passed)
+		prettyMsg += fmt.Sprintf("%s Failed: %d", theme.IconError, failed)
+		ulogHarness.Error("Some scenarios failed").
+			Field("passed", passed).
+			Field("failed", failed).
+			Field("total", len(results)).
+			Pretty(prettyMsg).
+			Log(ctx)
 	}
 
 	if failed > 0 {

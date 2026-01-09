@@ -6,6 +6,7 @@ import (
 	"log"
 	"strings"
 
+	grovelogging "github.com/mattsolo1/grove-core/logging"
 	"github.com/mattsolo1/grove-core/tui/theme"
 	"github.com/mattsolo1/grove-tend/pkg/command"
 	"github.com/mattsolo1/grove-tend/pkg/fs"
@@ -14,9 +15,13 @@ import (
 	"github.com/mattsolo1/grove-tend/pkg/verify"
 )
 
+var ulog = grovelogging.NewUnifiedLogger("grove-tend.cmd.demo")
+
 func main() {
-	fmt.Printf("%s Grove Tend Framework Demo\n", theme.IconDebugStart)
-	fmt.Println("=" + string(make([]rune, 50)))
+	ctx := context.Background()
+	ulog.Info("Grove Tend Framework Demo").
+		Pretty(theme.IconDebugStart + " Grove Tend Framework Demo\n" + "=" + string(make([]rune, 50))).
+		Log(ctx)
 
 	// Create a sample scenario that demonstrates the framework capabilities
 	scenario := harness.NewScenario(
@@ -87,7 +92,11 @@ func newFeature() {
 					return result.Error
 				}
 
-				fmt.Printf("Directory listing shows %d lines of output\n", len(strings.Split(result.Stdout, "\n")))
+				lineCount := len(strings.Split(result.Stdout, "\n"))
+				ulog.Info("Directory listing completed").
+					Field("line_count", lineCount).
+					Pretty(fmt.Sprintf("Directory listing shows %d lines of output", lineCount)).
+					Log(context.Background())
 				return nil
 			}),
 
@@ -114,12 +123,17 @@ func newFeature() {
 					return fmt.Errorf("repository has uncommitted changes")
 				}
 
-				fmt.Printf("%s Repository is on branch '%s' with clean state\n", theme.IconSuccess, branch)
+				ulog.Success("Repository validation passed").
+					Field("branch", branch).
+					Pretty(theme.IconSuccess + fmt.Sprintf(" Repository is on branch '%s' with clean state", branch)).
+					Log(context.Background())
 				return nil
 			}),
 
 			harness.NewStep("Demonstrate assertion styles", func(ctx *harness.Context) error {
-				fmt.Printf("%s Demonstrating hard (fail-fast) and soft (collecting) assertions.\n", theme.IconSuccess)
+				ulog.Info("Demonstrating assertion styles").
+					Pretty(theme.IconSuccess + " Demonstrating hard (fail-fast) and soft (collecting) assertions.").
+					Log(context.Background())
 
 				// Example of a successful hard assertion
 				if err := ctx.Check("repository has a clean state", func() error {
@@ -146,7 +160,10 @@ func newFeature() {
 				})
 
 				if err != nil {
-					fmt.Printf("\nCollected assertion failures (as expected for demo):\n%v\n", err)
+					ulog.Info("Collected assertion failures").
+						Err(err).
+						Pretty(fmt.Sprintf("\nCollected assertion failures (as expected for demo):\n%v", err)).
+						Log(context.Background())
 					// In a real test, you would 'return err' here.
 					// We return nil so the demo scenario can continue and pass.
 					return nil
@@ -163,7 +180,9 @@ func newFeature() {
 						return ctx.HasKey("workspace")
 					},
 					func(ctx *harness.Context) error {
-						fmt.Printf("%s Conditional step executed successfully\n", theme.IconSuccess)
+						ulog.Success("Conditional step executed").
+							Pretty(theme.IconSuccess + " Conditional step executed successfully").
+							Log(context.Background())
 						return nil
 					})
 
@@ -178,7 +197,10 @@ func newFeature() {
 					if retryCounter < 2 {
 						return fmt.Errorf("attempt %d failed", retryCounter)
 					}
-					fmt.Printf("%s Retry step succeeded on attempt %d\n", theme.IconSuccess, retryCounter)
+					ulog.Success("Retry step succeeded").
+						Field("attempt", retryCounter).
+						Pretty(theme.IconSuccess + fmt.Sprintf(" Retry step succeeded on attempt %d", retryCounter)).
+						Log(context.Background())
 					return nil
 				})
 
@@ -199,27 +221,42 @@ func newFeature() {
 		log.Fatalf("Demo scenario failed: %v", err)
 	}
 
-	fmt.Printf("\n%s Demo completed successfully!\n", theme.IconStatusCompleted)
-	fmt.Printf("   Duration: %v\n", result.Duration)
-	fmt.Printf("   Steps executed: %d\n", len(result.StepResults))
+	ulog.Success("Demo completed successfully").
+		Field("duration", result.Duration).
+		Field("steps_executed", len(result.StepResults)).
+		Pretty(fmt.Sprintf("\n%s Demo completed successfully!\n   Duration: %v\n   Steps executed: %d",
+			theme.IconStatusCompleted, result.Duration, len(result.StepResults))).
+		Log(ctx)
 
 	// Show capabilities summary
-	fmt.Printf("\n%s Framework Capabilities Demonstrated:\n", theme.IconChecklist)
-	fmt.Printf("  %s Scenario definition and execution\n", theme.IconSuccess)
-	fmt.Printf("  %s Step-by-step progress tracking\n", theme.IconSuccess)
-	fmt.Printf("  %s Temporary directory management\n", theme.IconSuccess)
-	fmt.Printf("  %s Filesystem operations\n", theme.IconSuccess)
-	fmt.Printf("  %s Git repository operations\n", theme.IconSuccess)
-	fmt.Printf("  %s Command execution and output capture\n", theme.IconSuccess)
-	fmt.Printf("  %s Context state management between steps\n", theme.IconSuccess)
-	fmt.Printf("  %s Hard and soft assertion styles\n", theme.IconSuccess)
-	fmt.Printf("  %s Error handling and reporting\n", theme.IconSuccess)
-	fmt.Printf("  %s Step builder utilities\n", theme.IconSuccess)
-	fmt.Printf("  %s Automatic cleanup\n", theme.IconSuccess)
+	capabilitiesSummary := fmt.Sprintf(`
+%s Framework Capabilities Demonstrated:
+  %s Scenario definition and execution
+  %s Step-by-step progress tracking
+  %s Temporary directory management
+  %s Filesystem operations
+  %s Git repository operations
+  %s Command execution and output capture
+  %s Context state management between steps
+  %s Hard and soft assertion styles
+  %s Error handling and reporting
+  %s Step builder utilities
+  %s Automatic cleanup
 
-	fmt.Printf("\n%s Ready for:\n", theme.IconBuild)
-	fmt.Printf("  %s Converting existing bash test scripts\n", theme.IconBullet)
-	fmt.Printf("  %s Building complex multi-step scenarios\n", theme.IconBullet)
-	fmt.Printf("  %s Interactive debugging mode\n", theme.IconBullet)
-	fmt.Printf("  %s CI integration and reporting\n", theme.IconBullet)
+%s Ready for:
+  %s Converting existing bash test scripts
+  %s Building complex multi-step scenarios
+  %s Interactive debugging mode
+  %s CI integration and reporting`,
+		theme.IconChecklist,
+		theme.IconSuccess, theme.IconSuccess, theme.IconSuccess, theme.IconSuccess,
+		theme.IconSuccess, theme.IconSuccess, theme.IconSuccess, theme.IconSuccess,
+		theme.IconSuccess, theme.IconSuccess, theme.IconSuccess,
+		theme.IconBuild,
+		theme.IconBullet, theme.IconBullet, theme.IconBullet, theme.IconBullet)
+
+	ulog.Info("Framework capabilities summary").
+		Pretty(capabilitiesSummary).
+		PrettyOnly().
+		Log(ctx)
 }

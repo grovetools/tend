@@ -9,10 +9,14 @@ import (
 	"syscall"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/mattsolo1/grove-tend/pkg/harness"
+	grovelogging "github.com/mattsolo1/grove-core/logging"
 	"github.com/mattsolo1/grove-tend/pkg/app"
+	"github.com/mattsolo1/grove-tend/pkg/harness"
 	"github.com/mattsolo1/grove-tend/pkg/project"
 )
+
+
+var ulog = grovelogging.NewUnifiedLogger("grove-tend.main")
 
 const childProcessEnvVar = "TEND_IS_CHILD_PROCESS"
 
@@ -56,7 +60,7 @@ func main() {
 
 	go func() {
 		<-sigChan
-		fmt.Println("\nReceived interrupt signal, shutting down...")
+  ulog.Info("\nReceived interrupt signal, shutting down...").Pretty("\nReceived interrupt signal, shutting down...").PrettyOnly().Log(context.Background())
 		cancel()
 	}()
 

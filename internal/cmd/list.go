@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	grovelogging "github.com/mattsolo1/grove-core/logging"
 	"github.com/mattsolo1/grove-core/tui/components/table"
 	"github.com/mattsolo1/grove-core/tui/theme"
 	"github.com/spf13/cobra"
@@ -12,6 +14,8 @@ import (
 	"github.com/mattsolo1/grove-tend/pkg/harness"
 	"github.com/mattsolo1/grove-tend/pkg/ui"
 )
+
+var ulogList = grovelogging.NewUnifiedLogger("grove-tend.cmd.list")
 
 // newListCmd creates the list command with the provided scenarios
 func newListCmd(allScenarios []*harness.Scenario) *cobra.Command {
@@ -59,7 +63,11 @@ func listScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sc
 	}
 	
 	// Display header
-	fmt.Printf("Available scenarios (%d):\n\n", len(filteredScenarios))
+	ctx := context.Background()
+	ulogList.Info("Listing scenarios").
+		Field("count", len(filteredScenarios)).
+		Pretty(fmt.Sprintf("Available scenarios (%d):\n", len(filteredScenarios))).
+		Log(ctx)
 	
 	// Build table data
 	headers := []string{"NAME", "DESCRIPTION", "LOCAL", "EXPLICIT", "TAGS", "STEPS"}
@@ -126,11 +134,17 @@ func listScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sc
 		}
 	})
 	
-	fmt.Println(t)
-	
+	ulogList.Info("Scenario list table").
+		Pretty(t.String()).
+		PrettyOnly().
+		Log(ctx)
+
 	// If verbose, show detailed step information for each scenario
 	if verbose {
-		fmt.Println("\nDetailed scenario information:")
+		ulogList.Info("Detailed scenario information").
+			Pretty("\nDetailed scenario information:").
+			PrettyOnly().
+			Log(ctx)
 		for _, scenario := range filteredScenarios {
 			displayScenarioDetails(renderer, scenario)
 		}
@@ -140,39 +154,47 @@ func listScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sc
 }
 
 func displayScenarioDetails(renderer *ui.Renderer, scenario *harness.Scenario) {
+	ctx := context.Background()
+
 	// Scenario name and description
-	fmt.Printf("\n%s %s\n",
+	prettyMsg := fmt.Sprintf("\n%s %s",
 		theme.DefaultTheme.Header.Render("●"),
 		theme.DefaultTheme.Title.Render(scenario.Name))
 
 	if scenario.Description != "" {
-		fmt.Printf("  %s\n", theme.DefaultTheme.Muted.Render(scenario.Description))
+		prettyMsg += fmt.Sprintf("\n  %s", theme.DefaultTheme.Muted.Render(scenario.Description))
 	}
 
 	// Show LocalOnly warning
 	if scenario.LocalOnly {
-		fmt.Printf("  %s This scenario is marked as local-only and will be skipped in CI environments\n",
+		prettyMsg += fmt.Sprintf("\n  %s This scenario is marked as local-only and will be skipped in CI environments",
 			theme.DefaultTheme.Warning.Render(theme.IconWarning))
 	}
 
 	// Show ExplicitOnly warning
 	if scenario.ExplicitOnly {
-		fmt.Printf("  %s This scenario must be run explicitly by name (skipped during 'tend run')\n",
+		prettyMsg += fmt.Sprintf("\n  %s This scenario must be run explicitly by name (skipped during 'tend run')",
 			theme.DefaultTheme.Warning.Render(theme.IconWarning))
 	}
 
 	// Tags
 	if len(scenario.Tags) > 0 {
 		tagStr := strings.Join(scenario.Tags, ", ")
-		fmt.Printf("  %s %s\n",
+		prettyMsg += fmt.Sprintf("\n  %s %s",
 			theme.DefaultTheme.Info.Render("Tags:"),
 			theme.DefaultTheme.Muted.Render(tagStr))
 	}
 
 	// Step count
-	fmt.Printf("  %s %d step(s)\n",
+	prettyMsg += fmt.Sprintf("\n  %s %d step(s)",
 		theme.DefaultTheme.Info.Render("Steps:"),
 		len(scenario.Steps))
+
+	ulogList.Info("Scenario details").
+		Field("name", scenario.Name).
+		Field("steps_count", len(scenario.Steps)).
+		Pretty(prettyMsg).
+		Log(ctx)
 
 	// If verbose, show step details
 	if verbose {
