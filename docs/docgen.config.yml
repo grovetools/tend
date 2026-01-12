@@ -1,84 +1,83 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/mattsolo1/grove-docgen/main/schema/docgen.config.schema.json
 enabled: true
-title: "Grove Tend"
-description: "A Go library for creating powerful, scenario-based end-to-end testing frameworks."
-category: "Core Libraries"
+title: Grove Tend
+description: A Go library for creating powerful, scenario-based end-to-end testing frameworks.
+category: Core Libraries
 settings:
-  output_dir: docs
-  rules_file: docs.rules
-  structured_output_file: pkg/docs/docs.json
-  system_prompt: default
-  model: gemini-2.5-pro
-  regeneration_mode: reference
+    model: gemini-2.5-pro
+    regeneration_mode: reference
+    rules_file: docs.rules
+    structured_output_file: pkg/docs/docs.json
+    system_prompt: default
+    output_dir: docs
 sections:
-  - name: introduction
-    title: Introduction
-    order: 10
-    prompt: prompts/01-introduction.md
-    output: 01-introduction.md
-  - name: core_concepts
-    title: Core Concepts
-    order: 20
-    prompt: prompts/02-core-concepts.md
-    output: 02-core-concepts.md
-  - name: writing_tests_basic
-    title: "Writing Tests: A Basic Scenario"
-    order: 30
-    prompt: prompts/03-writing-tests-basic-scenario.md
-    output: 03-writing-tests-basic-scenario.md
-  - name: writing_tests_assertions
-    title: "Writing Tests: Assertions"
-    order: 40
-    prompt: prompts/04-writing-tests-assertions.md
-    output: 04-writing-tests-assertions.md
-  - name: writing_tests_filesystem
-    title: "Writing Tests: Filesystem Operations"
-    order: 50
-    prompt: prompts/05-writing-tests-filesystem.md
-    output: 05-writing-tests-filesystem.md
-  - name: writing_tests_commands
-    title: "Writing Tests: Running Commands"
-    order: 60
-    prompt: prompts/06-writing-tests-commands.md
-    output: 06-writing-tests-commands.md
-  - name: mocking
-    title: Mocking and Dependency Management
-    order: 70
-    prompt: prompts/07-mocking-dependencies.md
-    output: 07-mocking-dependencies.md
-  - name: tui_testing_basics
-    title: "TUI Testing: Session Management"
-    order: 80
-    prompt: prompts/08-tui-testing-basics.md
-    output: 08-tui-testing-basics.md
-  - name: tui_testing_interaction
-    title: "TUI Testing: Interaction"
-    order: 90
-    prompt: prompts/09-tui-testing-interaction.md
-    output: 09-tui-testing-interaction.md
-  - name: tui_testing_assertions
-    title: "TUI Testing: Assertions"
-    order: 100
-    prompt: prompts/10-tui-testing-assertions.md
-    output: 10-tui-testing-assertions.md
-  - name: interactive_debugging
-    title: Interactive Debugging
-    order: 110
-    prompt: prompts/11-interactive-debugging.md
-    output: 11-interactive-debugging.md
-  - name: cli_reference
-    title: CLI Reference
-    order: 120
-    prompt: prompts/12-cli-reference.md
-    output: 12-cli-reference.md
-  - name: project_integration
-    title: "How Tend Works: The Proxy Architecture"
-    order: 130
-    prompt: prompts/13-project-integration.md
-    output: 13-project-integration.md
+    - name: introduction
+      title: Introduction
+      order: 10
+      prompt: 01-introduction.md
+      output: 01-introduction.md
+    - name: core_concepts
+      title: Core Concepts
+      order: 20
+      prompt: 02-core-concepts.md
+      output: 02-core-concepts.md
+    - name: writing_tests_basic
+      title: 'Writing Tests: A Basic Scenario'
+      order: 30
+      prompt: 03-writing-tests-basic-scenario.md
+      output: 03-writing-tests-basic-scenario.md
+    - name: writing_tests_assertions
+      title: 'Writing Tests: Assertions'
+      order: 40
+      prompt: 04-writing-tests-assertions.md
+      output: 04-writing-tests-assertions.md
+    - name: writing_tests_filesystem
+      title: 'Writing Tests: Filesystem Operations'
+      order: 50
+      prompt: 05-writing-tests-filesystem.md
+      output: 05-writing-tests-filesystem.md
+    - name: writing_tests_commands
+      title: 'Writing Tests: Running Commands'
+      order: 60
+      prompt: 06-writing-tests-commands.md
+      output: 06-writing-tests-commands.md
+    - name: mocking
+      title: Mocking and Dependency Management
+      order: 70
+      prompt: 07-mocking-dependencies.md
+      output: 07-mocking-dependencies.md
+    - name: tui_testing_basics
+      title: 'TUI Testing: Session Management'
+      order: 80
+      prompt: 08-tui-testing-basics.md
+      output: 08-tui-testing-basics.md
+    - name: tui_testing_interaction
+      title: 'TUI Testing: Interaction'
+      order: 90
+      prompt: 09-tui-testing-interaction.md
+      output: 09-tui-testing-interaction.md
+    - name: tui_testing_assertions
+      title: 'TUI Testing: Assertions'
+      order: 100
+      prompt: 10-tui-testing-assertions.md
+      output: 10-tui-testing-assertions.md
+    - name: interactive_debugging
+      title: Interactive Debugging
+      order: 110
+      prompt: 11-interactive-debugging.md
+      output: 11-interactive-debugging.md
+    - name: cli_reference
+      title: CLI Reference
+      order: 120
+      prompt: 12-cli-reference.md
+      output: 12-cli-reference.md
+    - name: project_integration
+      title: 'How Tend Works: The Proxy Architecture'
+      order: 130
+      prompt: 13-project-integration.md
+      output: 13-project-integration.md
 readme:
-  generate_toc: true
-  template: docs/README.md.tpl
-  output: README.md
-  source_section: introduction
-  strip_lines: 1 # Strip the H1 from the introduction content
+    template: docs/README.md.tpl
+    output: README.md
+    source_section: introduction
+    strip_lines: 1
+    generate_toc: true
