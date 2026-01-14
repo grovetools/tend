@@ -210,8 +210,8 @@ func ParallelRunAllPassingScenario() *harness.Scenario {
 					return err
 				}
 
-				// Create temp file for JSON report in a predictable location
-				reportPath := filepath.Join(ctx.ProjectRoot, "report.json")
+				// Create temp file for JSON report in the test's isolated directory
+				reportPath := filepath.Join(ctx.RootDir, "report.json")
 
 				// The parallel runner requires a TTY for the TUI
 				// We need to use StartTUI to provide that
@@ -305,8 +305,8 @@ func ParallelRunWithFailuresScenario() *harness.Scenario {
 					return err
 				}
 
-				jsonPath := filepath.Join(ctx.ProjectRoot, "report.json")
-				junitPath := filepath.Join(ctx.ProjectRoot, "report.xml")
+				jsonPath := filepath.Join(ctx.RootDir, "report.json")
+				junitPath := filepath.Join(ctx.RootDir, "report.xml")
 
 				session, err := ctx.StartTUI(tendBinary, []string{
 					"run",
