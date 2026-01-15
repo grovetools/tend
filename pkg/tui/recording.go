@@ -413,7 +413,7 @@ func (s *Session) generateHTMLReport() string {
 			}
 		case "wait", "assert", "navigate":
 			if event.Result != "" {
-				sb.WriteString(fmt.Sprintf(`<span class="success">✓ %s</span>`,
+				sb.WriteString(fmt.Sprintf(`<span class="success">* %s</span>`,
 					html.EscapeString(event.Result)))
 			}
 		case "screenshot":
@@ -426,7 +426,7 @@ func (s *Session) generateHTMLReport() string {
 
 		// Add error if present
 		if event.Error != "" {
-			sb.WriteString(fmt.Sprintf(`<div class="error">✗ Error: %s</div>`,
+			sb.WriteString(fmt.Sprintf(`<div class="error">x Error: %s</div>`,
 				html.EscapeString(event.Error)))
 		}
 

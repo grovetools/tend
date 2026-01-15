@@ -190,11 +190,11 @@ echo "Processing..."
 sleep 0.2
 # Simulate random outcome
 if [ $((RANDOM % 3)) -eq 0 ]; then
-    echo "✓ Success"
+    echo "* Success"
 elif [ $((RANDOM % 3)) -eq 1 ]; then
-    echo "✗ Failed"  
+    echo "x Failed"  
 else
-    echo "⚠ Warning"
+    echo "WARNING: Warning"
 fi`
 	err := client.Launch(ctx, tmux.LaunchOptions{
 		SessionName: sessionName,
@@ -208,13 +208,13 @@ fi`
 	session := NewSession(sessionName, client, t.TempDir())
 
 	// Test WaitForAnyText
-	result, err := session.WaitForAnyText([]string{"✓ Success", "✗ Failed", "⚠ Warning"}, 2*time.Second)
+	result, err := session.WaitForAnyText([]string{"* Success", "x Failed", "WARNING: Warning"}, 2*time.Second)
 	if err != nil {
 		t.Fatalf("WaitForAnyText failed: %v", err)
 	}
 	
 	// Verify we got one of the expected results
-	validResults := map[string]bool{"✓ Success": true, "✗ Failed": true, "⚠ Warning": true}
+	validResults := map[string]bool{"* Success": true, "x Failed": true, "WARNING: Warning": true}
 	if !validResults[result] {
 		t.Errorf("Unexpected result from WaitForAnyText: %s", result)
 	}

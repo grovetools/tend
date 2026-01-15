@@ -107,9 +107,9 @@ func (m Model) View() string {
 				case StatusRunning:
 					statusIcon = theme.DefaultTheme.Warning.Render("~ ")
 				case StatusPassed:
-					statusIcon = theme.DefaultTheme.Success.Render("✓ ")
+					statusIcon = theme.DefaultTheme.Success.Render("* ")
 				case StatusFailed:
-					statusIcon = theme.DefaultTheme.Error.Render("✗ ")
+					statusIcon = theme.DefaultTheme.Error.Render("x ")
 				case StatusNotRun:
 					statusIcon = "  "
 				}

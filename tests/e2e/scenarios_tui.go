@@ -197,7 +197,7 @@ func ExampleAdvancedTuiNavigation() *harness.Scenario {
 					return err
 				}
 
-				fmt.Println("   ✓ Successfully selected 'docs/guide.md'")
+				fmt.Println("   * Successfully selected 'docs/guide.md'")
 				return nil
 			}),
 			harness.NewStep("Navigate back to main.go using NavigateToText", func(ctx *harness.Context) error {
@@ -216,8 +216,8 @@ func ExampleAdvancedTuiNavigation() *harness.Scenario {
 					return err
 				}
 
-				fmt.Println("   ✓ Successfully selected 'main.go'")
-				fmt.Println("   ✓ NavigateToText works for selection-based TUIs!")
+				fmt.Println("   * Successfully selected 'main.go'")
+				fmt.Println("   * NavigateToText works for selection-based TUIs!")
 				return nil
 			}),
 			harness.NewStep("Test SelectItem functionality", func(ctx *harness.Context) error {
@@ -300,7 +300,7 @@ func ExampleConditionalFlowsAndRecording() *harness.Scenario {
 				// Wait for one of multiple possible outcomes
 				fmt.Println("   Waiting for operation result...")
 				result, err := session.WaitForAnyText(
-					[]string{"✓ Success", "✗ Failed", "⚠ Warning"},
+					[]string{"* Success", "x Failed", "WARNING: Warning"},
 					3*time.Second,
 				)
 				if err != nil {
@@ -311,11 +311,11 @@ func ExampleConditionalFlowsAndRecording() *harness.Scenario {
 
 				// Handle based on result
 				switch result {
-				case "✓ Success":
+				case "* Success":
 					fmt.Printf("   %s Operation completed successfully!\n", theme.IconSuccess)
-				case "✗ Failed":
+				case "x Failed":
 					fmt.Printf("   %s Operation failed!\n", theme.IconError)
-				case "⚠ Warning":
+				case "WARNING: Warning":
 					fmt.Printf("   %s  Operation completed with warnings\n", theme.IconWarning)
 				}
 

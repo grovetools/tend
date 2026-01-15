@@ -102,7 +102,7 @@ var FlowMockScenario = harness.NewScenario(
 			result := cmd.Run()
 			ctx.ShowCommandOutput(cmd.String(), result.Stdout, result.Stderr)
 			if assert.Contains(result.Stdout, "mock", "should be using mock flow") != nil {
-				fmt.Println("✓ Using mock flow")
+				fmt.Println("* Using mock flow")
 			}
 			return nil
 		}),

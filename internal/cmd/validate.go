@@ -56,7 +56,7 @@ func validateScenarios(cmd *cobra.Command, args []string, allScenarios []*harnes
 		if len(errors) == 0 {
 			validCount++
 			if verbose {
-				renderer.RenderSuccess(fmt.Sprintf("✓ %s", scenario.Name))
+				renderer.RenderSuccess(fmt.Sprintf("* %s", scenario.Name))
 			}
 		} else {
 			for _, err := range errors {

@@ -85,7 +85,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, func() tea.Msg {
 					time.Sleep(300 * time.Millisecond)
 					return processingDoneMsg{
-						result: "✓ Success: All files processed\nFound 15 files modified\nFound 3 files added",
+						result: "* Success: All files processed\nFound 15 files modified\nFound 3 files added",
 					}
 				}
 			case "2":
@@ -95,7 +95,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, func() tea.Msg {
 					time.Sleep(300 * time.Millisecond)
 					return processingDoneMsg{
-						result: "✓ Success: All tests passed\nTest Suite: Unit Tests\nTests: 42 passed, 0 failed",
+						result: "* Success: All tests passed\nTest Suite: Unit Tests\nTests: 42 passed, 0 failed",
 					}
 				}
 			case "3":
@@ -105,7 +105,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, func() tea.Msg {
 					time.Sleep(300 * time.Millisecond)
 					return processingDoneMsg{
-						result: "⚠ Warning: Low disk space",
+						result: "WARNING: Warning: Low disk space",
 					}
 				}
 			}
@@ -163,15 +163,15 @@ func (m model) View() string {
 
 		// Parse and colorize the result
 		if m.choice == "1" {
-			s += successStyle.Render("✓ Success: All files processed") + "\n"
+			s += successStyle.Render("* Success: All files processed") + "\n"
 			s += detailStyle.Render("Found 15 files modified") + "\n"
 			s += detailStyle.Render("Found 3 files added") + "\n"
 		} else if m.choice == "2" {
-			s += successStyle.Render("✓ Success: All tests passed") + "\n"
+			s += successStyle.Render("* Success: All tests passed") + "\n"
 			s += detailStyle.Render("Test Suite: Unit Tests") + "\n"
 			s += detailStyle.Render("Tests: 42 passed, 0 failed") + "\n"
 		} else if m.choice == "3" {
-			s += warningStyle.Render("⚠ Warning: Low disk space") + "\n"
+			s += warningStyle.Render("WARNING: Warning: Low disk space") + "\n"
 		}
 
 		s += "\n" + promptStyle.Render("Press 'q' to quit.") + "\n"
