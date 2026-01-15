@@ -37,7 +37,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case <-chan Event:
 		m.eventsChan = msg
-		return m, waitForEventCmd(m.eventsChan)
+		return m, tea.Batch(m.spinner.Tick, waitForEventCmd(m.eventsChan))
 
 	case Event:
 		switch msg.Type {
@@ -89,7 +89,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return quitMsg{}
 			}
 		}
-		return m, waitForEventCmd(m.eventsChan)
+		return m, tea.Batch(m.spinner.Tick, waitForEventCmd(m.eventsChan))
 
 	case nil: // Channel closed
 		m.finished = true

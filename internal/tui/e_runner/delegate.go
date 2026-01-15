@@ -59,6 +59,12 @@ func (d delegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
 		}
 	}
 
-	line := fmt.Sprintf(" %s %s %s", statusIcon, s.projectName, durationStr)
+	// Show selection indicator
+	cursor := "   "
+	if index == m.Index() {
+		cursor = " " + theme.DefaultTheme.Highlight.Render(theme.IconArrowRightBold) + " "
+	}
+
+	line := fmt.Sprintf("%s%s %s %s", cursor, statusIcon, s.projectName, durationStr)
 	fmt.Fprint(w, line)
 }
