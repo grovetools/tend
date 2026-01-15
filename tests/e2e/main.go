@@ -8,11 +8,15 @@ import (
 	"os/signal"
 	"syscall"
 
+	grovelogging "github.com/mattsolo1/grove-core/logging"
 	"github.com/mattsolo1/grove-tend/pkg/app"
 	"github.com/mattsolo1/grove-tend/pkg/harness"
 )
 
 func main() {
+	// CLI output goes to stdout (stderr is for errors only)
+	grovelogging.SetGlobalOutput(os.Stdout)
+
 	// A list of all E2E scenarios for tend itself.
 	scenarios := []*harness.Scenario{
 		// CLI Scenarios

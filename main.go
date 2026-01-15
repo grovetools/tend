@@ -48,6 +48,9 @@ func shouldSkipProxy() bool {
 }
 
 func main() {
+	// CLI output goes to stdout (stderr is for errors only)
+	grovelogging.SetGlobalOutput(os.Stdout)
+
 	// Try to proxy to project-specific binary first
 	proxyToProjectBinary()
 
