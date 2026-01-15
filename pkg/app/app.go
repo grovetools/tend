@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 
+	"github.com/mattsolo1/grove-core/cli"
 	"github.com/mattsolo1/grove-tend/internal/cmd"
 	"github.com/mattsolo1/grove-tend/pkg/harness"
 	"github.com/spf13/cobra"
@@ -16,5 +17,5 @@ func New(scenarios []*harness.Scenario) *cobra.Command {
 // Execute creates the app and executes it.
 func Execute(ctx context.Context, scenarios []*harness.Scenario) error {
 	app := New(scenarios)
-	return app.ExecuteContext(ctx)
+	return cli.ExecuteContext(ctx, app)
 }
