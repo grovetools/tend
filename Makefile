@@ -2,7 +2,7 @@
 
 BINARY_NAME=tend
 BIN_DIR=bin
-VERSION_PKG=github.com/mattsolo1/grove-core/version
+VERSION_PKG=github.com/grovetools/core/version
 
 # --- Versioning ---
 # For dev builds, we construct a version string from git info.

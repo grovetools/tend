@@ -221,7 +221,7 @@ func findEcosystemRoot() (string, error) {
 	}
 	for {
 		if _, err := os.Stat(filepath.Join(current, "Makefile")); err == nil {
-			if _, err := os.Stat(filepath.Join(current, "grove-core")); err == nil {
+			if _, err := os.Stat(filepath.Join(current, "core")); err == nil {
 				return current, nil
 			}
 		}
