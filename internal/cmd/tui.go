@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/mattsolo1/grove-core/pkg/workspace"
-	"github.com/mattsolo1/grove-tend/internal/tui/runner"
-	"github.com/mattsolo1/grove-tend/pkg/recorder"
+	"github.com/grovetools/core/pkg/workspace"
+	"github.com/grovetools/tend/internal/tui/runner"
+	"github.com/grovetools/tend/pkg/recorder"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )

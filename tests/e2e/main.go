@@ -8,9 +8,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	grovelogging "github.com/mattsolo1/grove-core/logging"
-	"github.com/mattsolo1/grove-tend/pkg/app"
-	"github.com/mattsolo1/grove-tend/pkg/harness"
+	grovelogging "github.com/grovetools/core/logging"
+	"github.com/grovetools/tend/pkg/app"
+	"github.com/grovetools/tend/pkg/harness"
 )
 
 func main() {

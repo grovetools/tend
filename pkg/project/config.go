@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mattsolo1/grove-tend/pkg/command"
+	"github.com/grovetools/tend/pkg/command"
 	"gopkg.in/yaml.v3"
 )
 
@@ -107,7 +107,7 @@ func getGitInfo(projectRoot string) gitInfo {
 
 // buildLDFlags constructs the -ldflags string for injecting version info.
 func buildLDFlags(info gitInfo) string {
-	versionPkg := "github.com/mattsolo1/grove-core/version"
+	versionPkg := "github.com/grovetools/core/version"
 	version := info.Branch + "-" + info.Commit
 	if info.IsDirty {
 		version += "-dirty"

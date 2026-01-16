@@ -11,15 +11,15 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
-	grovelogging "github.com/mattsolo1/grove-core/logging"
-	"github.com/mattsolo1/grove-core/pkg/tmux"
-	"github.com/mattsolo1/grove-core/tui/theme"
+	grovelogging "github.com/grovetools/core/logging"
+	"github.com/grovetools/core/pkg/tmux"
+	"github.com/grovetools/core/tui/theme"
 	"github.com/spf13/cobra"
 
-	"github.com/mattsolo1/grove-tend/pkg/harness"
-	"github.com/mattsolo1/grove-tend/pkg/harness/reporters"
-	"github.com/mattsolo1/grove-tend/pkg/ui"
-	"github.com/mattsolo1/grove-tend/internal/tui/prunner"
+	"github.com/grovetools/tend/pkg/harness"
+	"github.com/grovetools/tend/pkg/harness/reporters"
+	"github.com/grovetools/tend/pkg/ui"
+	"github.com/grovetools/tend/internal/tui/prunner"
 	tea "github.com/charmbracelet/bubbletea"
 )
 

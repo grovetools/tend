@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mattsolo1/grove-tend/pkg/harness/reporters"
+	"github.com/grovetools/tend/pkg/harness/reporters"
 )
 
 // ProjectResult holds the outcome of a single project's test run.

@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mattsolo1/grove-core/pkg/tmux"
-	"github.com/mattsolo1/grove-tend/pkg/assert"
-	"github.com/mattsolo1/grove-tend/pkg/fs"
-	"github.com/mattsolo1/grove-tend/pkg/wait"
+	"github.com/grovetools/core/pkg/tmux"
+	"github.com/grovetools/tend/pkg/assert"
+	"github.com/grovetools/tend/pkg/fs"
+	"github.com/grovetools/tend/pkg/wait"
 )
 
 // Session represents an active TUI application running in a tmux session.

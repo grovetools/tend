@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/mattsolo1/grove-tend/pkg/harness"
+	"github.com/grovetools/tend/pkg/harness"
 )
 
 // JUnitTestSuites represents the root element

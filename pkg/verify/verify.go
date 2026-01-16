@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 	
-	"github.com/mattsolo1/grove-tend/pkg/command"
-	"github.com/mattsolo1/grove-tend/pkg/wait"
+	"github.com/grovetools/tend/pkg/command"
+	"github.com/grovetools/tend/pkg/wait"
 )
 
 // ServiceRunning verifies a Grove service is running

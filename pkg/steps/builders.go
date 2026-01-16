@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"time"
 	
-	"github.com/mattsolo1/grove-tend/pkg/harness"
-	"github.com/mattsolo1/grove-tend/pkg/retry"
-	"github.com/mattsolo1/grove-tend/pkg/verify"
-	"github.com/mattsolo1/grove-tend/pkg/wait"
+	"github.com/grovetools/tend/pkg/harness"
+	"github.com/grovetools/tend/pkg/retry"
+	"github.com/grovetools/tend/pkg/verify"
+	"github.com/grovetools/tend/pkg/wait"
 )
 
 // WaitFor creates a step that waits for a condition

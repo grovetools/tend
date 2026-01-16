@@ -12,13 +12,13 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	grovelogging "github.com/mattsolo1/grove-core/logging"
-	"github.com/mattsolo1/grove-core/tui/components/table"
-	"github.com/mattsolo1/grove-core/tui/theme"
-	"github.com/mattsolo1/grove-tend/internal/tui/e_runner"
-	"github.com/mattsolo1/grove-tend/pkg/command"
-	"github.com/mattsolo1/grove-tend/pkg/harness/reporters"
-	"github.com/mattsolo1/grove-tend/pkg/ui"
+	grovelogging "github.com/grovetools/core/logging"
+	"github.com/grovetools/core/tui/components/table"
+	"github.com/grovetools/core/tui/theme"
+	"github.com/grovetools/tend/internal/tui/e_runner"
+	"github.com/grovetools/tend/pkg/command"
+	"github.com/grovetools/tend/pkg/harness/reporters"
+	"github.com/grovetools/tend/pkg/ui"
 	"github.com/spf13/cobra"
 )
 

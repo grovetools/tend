@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
-	grovelogging "github.com/mattsolo1/grove-core/logging"
-	"github.com/mattsolo1/grove-core/tui/theme"
+	grovelogging "github.com/grovetools/core/logging"
+	"github.com/grovetools/core/tui/theme"
 )
 
 var ulog = grovelogging.NewUnifiedLogger("grove-tend.harness.ui")

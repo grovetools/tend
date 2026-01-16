@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mattsolo1/grove-core/pkg/tmux"
+	"github.com/grovetools/core/pkg/tmux"
 )
 
 // Helper to skip tests if tmux is not available

@@ -9,13 +9,13 @@ import (
 	"strings"
 	"time"
 
-	grovelogging "github.com/mattsolo1/grove-core/logging"
-	"github.com/mattsolo1/grove-core/pkg/tmux"
-	"github.com/mattsolo1/grove-core/tui/theme"
-	"github.com/mattsolo1/grove-tend/pkg/command"
-	"github.com/mattsolo1/grove-tend/pkg/fs"
-	"github.com/mattsolo1/grove-tend/pkg/project"
-	"github.com/mattsolo1/grove-tend/pkg/tui"
+	grovelogging "github.com/grovetools/core/logging"
+	"github.com/grovetools/core/pkg/tmux"
+	"github.com/grovetools/core/tui/theme"
+	"github.com/grovetools/tend/pkg/command"
+	"github.com/grovetools/tend/pkg/fs"
+	"github.com/grovetools/tend/pkg/project"
+	"github.com/grovetools/tend/pkg/tui"
 )
 
 var ulogHarness = grovelogging.NewUnifiedLogger("grove-tend.harness")

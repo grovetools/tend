@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/mattsolo1/grove-core/pkg/tmux"
+	"github.com/grovetools/core/pkg/tmux"
 )
 
 // sessionsListedMsg contains the list of tend sessions found.

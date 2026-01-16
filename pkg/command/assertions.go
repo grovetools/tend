@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mattsolo1/grove-tend/pkg/assert"
+	"github.com/grovetools/tend/pkg/assert"
 )
 
 // AssertStdoutContains asserts that stdout contains all the specified patterns.

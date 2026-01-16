@@ -10,13 +10,13 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	corecommand "github.com/mattsolo1/grove-core/command"
-	"github.com/mattsolo1/grove-core/pkg/tmux"
-	"github.com/mattsolo1/grove-tend/pkg/command"
-	"github.com/mattsolo1/grove-tend/pkg/project"
-	"github.com/mattsolo1/grove-tend/pkg/teatest"
-	"github.com/mattsolo1/grove-tend/pkg/tui"
-	"github.com/mattsolo1/grove-tend/pkg/verify"
+	corecommand "github.com/grovetools/core/command"
+	"github.com/grovetools/core/pkg/tmux"
+	"github.com/grovetools/tend/pkg/command"
+	"github.com/grovetools/tend/pkg/project"
+	"github.com/grovetools/tend/pkg/teatest"
+	"github.com/grovetools/tend/pkg/tui"
+	"github.com/grovetools/tend/pkg/verify"
 )
 
 // contextMutex protects concurrent access to context maps

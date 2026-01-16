@@ -7,11 +7,11 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/mattsolo1/grove-tend/pkg/fs"
-	"github.com/mattsolo1/grove-tend/pkg/git"
-	"github.com/mattsolo1/grove-tend/pkg/harness"
-	"github.com/mattsolo1/grove-tend/pkg/tui"
-	"github.com/mattsolo1/grove-tend/pkg/verify"
+	"github.com/grovetools/tend/pkg/fs"
+	"github.com/grovetools/tend/pkg/git"
+	"github.com/grovetools/tend/pkg/harness"
+	"github.com/grovetools/tend/pkg/tui"
+	"github.com/grovetools/tend/pkg/verify"
 )
 
 // TendTUIScenario tests the interactive `tend tui` command.
@@ -83,7 +83,7 @@ func setupMockFilesystem(ctx *harness.Context) error {
 	// Add a dummy scenario file for discovery
 	scenarioA := `package main
 
-import "github.com/mattsolo1/grove-tend/pkg/harness"
+import "github.com/grovetools/tend/pkg/harness"
 
 func ScenarioForA() *harness.Scenario {
 	return harness.NewScenario("standalone-test", "A standalone test scenario", []string{"smoke"}, nil)
@@ -124,7 +124,7 @@ func ScenarioForA() *harness.Scenario {
 	}
 	scenarioC := `package main
 
-import "github.com/mattsolo1/grove-tend/pkg/harness"
+import "github.com/grovetools/tend/pkg/harness"
 
 func ScenarioForC() *harness.Scenario {
 	return harness.NewScenario("sub-app-test", "A sub-project test scenario", []string{"integration"}, nil)

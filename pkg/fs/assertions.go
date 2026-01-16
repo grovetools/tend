@@ -3,7 +3,7 @@ package fs
 import (
 	"fmt"
 
-	"github.com/mattsolo1/grove-tend/pkg/assert"
+	"github.com/grovetools/tend/pkg/assert"
 )
 
 // AssertExists asserts that a file or directory exists at the given path.

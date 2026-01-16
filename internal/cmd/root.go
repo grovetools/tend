@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/mattsolo1/grove-core/cli"
-	"github.com/mattsolo1/grove-tend/pkg/docs"
-	"github.com/mattsolo1/grove-tend/pkg/harness"
+	"github.com/grovetools/core/cli"
+	"github.com/grovetools/tend/pkg/docs"
+	"github.com/grovetools/tend/pkg/harness"
 	"github.com/spf13/cobra"
 )
 

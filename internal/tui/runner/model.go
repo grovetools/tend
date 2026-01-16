@@ -6,9 +6,9 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/mattsolo1/grove-core/pkg/workspace"
-	"github.com/mattsolo1/grove-core/tui/components/help"
-	"github.com/mattsolo1/grove-tend/pkg/harness"
+	"github.com/grovetools/core/pkg/workspace"
+	"github.com/grovetools/core/tui/components/help"
+	"github.com/grovetools/tend/pkg/harness"
 )
 
 // TestStatus represents the run state of a testable node.

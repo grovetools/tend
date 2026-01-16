@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	grovelogging "github.com/mattsolo1/grove-core/logging"
+	grovelogging "github.com/grovetools/core/logging"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,8 +10,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mattsolo1/grove-core/pkg/tmux"
-	"github.com/mattsolo1/grove-tend/internal/tui/sessions"
+	"github.com/grovetools/core/pkg/tmux"
+	"github.com/grovetools/tend/internal/tui/sessions"
 	"github.com/spf13/cobra"
 	tea "github.com/charmbracelet/bubbletea"
 )

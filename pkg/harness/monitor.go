@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mattsolo1/grove-tend/pkg/command"
+	"github.com/grovetools/tend/pkg/command"
 )
 
 // ContainerMonitor monitors Docker containers during test execution

@@ -10,10 +10,10 @@ import (
 	"sync"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/mattsolo1/grove-core/pkg/workspace"
-	"github.com/mattsolo1/grove-core/tui/theme"
-	"github.com/mattsolo1/grove-tend/internal/tui/scanner"
-	"github.com/mattsolo1/grove-tend/pkg/harness"
+	"github.com/grovetools/core/pkg/workspace"
+	"github.com/grovetools/core/tui/theme"
+	"github.com/grovetools/tend/internal/tui/scanner"
+	"github.com/grovetools/tend/pkg/harness"
 	"github.com/sirupsen/logrus"
 )
 

@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/mattsolo1/grove-tend/pkg/command"
+	"github.com/grovetools/tend/pkg/command"
 )
 
 var pathRegex = regexp.MustCompile(`\((.*?)\)`)

@@ -9,12 +9,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mattsolo1/grove-core/tui/theme"
-	"github.com/mattsolo1/grove-tend/pkg/command"
-	"github.com/mattsolo1/grove-tend/pkg/harness"
-	"github.com/mattsolo1/grove-tend/pkg/harness/reporters"
-	"github.com/mattsolo1/grove-tend/pkg/tui"
-	"github.com/mattsolo1/grove-tend/pkg/verify"
+	"github.com/grovetools/core/tui/theme"
+	"github.com/grovetools/tend/pkg/command"
+	"github.com/grovetools/tend/pkg/harness"
+	"github.com/grovetools/tend/pkg/harness/reporters"
+	"github.com/grovetools/tend/pkg/tui"
+	"github.com/grovetools/tend/pkg/verify"
 )
 
 // Test fixture scenarios - these will be used by the parallel runner tests

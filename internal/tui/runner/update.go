@@ -14,8 +14,8 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/mattsolo1/grove-core/pkg/workspace"
-	"github.com/mattsolo1/grove-tend/pkg/harness/reporters"
+	"github.com/grovetools/core/pkg/workspace"
+	"github.com/grovetools/tend/pkg/harness/reporters"
 	"github.com/sirupsen/logrus"
 )
 

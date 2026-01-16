@@ -5,8 +5,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/mattsolo1/grove-core/tui/theme"
-	"github.com/mattsolo1/grove-tend/pkg/harness"
+	"github.com/grovetools/core/tui/theme"
+	"github.com/grovetools/tend/pkg/harness"
 )
 
 // Renderer handles rendering test output with beautiful styling

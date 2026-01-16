@@ -1,14 +1,14 @@
 package reporters
 
 import (
-	grovelogging "github.com/mattsolo1/grove-core/logging"
+	grovelogging "github.com/grovetools/core/logging"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 
-	"github.com/mattsolo1/grove-core/tui/theme"
-	"github.com/mattsolo1/grove-tend/pkg/harness"
+	"github.com/grovetools/core/tui/theme"
+	"github.com/grovetools/tend/pkg/harness"
 )
 
 

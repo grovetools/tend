@@ -1,7 +1,7 @@
 package verify
 
 import (
-	"github.com/mattsolo1/grove-tend/pkg/assert"
+	"github.com/grovetools/tend/pkg/assert"
 )
 
 // AssertionLogger is an interface for logging assertion results.
