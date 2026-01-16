@@ -1,5 +1,5 @@
 enabled: true
-title: Grove Tend
+title: tend
 description: A Go library for creating powerful, scenario-based end-to-end testing frameworks.
 category: Core Libraries
 settings:
