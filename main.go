@@ -38,6 +38,7 @@ func shouldSkipProxy() bool {
 		"completion": true, // Generates shell completions
 		"docs":       true, // Prints JSON documentation
 		"sessions":   true, // Manages test sessions (operates on existing data)
+		"demo":       true, // Demo environment management (global, not project-specific)
 		"-h":         true, // Help flag
 		"--help":     true, // Help flag
 		"-v":         true, // Might be version flag
