@@ -254,7 +254,8 @@ func (g *Generator) createRepo(ecoDir string, spec RepoSpec) error {
 	if spec.Worktree != "" {
 		// Sanitize branch name for directory path (replace / with -)
 		safeBranchName := strings.ReplaceAll(spec.Worktree, "/", "-")
-		worktreeDir := filepath.Join(ecoDir, ".grove-worktrees", spec.Name, safeBranchName)
+		// Worktrees go inside the repo's .grove-worktrees directory (EcosystemSubProjectWorktree pattern)
+		worktreeDir := filepath.Join(repoDir, ".grove-worktrees", safeBranchName)
 		if err := repo.CreateWorktree(worktreeDir, spec.Worktree); err != nil {
 			return fmt.Errorf("creating worktree: %w", err)
 		}
