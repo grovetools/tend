@@ -3,6 +3,7 @@ package demo
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -35,6 +36,12 @@ func (g *Generator) Generate() error {
 	// Create directory structure
 	if err := g.createDirectoryStructure(); err != nil {
 		return fmt.Errorf("creating directory structure: %w", err)
+	}
+
+	// Symlink real user configs (except grove/) for familiar environment
+	if err := g.symlinkRealConfigs(); err != nil {
+		// Non-fatal - demo still works without real configs
+		ulog.Warn("Failed to symlink real configs").Err(err).Emit()
 	}
 
 	// Create ecosystems
@@ -89,6 +96,88 @@ func (g *Generator) createDirectoryStructure() error {
 			return fmt.Errorf("creating %s: %w", dir, err)
 		}
 	}
+
+	return nil
+}
+
+// symlinkRealConfigs symlinks real user config directories into the sandbox.
+// This provides a familiar environment (tmux keybindings, shell config, etc.)
+// while keeping grove config isolated for demo ecosystem discovery.
+func (g *Generator) symlinkRealConfigs() error {
+	realHome, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("getting real home dir: %w", err)
+	}
+
+	realConfigDir := filepath.Join(realHome, ".config")
+	sandboxConfigDir := filepath.Join(g.homeDir(), ".config")
+
+	// Read real .config directory
+	entries, err := os.ReadDir(realConfigDir)
+	if err != nil {
+		return fmt.Errorf("reading real config dir: %w", err)
+	}
+
+	// Symlink each config directory except grove (which we manage)
+	for _, entry := range entries {
+		name := entry.Name()
+
+		// Skip grove - we generate our own config for demo ecosystems
+		if name == "grove" {
+			continue
+		}
+
+		realPath := filepath.Join(realConfigDir, name)
+		sandboxPath := filepath.Join(sandboxConfigDir, name)
+
+		// Skip if already exists in sandbox
+		if _, err := os.Lstat(sandboxPath); err == nil {
+			continue
+		}
+
+		// Create symlink
+		if err := os.Symlink(realPath, sandboxPath); err != nil {
+			ulog.Debug("Failed to symlink config").
+				Field("name", name).
+				Err(err).
+				Emit()
+			// Continue with other configs
+			continue
+		}
+
+		ulog.Debug("Symlinked config").Field("name", name).Emit()
+	}
+
+	// Symlink common dotfiles from real home
+	dotfiles := []string{".tmux.conf", ".gitconfig", ".gitignore_global"}
+	for _, dotfile := range dotfiles {
+		realPath := filepath.Join(realHome, dotfile)
+		sandboxPath := filepath.Join(g.homeDir(), dotfile)
+
+		// Skip if real file doesn't exist
+		if _, err := os.Stat(realPath); os.IsNotExist(err) {
+			continue
+		}
+
+		// Skip if already exists in sandbox
+		if _, err := os.Lstat(sandboxPath); err == nil {
+			continue
+		}
+
+		if err := os.Symlink(realPath, sandboxPath); err != nil {
+			ulog.Debug("Failed to symlink dotfile").
+				Field("name", dotfile).
+				Err(err).
+				Emit()
+			continue
+		}
+
+		ulog.Debug("Symlinked dotfile").Field("name", dotfile).Emit()
+	}
+
+	ulog.Info("Symlinked real user configs").
+		Pretty("Symlinked real configs (tmux, fish, git, etc.) - grove config isolated").
+		Emit()
 
 	return nil
 }
