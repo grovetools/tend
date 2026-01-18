@@ -3,7 +3,6 @@ package demo
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -38,12 +37,6 @@ func (g *Generator) Generate() error {
 		return fmt.Errorf("creating directory structure: %w", err)
 	}
 
-	// Symlink real user configs (except grove/) for familiar environment
-	if err := g.symlinkRealConfigs(); err != nil {
-		// Non-fatal - demo still works without real configs
-		ulog.Warn("Failed to symlink real configs").Err(err).Emit()
-	}
-
 	// Create ecosystems
 	ecosystems, err := g.createEcosystems()
 	if err != nil {
@@ -70,7 +63,7 @@ func (g *Generator) Generate() error {
 		CreatedAt:   time.Now(),
 		TmuxSocket:  TmuxSocketName,
 		Ecosystems:  ecosystems,
-		HomeDir:     g.homeDir(),
+		OverlayPath: g.overlayPath(),
 		NotebookDir: g.notebookDir(),
 	}
 	if err := SaveMetadata(g.rootDir, meta); err != nil {
@@ -81,12 +74,10 @@ func (g *Generator) Generate() error {
 }
 
 // createDirectoryStructure creates the base directory structure.
+// Note: We no longer create a sandbox home since we use GROVE_CONFIG_OVERLAY
+// to isolate grove config while using the real HOME.
 func (g *Generator) createDirectoryStructure() error {
 	dirs := []string{
-		g.homeDir(),
-		filepath.Join(g.homeDir(), ".config", "grove"),
-		filepath.Join(g.homeDir(), ".local", "share"),
-		filepath.Join(g.homeDir(), ".cache"),
 		g.notebookDir(),
 		g.ecosystemsDir(),
 	}
@@ -96,100 +87,6 @@ func (g *Generator) createDirectoryStructure() error {
 			return fmt.Errorf("creating %s: %w", dir, err)
 		}
 	}
-
-	return nil
-}
-
-// symlinkRealConfigs symlinks real user config directories into the sandbox.
-// This provides a familiar environment (tmux keybindings, shell config, etc.)
-// while keeping grove config isolated for demo ecosystem discovery.
-func (g *Generator) symlinkRealConfigs() error {
-	realHome, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("getting real home dir: %w", err)
-	}
-
-	realConfigDir := filepath.Join(realHome, ".config")
-	sandboxConfigDir := filepath.Join(g.homeDir(), ".config")
-
-	// Read real .config directory
-	entries, err := os.ReadDir(realConfigDir)
-	if err != nil {
-		return fmt.Errorf("reading real config dir: %w", err)
-	}
-
-	// Symlink each config directory except grove (which we manage)
-	for _, entry := range entries {
-		name := entry.Name()
-
-		// Skip grove - we generate our own config for demo ecosystems
-		if name == "grove" {
-			continue
-		}
-
-		realPath := filepath.Join(realConfigDir, name)
-		sandboxPath := filepath.Join(sandboxConfigDir, name)
-
-		// Check if something already exists in sandbox
-		if info, err := os.Lstat(sandboxPath); err == nil {
-			// If it's already a symlink, skip
-			if info.Mode()&os.ModeSymlink != 0 {
-				continue
-			}
-			// If it's a directory/file (e.g., auto-created by shell), remove it
-			// so we can replace with symlink to real config
-			if err := os.RemoveAll(sandboxPath); err != nil {
-				ulog.Debug("Failed to remove existing config").
-					Field("name", name).
-					Err(err).
-					Emit()
-				continue
-			}
-		}
-
-		// Create symlink
-		if err := os.Symlink(realPath, sandboxPath); err != nil {
-			ulog.Debug("Failed to symlink config").
-				Field("name", name).
-				Err(err).
-				Emit()
-			// Continue with other configs
-			continue
-		}
-
-		ulog.Debug("Symlinked config").Field("name", name).Emit()
-	}
-
-	// Symlink common dotfiles from real home
-	dotfiles := []string{".tmux.conf", ".gitconfig", ".gitignore_global"}
-	for _, dotfile := range dotfiles {
-		realPath := filepath.Join(realHome, dotfile)
-		sandboxPath := filepath.Join(g.homeDir(), dotfile)
-
-		// Skip if real file doesn't exist
-		if _, err := os.Stat(realPath); os.IsNotExist(err) {
-			continue
-		}
-
-		// Skip if already exists in sandbox
-		if _, err := os.Lstat(sandboxPath); err == nil {
-			continue
-		}
-
-		if err := os.Symlink(realPath, sandboxPath); err != nil {
-			ulog.Debug("Failed to symlink dotfile").
-				Field("name", dotfile).
-				Err(err).
-				Emit()
-			continue
-		}
-
-		ulog.Debug("Symlinked dotfile").Field("name", dotfile).Emit()
-	}
-
-	ulog.Info("Symlinked real user configs").
-		Pretty("Symlinked real configs (tmux, fish, git, etc.) - grove config isolated").
-		Emit()
 
 	return nil
 }
@@ -472,7 +369,9 @@ func (g *Generator) writeEcosystemConfig(ecoDir, name string, workspaces []strin
 	return fs.WriteFile(filepath.Join(ecoDir, "grove.yml"), data)
 }
 
-// createGlobalConfig creates the global grove.yml configuration.
+// createGlobalConfig creates the GROVE_CONFIG_OVERLAY file.
+// This overlay is merged on top of the user's real grove config,
+// overriding workspaces/groves while preserving API keys and other settings.
 func (g *Generator) createGlobalConfig() error {
 	config := map[string]interface{}{
 		"version": "1.0",
@@ -481,19 +380,32 @@ func (g *Generator) createGlobalConfig() error {
 				"path":        filepath.Join(g.ecosystemsDir(), "homelab"),
 				"enabled":     true,
 				"description": "Main homelab ecosystem",
-				"notebook":    filepath.Join(g.notebookDir(), "homelab"),
+				"notebook":    "homelab",
 			},
 			"contrib": map[string]interface{}{
 				"path":        filepath.Join(g.ecosystemsDir(), "contrib"),
 				"enabled":     true,
 				"description": "Community contributions",
-				"notebook":    filepath.Join(g.notebookDir(), "contrib"),
+				"notebook":    "contrib",
 			},
 			"infra": map[string]interface{}{
 				"path":        filepath.Join(g.ecosystemsDir(), "infra"),
 				"enabled":     true,
 				"description": "Infrastructure and deployment",
-				"notebook":    filepath.Join(g.notebookDir(), "infra"),
+				"notebook":    "infra",
+			},
+		},
+		"notebooks": map[string]interface{}{
+			"definitions": map[string]interface{}{
+				"homelab": map[string]interface{}{
+					"root_dir": filepath.Join(g.notebookDir(), "homelab"),
+				},
+				"contrib": map[string]interface{}{
+					"root_dir": filepath.Join(g.notebookDir(), "contrib"),
+				},
+				"infra": map[string]interface{}{
+					"root_dir": filepath.Join(g.notebookDir(), "infra"),
+				},
 			},
 		},
 	}
@@ -503,8 +415,7 @@ func (g *Generator) createGlobalConfig() error {
 		return err
 	}
 
-	configPath := filepath.Join(g.homeDir(), ".config", "grove", "grove.yml")
-	return fs.WriteFile(configPath, data)
+	return fs.WriteFile(g.overlayPath(), data)
 }
 
 // seedNotebooks creates notebook content for the ecosystems.
@@ -540,10 +451,6 @@ func (g *Generator) seedNotebooks() error {
 const TmuxSocketName = "grove-demo"
 
 // Helper methods for directory paths
-func (g *Generator) homeDir() string {
-	return filepath.Join(g.rootDir, "home")
-}
-
 func (g *Generator) notebookDir() string {
 	return filepath.Join(g.rootDir, "notebooks")
 }
@@ -552,15 +459,17 @@ func (g *Generator) ecosystemsDir() string {
 	return filepath.Join(g.rootDir, "ecosystems")
 }
 
+func (g *Generator) overlayPath() string {
+	return filepath.Join(g.rootDir, "grove-overlay.yml")
+}
+
 // BuildEnvironment returns the environment variables for the demo.
+// Uses GROVE_CONFIG_OVERLAY to isolate grove config discovery while keeping
+// the real HOME, so nvim, LSPs, shell config, etc. all work normally.
 func BuildEnvironment(demoDir string) map[string]string {
-	homeDir := filepath.Join(demoDir, "home")
 	return map[string]string{
-		"HOME":              homeDir,
-		"XDG_CONFIG_HOME":   filepath.Join(homeDir, ".config"),
-		"XDG_DATA_HOME":     filepath.Join(homeDir, ".local", "share"),
-		"XDG_CACHE_HOME":    filepath.Join(homeDir, ".cache"),
-		"GROVE_DEMO":        "1",
-		"GROVE_TMUX_SOCKET": TmuxSocketName,
+		"GROVE_CONFIG_OVERLAY": filepath.Join(demoDir, "grove-overlay.yml"),
+		"GROVE_DEMO":           "1",
+		"GROVE_TMUX_SOCKET":    TmuxSocketName,
 	}
 }

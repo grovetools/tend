@@ -13,7 +13,7 @@ type Metadata struct {
 	CreatedAt   time.Time       `yaml:"created_at"`
 	TmuxSocket  string          `yaml:"tmux_socket"`
 	Ecosystems  []EcosystemMeta `yaml:"ecosystems"`
-	HomeDir     string          `yaml:"home_dir"`
+	OverlayPath string          `yaml:"overlay_path"`
 	NotebookDir string          `yaml:"notebook_dir"`
 }
 

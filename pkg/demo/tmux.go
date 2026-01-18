@@ -25,11 +25,6 @@ func (g *Generator) setupTmux() error {
 	// Build environment for the demo session
 	env := BuildEnvironment(g.rootDir)
 
-	// Set global environment at the tmux server level so all new sessions inherit it
-	if err := client.SetGlobalEnvironment(ctx, env); err != nil {
-		return fmt.Errorf("setting global environment: %w", err)
-	}
-
 	// Convert env map to slice format
 	var envSlice []string
 	for k, v := range env {
@@ -40,6 +35,7 @@ func (g *Generator) setupTmux() error {
 	homelabDir := filepath.Join(g.ecosystemsDir(), "homelab")
 
 	// Create the main session with a layout suitable for screenshots
+	// This also starts the tmux server
 	launchOpts := tmux.LaunchOptions{
 		SessionName:      "grove-demo",
 		WorkingDirectory: homelabDir,
@@ -59,6 +55,12 @@ func (g *Generator) setupTmux() error {
 
 	// Give tmux a moment to start
 	time.Sleep(200 * time.Millisecond)
+
+	// Set global environment at the tmux server level so all new windows/sessions inherit it
+	// This must be done AFTER Launch since Launch starts the server
+	if err := client.SetGlobalEnvironment(ctx, env); err != nil {
+		return fmt.Errorf("setting global environment: %w", err)
+	}
 
 	// Create additional windows for the demo
 	// Window 2: Dashboard worktree (branch name sanitized: feature/gpu-widgets -> feature-gpu-widgets)
@@ -116,7 +118,8 @@ func (g *Generator) setupTmux() error {
 ║                   Grove Demo Environment                          ║
 ╠══════════════════════════════════════════════════════════════════╣
 ║                                                                    ║
-║  This is an isolated demo environment for Grove.                   ║
+║  This is a demo environment for Grove using config overlay.        ║
+║  Your real HOME, nvim, shell config, etc. are preserved.          ║
 ║                                                                    ║
 ║  Ecosystems:                                                       ║
 ║    • homelab (main) - 8 repos, 4 worktrees                        ║
@@ -135,12 +138,12 @@ func (g *Generator) setupTmux() error {
 ║    4. git        - Git status overview                             ║
 ║                                                                    ║
 ║  Environment:                                                      ║
-║    HOME=%s
+║    GROVE_CONFIG_OVERLAY=%s
 ║    GROVE_DEMO=1                                                    ║
 ║                                                                    ║
 ╚══════════════════════════════════════════════════════════════════╝
 EOF
-`, g.homeDir())
+`, g.overlayPath())
 
 	_ = client.SendKeys(ctx, "grove-demo:overview", welcomeMsg)
 
