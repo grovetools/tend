@@ -56,8 +56,8 @@ func (g *Generator) setupTmux() error {
 	time.Sleep(200 * time.Millisecond)
 
 	// Create additional windows for the demo
-	// Window 2: Dashboard worktree
-	dashboardWorktree := filepath.Join(homelabDir, ".grove-worktrees", "dashboard", "feature", "gpu-widgets")
+	// Window 2: Dashboard worktree (branch name sanitized: feature/gpu-widgets -> feature-gpu-widgets)
+	dashboardWorktree := filepath.Join(homelabDir, ".grove-worktrees", "dashboard", "feature-gpu-widgets")
 	if err := client.NewWindowWithOptions(ctx, tmux.NewWindowOptions{
 		Target:     "grove-demo",
 		WindowName: "dashboard",

@@ -4,6 +4,7 @@ package demo
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 
 	grovelogging "github.com/grovetools/core/logging"
@@ -253,7 +254,9 @@ func (g *Generator) createRepo(ecoDir string, spec RepoSpec) error {
 
 	// Create worktree if specified
 	if spec.Worktree != "" {
-		worktreeDir := filepath.Join(ecoDir, ".grove-worktrees", spec.Name, spec.Worktree)
+		// Sanitize branch name for directory path (replace / with -)
+		safeBranchName := strings.ReplaceAll(spec.Worktree, "/", "-")
+		worktreeDir := filepath.Join(ecoDir, ".grove-worktrees", spec.Name, safeBranchName)
 		if err := repo.CreateWorktree(worktreeDir, spec.Worktree); err != nil {
 			return fmt.Errorf("creating worktree: %w", err)
 		}
