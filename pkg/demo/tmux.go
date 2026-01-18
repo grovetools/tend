@@ -25,6 +25,11 @@ func (g *Generator) setupTmux() error {
 	// Build environment for the demo session
 	env := BuildEnvironment(g.rootDir)
 
+	// Set global environment at the tmux server level so all new sessions inherit it
+	if err := client.SetGlobalEnvironment(ctx, env); err != nil {
+		return fmt.Errorf("setting global environment: %w", err)
+	}
+
 	// Convert env map to slice format
 	var envSlice []string
 	for k, v := range env {
