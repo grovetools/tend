@@ -3,10 +3,10 @@ package sessions
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
+	"github.com/grovetools/core/pkg/tmux"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -99,10 +99,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				sessionName := selectedItem.sessionName
 
 				// Use tmux switch-client to switch to the session
-				cmd := exec.Command("tmux", "switch-client", "-t", sessionName)
+				cmd := tmux.Command("switch-client", "-t", sessionName)
 				if err := cmd.Run(); err != nil {
 					// If switch-client fails (not in tmux), try attach
-					cmd = exec.Command("tmux", "attach", "-t", sessionName)
+					cmd = tmux.Command("attach", "-t", sessionName)
 					cmd.Stdin = os.Stdin
 					cmd.Stdout = os.Stdout
 					cmd.Stderr = os.Stderr

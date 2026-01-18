@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -453,7 +452,7 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 					ui.Info("Attach", fmt.Sprintf("Attaching to tmux session '%s'. Detach with 'Ctrl-b d' to continue test.", sessionName))
 					
 					// Temporarily suspend the runner to attach
-					cmd := exec.Command("tmux", "attach-session", "-t", sessionName)
+					cmd := tmux.Command("attach-session", "-t", sessionName)
 					cmd.Stdin = os.Stdin
 					cmd.Stdout = os.Stdout
 					cmd.Stderr = os.Stderr
