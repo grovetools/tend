@@ -196,6 +196,9 @@ This kills the demo tmux server and removes all demo files.`,
 			}
 
 			// Remove the directory
+			// Note: os.RemoveAll is safe with symlinks - it removes the link, not the target.
+			// The demo may contain symlinks to real user configs (~/.config/*), but those
+			// real files will NOT be deleted.
 			if err := os.RemoveAll(outputDir); err != nil {
 				return fmt.Errorf("removing demo directory: %w", err)
 			}
