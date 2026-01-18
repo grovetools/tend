@@ -130,9 +130,21 @@ func (g *Generator) symlinkRealConfigs() error {
 		realPath := filepath.Join(realConfigDir, name)
 		sandboxPath := filepath.Join(sandboxConfigDir, name)
 
-		// Skip if already exists in sandbox
-		if _, err := os.Lstat(sandboxPath); err == nil {
-			continue
+		// Check if something already exists in sandbox
+		if info, err := os.Lstat(sandboxPath); err == nil {
+			// If it's already a symlink, skip
+			if info.Mode()&os.ModeSymlink != 0 {
+				continue
+			}
+			// If it's a directory/file (e.g., auto-created by shell), remove it
+			// so we can replace with symlink to real config
+			if err := os.RemoveAll(sandboxPath); err != nil {
+				ulog.Debug("Failed to remove existing config").
+					Field("name", name).
+					Err(err).
+					Emit()
+				continue
+			}
 		}
 
 		// Create symlink
