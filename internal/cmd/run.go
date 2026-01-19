@@ -492,6 +492,12 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 
 	if parallel {
 		results, scenarioStates, err = runScenariosParallel(ctx, h, selectedScenarios, renderer, rootDir)
+
+		// Clean up orphaned tmux servers from parallel test runs
+		// Parallel tests use --no-cleanup to avoid interference, so we clean up here
+		if err := cleanupOrphanedTmuxServers(ctx); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to cleanup orphaned tmux servers: %v\n", err)
+		}
 	} else {
 		results, err = runScenariosSequential(ctx, h, selectedScenarios, renderer)
 	}
@@ -772,6 +778,71 @@ func writeReports(results []*harness.Result) error {
 			return fmt.Errorf("writing github annotations: %w", err)
 		}
 	}
-	
+
+	return nil
+}
+
+// cleanupOrphanedTmuxServers kills all tend-test tmux servers and removes their socket files.
+// This is called after parallel test runs to clean up servers left by --no-cleanup.
+func cleanupOrphanedTmuxServers(ctx context.Context) error {
+	// Get the tmux socket directory
+	socketDir := fmt.Sprintf("/tmp/tmux-%d", os.Getuid())
+
+	// Check if directory exists
+	entries, err := os.ReadDir(socketDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil // No socket directory, nothing to clean
+		}
+		return fmt.Errorf("failed to read socket directory: %w", err)
+	}
+
+	// Find all tend-test sockets
+	var tendSockets []string
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), "tend-test-") {
+			tendSockets = append(tendSockets, entry.Name())
+		}
+	}
+
+	if len(tendSockets) == 0 {
+		return nil // Nothing to clean up
+	}
+
+	ulogRun.Debug("Cleaning up orphaned tmux servers").
+		Field("count", len(tendSockets)).
+		Emit()
+
+	// Kill servers and remove socket files
+	var cleanupErrors []string
+	for _, socketName := range tendSockets {
+		socketPath := filepath.Join(socketDir, socketName)
+
+		// Try to kill the server (if running)
+		client, err := tmux.NewClientWithSocket(socketName)
+		if err == nil {
+			if err := client.KillServer(ctx); err != nil {
+				// Log but continue - server might already be dead
+				ulogRun.Debug("Failed to kill tmux server during cleanup").
+					Field("socket", socketName).
+					Field("error", err.Error()).
+					Emit()
+			}
+		}
+
+		// Remove the socket file
+		if err := os.Remove(socketPath); err != nil && !os.IsNotExist(err) {
+			cleanupErrors = append(cleanupErrors, fmt.Sprintf("%s: %v", socketName, err))
+		}
+	}
+
+	if len(cleanupErrors) > 0 {
+		return fmt.Errorf("some socket files could not be removed: %s", strings.Join(cleanupErrors, "; "))
+	}
+
+	ulogRun.Debug("Successfully cleaned up orphaned tmux servers").
+		Field("count", len(tendSockets)).
+		Emit()
+
 	return nil
 }

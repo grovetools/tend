@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	grovelogging "github.com/grovetools/core/logging"
@@ -195,36 +197,70 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 
 	// Declare testCtx variable here so defer can reference it
 	var testCtx *Context
-	
-	// Setup cleanup
-	if !h.opts.NoCleanup {
-		defer func() {
-			ui.Cleanup()
-			// Clean up all TUI sessions if testCtx was initialized
-			if testCtx != nil {
-				// If using an isolated tmux server, kill the entire server
-				// This cleans up all sessions and the server in one operation
-				if testCtx.tmuxSocket != "" {
-					client, err := tmux.NewClientWithSocket(testCtx.tmuxSocket)
-					if err == nil {
-						_ = client.KillServer(context.Background())
-					}
+
+	// Create cleanup function that can be called from multiple places
+	cleanupFunc := func() {
+		ui.Cleanup()
+		// Clean up all TUI sessions if testCtx was initialized
+		if testCtx != nil {
+			// If using an isolated tmux server, kill the entire server
+			// This cleans up all sessions and the server in one operation
+			if testCtx.tmuxSocket != "" {
+				ulogHarness.Debug("Attempting to kill tmux server").
+					Field("socket", testCtx.tmuxSocket).
+					Emit()
+				client, err := tmux.NewClientWithSocket(testCtx.tmuxSocket)
+				if err != nil {
+					ulogHarness.Error("Failed to create tmux client for cleanup").
+						Field("socket", testCtx.tmuxSocket).
+						Field("error", err.Error()).
+						Emit()
 				} else {
-					// Fallback: kill individual sessions on the default tmux server
-					sessions := testCtx.GetStringSlice("tui_sessions")
-					if len(sessions) > 0 {
-						tmuxClient, err := tmux.NewClient()
-						if err == nil {
-							for _, sessionName := range sessions {
-								_ = tmuxClient.KillSession(context.Background(), sessionName)
-							}
+					if err := client.KillServer(context.Background()); err != nil {
+						ulogHarness.Error("Failed to kill tmux server").
+							Field("socket", testCtx.tmuxSocket).
+							Field("error", err.Error()).
+							Emit()
+					} else {
+						ulogHarness.Debug("Successfully killed tmux server").
+							Field("socket", testCtx.tmuxSocket).
+							Emit()
+					}
+				}
+			} else {
+				// Fallback: kill individual sessions on the default tmux server
+				sessions := testCtx.GetStringSlice("tui_sessions")
+				if len(sessions) > 0 {
+					tmuxClient, err := tmux.NewClient()
+					if err == nil {
+						for _, sessionName := range sessions {
+							_ = tmuxClient.KillSession(context.Background(), sessionName)
 						}
 					}
 				}
 			}
-			if cleanErr := tempMgr.Cleanup(); cleanErr != nil {
-				ui.Error("Cleanup failed", cleanErr)
-			}
+		}
+		if cleanErr := tempMgr.Cleanup(); cleanErr != nil {
+			ui.Error("Cleanup failed", cleanErr)
+		}
+	}
+
+	// Setup cleanup
+	if !h.opts.NoCleanup {
+		defer cleanupFunc()
+
+		// Setup signal handler to ensure cleanup happens even on interrupt
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+		// Clean up signal handler when done
+		defer signal.Stop(sigChan)
+
+		go func() {
+			<-sigChan
+			ulogHarness.Info("Received interrupt signal, cleaning up...").Emit()
+			cleanupFunc()
+			os.Exit(130) // Standard exit code for SIGINT
 		}()
 	} else {
 		ui.Info("Cleanup disabled", fmt.Sprintf("Test files preserved in: %s", tempMgr.BaseDir()))

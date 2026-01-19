@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"syscall"
@@ -53,6 +54,7 @@ Examples:
 	sessionsCmd.AddCommand(newSessionsCaptureCmd())
 	sessionsCmd.AddCommand(newSessionsSendKeysCmd())
 	sessionsCmd.AddCommand(newSessionsAttachCmd())
+	sessionsCmd.AddCommand(newSessionsCleanupCmd())
 
 	return sessionsCmd
 }
@@ -255,4 +257,110 @@ func newSessionsAttachCmd() *cobra.Command {
 			return nil // This line is never reached
 		},
 	}
+}
+
+// newSessionsCleanupCmd creates the "sessions cleanup" command to remove orphaned tmux servers.
+func newSessionsCleanupCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "cleanup",
+		Short: "Clean up orphaned tend test tmux servers",
+		Long: `Clean up orphaned tmux servers created by tend tests.
+
+Tend tests create isolated tmux servers using sockets named "tend-test-*".
+These servers are normally cleaned up automatically, but may remain if tests
+are interrupted (Ctrl+C) or crash. This command finds and kills all orphaned
+tend test tmux servers.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			dryRun, _ := cmd.Flags().GetBool("dry-run")
+			removeStale, _ := cmd.Flags().GetBool("remove-stale")
+
+			// Get the tmux socket directory
+			socketDir := "/tmp/tmux-" + fmt.Sprintf("%d", os.Getuid())
+
+			// Check if directory exists
+			entries, err := os.ReadDir(socketDir)
+			if err != nil {
+				if os.IsNotExist(err) {
+					ulogSessions.Info("No tmux socket directory found.").
+						Pretty("No tmux socket directory found.").
+						PrettyOnly().Emit()
+					return nil
+				}
+				return fmt.Errorf("failed to read socket directory: %w", err)
+			}
+
+			// Find all tend-test sockets
+			// NOTE: We cannot reliably check if servers are running without potentially
+			// auto-starting them (tmux auto-starts servers when you connect).
+			// So we just collect all tend-test sockets and kill them.
+			var tendSockets []string
+
+			for _, entry := range entries {
+				if strings.HasPrefix(entry.Name(), "tend-test-") {
+					tendSockets = append(tendSockets, entry.Name())
+				}
+			}
+
+			if len(tendSockets) == 0 {
+				ulogSessions.Info("No tend test servers or sockets found.").
+					Pretty("No tend test servers or sockets found.").
+					PrettyOnly().Emit()
+				return nil
+			}
+
+			ulogSessions.Info("Found tend test sockets").
+				Field("count", len(tendSockets)).
+				Pretty(fmt.Sprintf("Found %d tend test sockets to clean up:", len(tendSockets))).
+				Emit()
+
+			// Kill servers and optionally remove socket files
+			var killedCount, removedCount int
+			for _, socketName := range tendSockets {
+				socketPath := filepath.Join(socketDir, socketName)
+
+				if dryRun {
+					fmt.Printf("  [dry-run] Would kill server and remove socket: %s\n", socketName)
+					continue
+				}
+
+				// Try to kill the server (if running)
+				client, err := tmux.NewClientWithSocket(socketName)
+				if err == nil {
+					if err := client.KillServer(cmd.Context()); err == nil {
+						killedCount++
+						fmt.Printf("  Killed server: %s\n", socketName)
+					}
+				}
+
+				// Remove the socket file if requested
+				if removeStale {
+					if err := os.Remove(socketPath); err == nil {
+						removedCount++
+						fmt.Printf("  Removed socket file: %s\n", socketName)
+					}
+				}
+			}
+
+			if !dryRun {
+				if removeStale {
+					ulogSessions.Success("Cleanup complete").
+						Field("killed", killedCount).
+						Field("removed", removedCount).
+						Pretty(fmt.Sprintf("Cleanup complete: killed %d servers, removed %d socket files", killedCount, removedCount)).
+						PrettyOnly().Emit()
+				} else {
+					ulogSessions.Success("Cleanup complete").
+						Field("killed", killedCount).
+						Pretty(fmt.Sprintf("Cleanup complete: killed %d servers. Use --remove-stale to also remove socket files.", killedCount)).
+						PrettyOnly().Emit()
+				}
+			}
+
+			return nil
+		},
+	}
+
+	cmd.Flags().Bool("dry-run", false, "Show what would be cleaned up without actually doing it")
+	cmd.Flags().Bool("remove-stale", false, "Also remove stale socket files where servers are not running")
+	return cmd
 }
