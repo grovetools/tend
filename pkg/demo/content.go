@@ -2,9 +2,10 @@ package demo
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
-
-	"github.com/grovetools/tend/pkg/fs"
+	"regexp"
+	"strings"
 )
 
 // Template content constants
@@ -245,60 +246,6 @@ grafana:
   enabled: true
   adminPassword: changeme
 `
-
-// generateGroveYML generates the grove.yml content for a repo.
-func (g *Generator) generateGroveYML(spec RepoSpec) string {
-	return fmt.Sprintf(`name: %s
-version: "1.0"
-build_cmd: make build
-`, spec.Name)
-}
-
-// generateREADME generates the README.md content for a repo.
-func (g *Generator) generateREADME(spec RepoSpec) string {
-	langBadge := ""
-	switch spec.Lang {
-	case "go":
-		langBadge = "![Go](https://img.shields.io/badge/Go-1.21-00ADD8?logo=go)"
-	case "typescript":
-		langBadge = "![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?logo=typescript)"
-	case "python":
-		langBadge = "![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python)"
-	}
-
-	return fmt.Sprintf(`# %s
-
-%s
-
-A homelab service for self-hosted infrastructure management.
-
-## Getting Started
-
-See the [documentation](docs/README.md) for setup instructions.
-
-## Development
-
-%s
-
-## License
-
-MIT
-`, spec.Name, langBadge, g.getDevelopmentInstructions(spec))
-}
-
-// getDevelopmentInstructions returns language-specific dev instructions.
-func (g *Generator) getDevelopmentInstructions(spec RepoSpec) string {
-	switch spec.Lang {
-	case "go":
-		return "```bash\nmake build\nmake test\n```"
-	case "typescript":
-		return "```bash\nnpm install\nnpm run dev\n```"
-	case "python":
-		return "```bash\npip install -e \".[dev]\"\npytest\n```"
-	default:
-		return "See Makefile for available commands."
-	}
-}
 
 // generateGoMain generates a Go main.go file.
 func (g *Generator) generateGoMain(spec RepoSpec) string {
@@ -822,19 +769,23 @@ export interface Container {
 `
 }
 
-// seedHomelabNotes creates notes for the homelab ecosystem.
+// noteSpec defines a note to be created.
+type noteSpec struct {
+	title    string
+	noteType string
+	body     string
+}
+
+// seedHomelabNotes creates notes for the homelab ecosystem using CLI delegation.
 func (g *Generator) seedHomelabNotes() error {
-	notebookDir := filepath.Join(g.notebookDir(), "homelab")
+	// Set working directory to dashboard repo for git context
+	dashboardDir := filepath.Join(g.ecosystemsDir(), "homelab", "dashboard")
 
-	notes := map[string]string{
-		"component-library-evaluation.md": `---
-id: note-001
-title: Component library evaluation - shadcn vs Radix
-created: 2024-01-15T10:30:00Z
-tags: [dashboard, frontend, research]
----
-
-# Component Library Evaluation
+	notes := []noteSpec{
+		{
+			title:    "Component library evaluation - shadcn vs Radix",
+			noteType: "research",
+			body: `# Component Library Evaluation
 
 ## Options Considered
 
@@ -850,19 +801,15 @@ tags: [dashboard, frontend, research]
 
 Going with shadcn/ui for the dashboard. Better DX and we already use Tailwind.
 `,
-
-		"dark-mode-implementation.md": `---
-id: note-002
-title: Dark mode implementation notes
-created: 2024-01-16T14:20:00Z
-tags: [dashboard, frontend, theming]
----
-
-# Dark Mode Implementation
+		},
+		{
+			title:    "Dark mode implementation notes",
+			noteType: "research",
+			body: `# Dark Mode Implementation
 
 ## Approach
 
-Using CSS custom properties with a ` + "`data-theme`" + ` attribute on the root.
+Using CSS custom properties with a data-theme attribute on the root.
 
 ## Theme Toggle
 
@@ -874,15 +821,11 @@ Using CSS custom properties with a ` + "`data-theme`" + ` attribute on the root.
 
 Using Catppuccin Mocha as the dark theme base.
 `,
-
-		"widget-drag-drop.md": `---
-id: note-003
-title: Widget drag-and-drop research
-created: 2024-01-17T09:00:00Z
-tags: [dashboard, frontend, ux]
----
-
-# Drag and Drop Research
+		},
+		{
+			title:    "Widget drag-and-drop research",
+			noteType: "research",
+			body: `# Drag and Drop Research
 
 ## Libraries Evaluated
 
@@ -894,15 +837,11 @@ tags: [dashboard, frontend, ux]
 
 Use @dnd-kit/core - best balance of features and bundle size.
 `,
-
-		"prometheus-vs-custom.md": `---
-id: note-004
-title: Prometheus vs custom metrics format
-created: 2024-01-14T11:00:00Z
-tags: [sentinel, backend, monitoring]
----
-
-# Metrics Format Decision
+		},
+		{
+			title:    "Prometheus vs custom metrics format",
+			noteType: "research",
+			body: `# Metrics Format Decision
 
 ## Prometheus Format
 
@@ -916,15 +855,11 @@ More flexible, easier to extend, but less ecosystem support.
 
 Use Prometheus format for sentinel. Standard tooling is worth it.
 `,
-
-		"container-runtime-detection.md": `---
-id: note-005
-title: Container runtime detection
-created: 2024-01-18T08:30:00Z
-tags: [sentinel, backend, containers]
----
-
-# Container Runtime Detection
+		},
+		{
+			title:    "Container runtime detection",
+			noteType: "research",
+			body: `# Container Runtime Detection
 
 Need to support multiple container runtimes:
 
@@ -942,118 +877,234 @@ Need to support multiple container runtimes:
 
 Use a runtime interface with specific implementations for each.
 `,
+		},
 	}
 
-	for filename, content := range notes {
-		path := filepath.Join(notebookDir, filename)
-		if err := fs.WriteString(path, content); err != nil {
-			return err
+	for _, note := range notes {
+		// Create note via CLI with stdin
+		cmd := g.delegatedCommand("nb", "new", note.title,
+			"-t", note.noteType,
+			"--no-edit",
+			"--stdin")
+		cmd.Dir = dashboardDir
+		cmd.Stdin = strings.NewReader(note.body)
+
+		if err := g.runDelegatedCmd(cmd, "Creating note: "+note.title); err != nil {
+			return fmt.Errorf("creating note %s: %w", note.title, err)
 		}
 	}
 
 	return nil
 }
 
-// seedHomelabPlans creates plans for the homelab ecosystem.
+// jobSpec defines a job to be created in a plan.
+type jobSpec struct {
+	title     string
+	jobType   string
+	prompt    string
+	status    string // target status after creation
+	dependsOn int    // index of dependency job (0-based), -1 for no dependency
+}
+
+// seedHomelabPlans creates plans for the homelab ecosystem using CLI delegation.
 func (g *Generator) seedHomelabPlans() error {
-	notebookDir := filepath.Join(g.notebookDir(), "homelab")
-	plansDir := filepath.Join(notebookDir, "plans")
-	if err := fs.CreateDir(plansDir); err != nil {
-		return err
+	// Run from dashboard repo for workspace context (like notes)
+	dashboardDir := filepath.Join(g.ecosystemsDir(), "homelab", "dashboard")
+
+	// Create GPU Monitoring plan - realistic multi-job plan
+	if err := g.createPlanWithJobs(dashboardDir, "gpu-monitoring", []jobSpec{
+		{
+			title:     "Define GPU Monitoring Spec",
+			jobType:   "oneshot",
+			prompt:    "Research NVIDIA and AMD GPU monitoring APIs. Define metrics to collect including utilization, memory, temperature, and power consumption.",
+			status:    "completed",
+			dependsOn: -1,
+		},
+		{
+			title:     "Implement Sentinel Collector",
+			jobType:   "headless_agent",
+			prompt:    "Add GPU metrics collector to sentinel using nvidia-smi. Implement the Collector interface and add GPU-specific metrics.",
+			status:    "completed",
+			dependsOn: 0, // depends on job 0
+		},
+		{
+			title:     "Add Dashboard Widget",
+			jobType:   "headless_agent",
+			prompt:    "Create GPU widget component in the dashboard. Display real-time GPU utilization, memory usage, and temperature graphs.",
+			status:    "running",
+			dependsOn: 1, // depends on job 1
+		},
+		{
+			title:     "Write Integration Tests",
+			jobType:   "oneshot",
+			prompt:    "Write e2e tests for GPU monitoring using tend. Test collector data flow and dashboard rendering.",
+			status:    "pending",
+			dependsOn: 2, // depends on job 2
+		},
+	}); err != nil {
+		return fmt.Errorf("creating gpu-monitoring plan: %w", err)
 	}
 
-	plans := map[string]string{
-		"gpu-monitoring/plan.md": `---
-id: plan-gpu-monitoring
-title: GPU Monitoring Integration
-status: in-progress
-created: 2024-01-10T09:00:00Z
-repository: homelab
-worktree: feature/gpu-widgets
-jobs_total: 6
-jobs_completed: 4
----
-
-# GPU Monitoring Integration
-
-Add GPU metrics to sentinel and dashboard widgets.
-
-## Jobs
-
-- [x] Research NVIDIA vs AMD GPU monitoring APIs
-- [x] Implement NVIDIA collector in sentinel
-- [x] Add GPU metrics to Prometheus exporter
-- [x] Create GPU widget component
-- [ ] Add AMD GPU support
-- [ ] Write integration tests
-
-## Notes
-
-NVIDIA support via nvidia-smi and NVML. AMD will use rocm-smi.
-`,
-
-		"security-hardening/plan.md": `---
-id: plan-security-hardening
-title: Security Hardening
-status: completed
-created: 2024-01-05T10:00:00Z
-completed_at: 2024-01-12T16:00:00Z
-repository: homelab
-jobs_total: 5
-jobs_completed: 5
----
-
-# Security Hardening
-
-Implement passkey authentication and audit logging.
-
-## Jobs
-
-- [x] Research WebAuthn/Passkey implementation
-- [x] Add passkey support to beacon
-- [x] Implement audit logging
-- [x] Add rate limiting
-- [x] Security review and testing
-
-## Outcome
-
-Successfully deployed passkey auth and comprehensive audit logging.
-`,
-
-		"v2-roadmap/plan.md": `---
-id: plan-v2-roadmap
-title: v2 Roadmap Planning
-status: pending
-created: 2024-01-18T08:00:00Z
-repository: homelab
-jobs_total: 3
-jobs_completed: 0
----
-
-# v2 Roadmap
-
-Planning document for the next major release.
-
-## Jobs
-
-- [ ] Gather community feedback
-- [ ] Define feature priorities
-- [ ] Create technical design docs
-
-## Ideas
-
-- Multi-node support
-- Plugin system
-- Mobile app
-`,
+	// Create Security Hardening plan - completed plan
+	if err := g.createPlanWithJobs(dashboardDir, "security-hardening", []jobSpec{
+		{
+			title:     "Research WebAuthn Passkey",
+			jobType:   "oneshot",
+			prompt:    "Research WebAuthn/Passkey implementation options. Evaluate libraries and browser support.",
+			status:    "completed",
+			dependsOn: -1,
+		},
+		{
+			title:     "Add Passkey Support to Beacon",
+			jobType:   "headless_agent",
+			prompt:    "Implement passkey authentication in the beacon service. Add registration and login flows.",
+			status:    "completed",
+			dependsOn: 0,
+		},
+		{
+			title:     "Implement Audit Logging",
+			jobType:   "headless_agent",
+			prompt:    "Add comprehensive audit logging for authentication events. Log to structured JSON format.",
+			status:    "completed",
+			dependsOn: 1,
+		},
+	}); err != nil {
+		return fmt.Errorf("creating security-hardening plan: %w", err)
 	}
 
-	for filename, content := range plans {
-		path := filepath.Join(plansDir, filename)
-		if err := fs.WriteString(path, content); err != nil {
-			return err
-		}
+	// Create v2 Roadmap plan - pending plan
+	if err := g.createPlanWithJobs(dashboardDir, "v2-roadmap", []jobSpec{
+		{
+			title:     "Gather Community Feedback",
+			jobType:   "oneshot",
+			prompt:    "Collect and organize feature requests from GitHub issues and discussions.",
+			status:    "pending",
+			dependsOn: -1,
+		},
+		{
+			title:     "Define Feature Priorities",
+			jobType:   "oneshot",
+			prompt:    "Prioritize features based on community feedback and technical feasibility.",
+			status:    "pending",
+			dependsOn: 0,
+		},
+		{
+			title:     "Create Technical Design Docs",
+			jobType:   "headless_agent",
+			prompt:    "Write technical design documents for the top priority features.",
+			status:    "pending",
+			dependsOn: 1,
+		},
+	}); err != nil {
+		return fmt.Errorf("creating v2-roadmap plan: %w", err)
 	}
 
 	return nil
+}
+
+// createPlanWithJobs creates a plan directory and adds jobs using CLI delegation.
+// repoDir is the repo to run from (for workspace context).
+func (g *Generator) createPlanWithJobs(repoDir, planName string, jobs []jobSpec) error {
+	// Step 1: Initialize plan directory via CLI (no recipe = minimal plan)
+	// Running from repoDir gives us workspace context
+	cmd := g.delegatedCommand("flow", "plan", "init", planName)
+	cmd.Dir = repoDir
+	if err := g.runDelegatedCmd(cmd, "Creating "+planName+" plan"); err != nil {
+		return err
+	}
+
+	// Find the created plan directory
+	planDir, err := g.findPlanDir(repoDir, planName)
+	if err != nil {
+		return fmt.Errorf("finding plan directory: %w", err)
+	}
+
+	// Track created job filenames for dependency resolution
+	jobFilenames := make([]string, 0, len(jobs))
+
+	// Step 2: Add jobs via CLI
+	for i, job := range jobs {
+		args := []string{"plan", "add", planDir,
+			"-t", job.jobType,
+			"--title", job.title,
+			"-p", job.prompt,
+		}
+		if job.dependsOn >= 0 && job.dependsOn < len(jobFilenames) {
+			args = append(args, "-d", jobFilenames[job.dependsOn])
+		}
+
+		cmd := g.delegatedCommand("flow", args...)
+		if err := g.runDelegatedCmd(cmd, "Adding job: "+job.title); err != nil {
+			return err
+		}
+
+		// Find the created job file (it's the most recent one with the expected number prefix)
+		jobFile, err := g.findJobFile(planDir, i+1)
+		if err != nil {
+			return fmt.Errorf("finding job file for %s: %w", job.title, err)
+		}
+		jobFilenames = append(jobFilenames, filepath.Base(jobFile))
+
+		// Step 3: Update job status via CLI
+		if job.status == "completed" {
+			// Use flow plan complete CLI
+			cmd := g.delegatedCommand("flow", "plan", "complete", jobFile)
+			if err := g.runDelegatedCmd(cmd, "Completing job: "+job.title); err != nil {
+				return fmt.Errorf("completing job %s: %w", job.title, err)
+			}
+		} else if job.status == "running" {
+			// "running" is a synthetic demo state - use manual update
+			if err := g.updateJobStatusFile(jobFile, job.status); err != nil {
+				return fmt.Errorf("updating job status for %s: %w", job.title, err)
+			}
+		}
+		// "pending" is the default, no action needed
+	}
+
+	return nil
+}
+
+// findPlanDir finds the plan directory created by flow plan init.
+// It searches in the notebook workspace for the given plan name.
+func (g *Generator) findPlanDir(repoDir, planName string) (string, error) {
+	// Plans are created in notebooks/<ecosystem>/workspaces/<repo>/plans/<planName>
+	// We need to search for the plan directory
+	pattern := filepath.Join(g.notebookDir(), "*", "workspaces", "*", "plans", planName)
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		return "", err
+	}
+	if len(matches) == 0 {
+		return "", fmt.Errorf("plan directory not found: %s", planName)
+	}
+	return matches[0], nil
+}
+
+// findJobFile finds the job file with the given number prefix.
+func (g *Generator) findJobFile(planDir string, jobNum int) (string, error) {
+	prefix := fmt.Sprintf("%02d-", jobNum)
+	pattern := filepath.Join(planDir, prefix+"*.md")
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		return "", err
+	}
+	if len(matches) == 0 {
+		return "", fmt.Errorf("no job file found matching %s", pattern)
+	}
+	return matches[0], nil
+}
+
+// updateJobStatusFile modifies a job file's status field.
+// Used only for synthetic "running" status - completed jobs use flow plan complete CLI.
+func (g *Generator) updateJobStatusFile(filePath, status string) error {
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return err
+	}
+
+	// Update the status field in frontmatter
+	statusRe := regexp.MustCompile(`(?m)^status:\s*.*$`)
+	newContent := statusRe.ReplaceAllString(string(content), "status: "+status)
+
+	return os.WriteFile(filePath, []byte(newContent), 0644)
 }

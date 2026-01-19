@@ -3,11 +3,14 @@ package demo
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
 	grovelogging "github.com/grovetools/core/logging"
+	"github.com/grovetools/core/util/delegation"
 	"github.com/grovetools/tend/pkg/fs"
 	"github.com/grovetools/tend/pkg/git"
 	"gopkg.in/yaml.v3"
@@ -224,14 +227,20 @@ func (g *Generator) createInfraEcosystem() (*EcosystemMeta, error) {
 }
 
 // createRepo creates a single repository with the given specification.
+// Uses CLI delegation for base structure, Go for synthetic states.
 func (g *Generator) createRepo(ecoDir string, spec RepoSpec) error {
-	repoDir := filepath.Join(ecoDir, spec.Name)
-	if err := fs.CreateDir(repoDir); err != nil {
+	// Step 1: Use CLI to create repo with proper grove.yml
+	cmd := g.delegatedCommand("grove", "repo", "add", spec.Name,
+		"--description", fmt.Sprintf("Demo %s service", spec.Name))
+	cmd.Dir = ecoDir
+	if err := g.runDelegatedCmd(cmd, "Creating repo "+spec.Name); err != nil {
 		return err
 	}
 
-	// Create files based on depth
-	files := g.getRepoFiles(spec)
+	repoDir := filepath.Join(ecoDir, spec.Name)
+
+	// Step 2: Add language-specific files (Go layer)
+	files := g.getLanguageFiles(spec)
 	for path, content := range files {
 		fullPath := filepath.Join(repoDir, path)
 		if err := fs.WriteString(fullPath, content); err != nil {
@@ -239,23 +248,22 @@ func (g *Generator) createRepo(ecoDir string, spec RepoSpec) error {
 		}
 	}
 
-	// Initialize git repo
-	repo, err := git.SetupTestRepo(repoDir)
-	if err != nil {
-		return fmt.Errorf("initializing git: %w", err)
+	// Commit additional files if any were added
+	if len(files) > 0 {
+		repo := git.New(repoDir)
+		if err := repo.Add(); err != nil {
+			return fmt.Errorf("staging files: %w", err)
+		}
+		if err := repo.Commit("Add project structure"); err != nil {
+			return fmt.Errorf("committing project structure: %w", err)
+		}
 	}
 
-	// Create initial commit
-	if err := repo.AddCommit("Initial commit"); err != nil {
-		return fmt.Errorf("initial commit: %w", err)
-	}
-
-	// Create worktree if specified
+	// Step 3: Create worktree if specified (Go layer)
 	if spec.Worktree != "" {
-		// Sanitize branch name for directory path (replace / with -)
 		safeBranchName := strings.ReplaceAll(spec.Worktree, "/", "-")
-		// Worktrees go inside the repo's .grove-worktrees directory (EcosystemSubProjectWorktree pattern)
 		worktreeDir := filepath.Join(repoDir, ".grove-worktrees", safeBranchName)
+		repo := git.New(repoDir)
 		if err := repo.CreateWorktree(worktreeDir, spec.Worktree); err != nil {
 			return fmt.Errorf("creating worktree: %w", err)
 		}
@@ -291,9 +299,16 @@ func (g *Generator) applyGitState(dir, state string) error {
 		return repo.Add("CHANGELOG.md")
 
 	case "dirty-unstaged":
-		// Create a modification without staging
-		file := filepath.Join(dir, "TODO.md")
-		return fs.WriteString(file, "# TODO\n\n- [ ] Fix this issue\n- [ ] Add tests\n")
+		// Modify an existing file without staging it
+		// This will show as "modified" in git status
+		file := filepath.Join(dir, "README.md")
+		existingContent, err := fs.ReadString(file)
+		if err != nil {
+			// If README doesn't exist, create a modification to grove.yml
+			file = filepath.Join(dir, "grove.yml")
+			existingContent, _ = fs.ReadString(file)
+		}
+		return fs.WriteString(file, existingContent+"\n# TODO: Fix this issue\n")
 
 	case "untracked":
 		// Create untracked files
@@ -305,13 +320,11 @@ func (g *Generator) applyGitState(dir, state string) error {
 	}
 }
 
-// getRepoFiles returns the file contents for a repository based on its specification.
-func (g *Generator) getRepoFiles(spec RepoSpec) map[string]string {
+// getLanguageFiles returns the language-specific file contents for a repository.
+// Note: grove.yml and README.md are created by the CLI, so we only return
+// language-specific files here.
+func (g *Generator) getLanguageFiles(spec RepoSpec) map[string]string {
 	files := make(map[string]string)
-
-	// Always include grove.yml and README
-	files["grove.yml"] = g.generateGroveYML(spec)
-	files["README.md"] = g.generateREADME(spec)
 
 	// Add language-specific files
 	switch spec.Lang {
@@ -473,4 +486,32 @@ func BuildEnvironment(demoDir string) map[string]string {
 		"GROVE_DEMO":           "1",
 		"GROVE_TMUX_SOCKET":    TmuxSocketName,
 	}
+}
+
+// runDelegatedCmd executes a delegated CLI command with proper environment.
+func (g *Generator) runDelegatedCmd(cmd *exec.Cmd, description string) error {
+	ulog.Debug(description).Field("cmd", cmd.String()).Emit()
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%s: %w\nOutput:\n%s", description, err, string(output))
+	}
+	return nil
+}
+
+// buildCmdEnv returns the environment slice for delegated commands.
+func (g *Generator) buildCmdEnv() []string {
+	demoEnv := BuildEnvironment(g.rootDir)
+	env := os.Environ()
+	for k, v := range demoEnv {
+		env = append(env, fmt.Sprintf("%s=%s", k, v))
+	}
+	return env
+}
+
+// delegatedCommand creates a delegated command with proper environment.
+func (g *Generator) delegatedCommand(tool string, args ...string) *exec.Cmd {
+	cmd := delegation.Command(tool, args...)
+	cmd.Env = g.buildCmdEnv()
+	return cmd
 }
