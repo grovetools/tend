@@ -10,16 +10,11 @@ settings:
     system_prompt: default
     output_dir: docs
 sections:
-    - name: introduction
-      title: Introduction
-      order: 10
-      prompt: 01-introduction.md
-      output: 01-introduction.md
-    - name: core_concepts
-      title: Core Concepts
+    - name: overview
+      title: Overview
       order: 20
-      prompt: 02-core-concepts.md
-      output: 02-core-concepts.md
+      prompt: 01-overview.md
+      output: 01-overview.md
     - name: writing_tests_basic
       title: 'Writing Tests: A Basic Scenario'
       order: 30

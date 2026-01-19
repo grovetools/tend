@@ -1,5 +1,17 @@
 `grove-tend` is a scenario-based testing framework designed for end-to-end validation of command-line tools and Terminal User Interfaces (TUIs). It provides a structured environment for defining test cases in Go, managing isolated filesystems, and interacting with application subprocesses. Its core components are Scenarios, Steps, the Harness, and the Context.
 
+Tests are defined as `Scenarios` composed of sequential `Steps`. The test `harness` executes these scenarios, managing state, sandboxed filesystems, mock dependencies, and automatic cleanup.
+
+When executed, the `tend` CLI acts as a proxy. It discovers the project under test, builds a project-specific test binary containing that project's compiled `Scenario` definitions, and then executes that binary with the specified arguments.
+
+Key capabilities include:
+
+*   Hermetic test execution via temporary, sandboxed filesystems and home directories.
+*   Mocking of command-line dependencies (e.g., `git`, `docker`, `kubectl`).
+*   Programmatic control and state assertion for TUIs via managed tmux sessions.
+*   Helpers for manipulating Git repositories, running commands, and managing Docker containers.
+*   Interactive debugging modes for step-through execution and live TUI exploration.
+
 ### 1. Scenarios and Steps
 
 The fundamental building blocks of a `grove-tend` test suite are `Scenarios` and `Steps`.
