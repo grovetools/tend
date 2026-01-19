@@ -23,19 +23,18 @@ func newDemoCmd() *cobra.Command {
 		Short: "Manage demo environments for screenshots and demos",
 		Long: `Create and manage isolated demo environments for screenshots and demonstrations.
 
-The demo environment creates a complete, isolated Grove ecosystem with:
-  - 3 ecosystems: homelab (main), contrib, and infra
-  - 8 repositories in the main ecosystem with realistic structure
-  - Active worktrees simulating in-progress work
-  - Git states (dirty, unstaged, untracked files)
-  - Notes and plans with proper frontmatter
-  - Isolated tmux session with preconfigured layout
+Demo environments provide complete, isolated Grove ecosystems for testing and demos.
+Each demo type creates different content (repositories, notes, plans, etc.) and
+can have its own tmux session with a preconfigured layout.
+
+Available demos:
+  homelab   - Full-featured demo with 3 ecosystems, 13 repos, worktrees, notes, and plans
 
 Commands:
-  tend demo create    Create a new demo environment
-  tend demo attach    Attach to the demo tmux session
-  tend demo destroy   Remove the demo environment
-  tend demo status    Show demo environment status`,
+  tend demo create <name>     Create a new demo environment
+  tend demo attach <name>     Attach to the demo tmux session
+  tend demo destroy <name>    Remove the demo environment
+  tend demo status <name>     Show demo environment status`,
 	}
 
 	demoCmd.AddCommand(newDemoCreateCmd())
@@ -53,27 +52,44 @@ func newDemoCreateCmd() *cobra.Command {
 	var force bool
 
 	cmd := &cobra.Command{
-		Use:   "create",
+		Use:   "create <name>",
 		Short: "Create a new demo environment",
 		Long: `Create a new demo environment with isolated ecosystems, repositories, and notebooks.
 
-The environment is created at ~/.grove-demo by default, or at the path specified
-with --output-dir. Use --force to overwrite an existing demo environment.
+Available demos:
+  homelab   - Full ecosystem with 3 ecosystems, 13 repos, worktrees, notes, and plans
 
-After creation, use 'tend demo attach' to connect to the demo tmux session.`,
+The environment is created at ~/.grove-demos/<name> by default, or at the path
+specified with --output-dir. Use --force to overwrite an existing demo environment.
+
+After creation, use 'tend demo attach <name>' to connect to the demo tmux session.`,
+		Args: cobra.ExactArgs(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			if len(args) == 0 {
+				return demo.List(), cobra.ShellCompDirectiveNoFileComp
+			}
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			demoName := args[0]
+
+			// Verify demo exists
+			if _, err := demo.Get(demoName); err != nil {
+				return fmt.Errorf("unknown demo '%s'. Available: %v", demoName, demo.List())
+			}
+
 			// Set default output directory
 			if outputDir == "" {
 				homeDir, err := os.UserHomeDir()
 				if err != nil {
 					return fmt.Errorf("getting home directory: %w", err)
 				}
-				outputDir = filepath.Join(homeDir, ".grove-demo")
+				outputDir = filepath.Join(homeDir, ".grove-demos", demoName)
 			}
 
 			// Check if already exists
 			if _, err := os.Stat(outputDir); err == nil && !force {
-				return fmt.Errorf("demo environment already exists at %s (use --force to overwrite)", outputDir)
+				return fmt.Errorf("demo exists at %s (use --force to overwrite)", outputDir)
 			}
 
 			// If force, remove existing
@@ -84,14 +100,19 @@ After creation, use 'tend demo attach' to connect to the demo tmux session.`,
 			}
 
 			// Create the demo environment
-			gen := demo.NewGenerator(outputDir)
+			gen, err := demo.NewGenerator(outputDir, demoName)
+			if err != nil {
+				return err
+			}
+
 			if err := gen.Generate(); err != nil {
 				return fmt.Errorf("generating demo environment: %w", err)
 			}
 
 			ulogDemo.Success("Demo environment created successfully").
+				Field("demo", demoName).
 				Field("path", outputDir).
-				Pretty(fmt.Sprintf("Demo environment created at: %s", outputDir)).
+				Pretty(fmt.Sprintf("Demo created at: %s", outputDir)).
 				Emit()
 
 			// Optionally attach immediately
@@ -99,8 +120,8 @@ After creation, use 'tend demo attach' to connect to the demo tmux session.`,
 				return attachToDemo(outputDir)
 			}
 
-			ulogDemo.Info("Attach with: tend demo attach").
-				Pretty("\nTo connect to the demo environment:\n  tend demo attach").
+			ulogDemo.Info("Attach with command").
+				Pretty(fmt.Sprintf("\nTo connect to the demo environment:\n  tend demo attach %s", demoName)).
 				PrettyOnly().
 				Emit()
 
@@ -108,7 +129,7 @@ After creation, use 'tend demo attach' to connect to the demo tmux session.`,
 		},
 	}
 
-	cmd.Flags().StringVarP(&outputDir, "output-dir", "o", "", "Output directory for demo environment (default: ~/.grove-demo)")
+	cmd.Flags().StringVarP(&outputDir, "output-dir", "o", "", "Output directory (default: ~/.grove-demos/<name>)")
 	cmd.Flags().BoolVarP(&attach, "attach", "a", false, "Attach to the demo session immediately after creation")
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "Overwrite existing demo environment")
 
@@ -120,34 +141,70 @@ func newDemoAttachCmd() *cobra.Command {
 	var outputDir string
 
 	cmd := &cobra.Command{
-		Use:   "attach",
-		Short: "Attach to the demo tmux session",
+		Use:   "attach <name>",
+		Short: "Attach to a demo tmux session",
 		Long: `Attach to the demo environment's isolated tmux session.
 
-This spawns a shell with the demo's environment variables (HOME, XDG_CONFIG_HOME, etc.)
-and connects to the demo's tmux server.`,
+This spawns a shell with the demo's environment variables and connects
+to the demo's tmux server.`,
+		Args: cobra.MaximumNArgs(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			if len(args) == 0 {
+				return listExistingDemos(), cobra.ShellCompDirectiveNoFileComp
+			}
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Set default output directory
+			// Determine directory
 			if outputDir == "" {
-				homeDir, err := os.UserHomeDir()
-				if err != nil {
-					return fmt.Errorf("getting home directory: %w", err)
+				if len(args) == 0 {
+					// Check for legacy ~/.grove-demo
+					homeDir, _ := os.UserHomeDir()
+					legacyDir := filepath.Join(homeDir, ".grove-demo")
+					if _, err := os.Stat(legacyDir); err == nil {
+						outputDir = legacyDir
+					} else {
+						return fmt.Errorf("no demo name provided")
+					}
+				} else {
+					homeDir, _ := os.UserHomeDir()
+					outputDir = filepath.Join(homeDir, ".grove-demos", args[0])
 				}
-				outputDir = filepath.Join(homeDir, ".grove-demo")
 			}
 
-			// Check if demo exists
 			if _, err := os.Stat(outputDir); os.IsNotExist(err) {
-				return fmt.Errorf("demo environment not found at %s (run 'tend demo create' first)", outputDir)
+				return fmt.Errorf("demo not found at %s", outputDir)
 			}
 
 			return attachToDemo(outputDir)
 		},
 	}
 
-	cmd.Flags().StringVarP(&outputDir, "output-dir", "o", "", "Demo environment directory (default: ~/.grove-demo)")
+	cmd.Flags().StringVarP(&outputDir, "output-dir", "o", "", "Demo directory")
 
 	return cmd
+}
+
+// listExistingDemos returns a list of existing demo directories.
+func listExistingDemos() []string {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil
+	}
+
+	demosDir := filepath.Join(homeDir, ".grove-demos")
+	entries, err := os.ReadDir(demosDir)
+	if err != nil {
+		return nil
+	}
+
+	var demos []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			demos = append(demos, entry.Name())
+		}
+	}
+	return demos
 }
 
 // newDemoDestroyCmd creates the "demo destroy" command.
@@ -156,19 +213,34 @@ func newDemoDestroyCmd() *cobra.Command {
 	var force bool
 
 	cmd := &cobra.Command{
-		Use:   "destroy",
-		Short: "Remove the demo environment",
+		Use:   "destroy <name>",
+		Short: "Remove a demo environment",
 		Long: `Remove the demo environment and all its contents.
 
 This kills the demo tmux server and removes all demo files.`,
+		Args: cobra.MaximumNArgs(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			if len(args) == 0 {
+				return listExistingDemos(), cobra.ShellCompDirectiveNoFileComp
+			}
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Set default output directory
+			// Determine directory
 			if outputDir == "" {
-				homeDir, err := os.UserHomeDir()
-				if err != nil {
-					return fmt.Errorf("getting home directory: %w", err)
+				if len(args) == 0 {
+					// Check for legacy ~/.grove-demo
+					homeDir, _ := os.UserHomeDir()
+					legacyDir := filepath.Join(homeDir, ".grove-demo")
+					if _, err := os.Stat(legacyDir); err == nil {
+						outputDir = legacyDir
+					} else {
+						return fmt.Errorf("no demo name provided")
+					}
+				} else {
+					homeDir, _ := os.UserHomeDir()
+					outputDir = filepath.Join(homeDir, ".grove-demos", args[0])
 				}
-				outputDir = filepath.Join(homeDir, ".grove-demo")
 			}
 
 			// Check if demo exists
@@ -189,10 +261,13 @@ This kills the demo tmux server and removes all demo files.`,
 				return nil
 			}
 
-			// Kill the tmux server first
-			client, err := tmux.NewClientWithSocket(demo.TmuxSocketName)
-			if err == nil {
-				_ = client.KillServer(cmd.Context())
+			// Kill the tmux server first using metadata
+			meta, err := demo.LoadMetadata(outputDir)
+			if err == nil && meta.TmuxSocket != "" {
+				client, err := tmux.NewClientWithSocket(meta.TmuxSocket)
+				if err == nil {
+					_ = client.KillServer(cmd.Context())
+				}
 			}
 
 			// Remove the directory
@@ -211,7 +286,7 @@ This kills the demo tmux server and removes all demo files.`,
 		},
 	}
 
-	cmd.Flags().StringVarP(&outputDir, "output-dir", "o", "", "Demo environment directory (default: ~/.grove-demo)")
+	cmd.Flags().StringVarP(&outputDir, "output-dir", "o", "", "Demo directory")
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "Skip confirmation prompt")
 
 	return cmd
@@ -222,17 +297,32 @@ func newDemoStatusCmd() *cobra.Command {
 	var outputDir string
 
 	cmd := &cobra.Command{
-		Use:   "status",
+		Use:   "status <name>",
 		Short: "Show demo environment status",
 		Long:  `Display the current state of the demo environment.`,
+		Args:  cobra.MaximumNArgs(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			if len(args) == 0 {
+				return listExistingDemos(), cobra.ShellCompDirectiveNoFileComp
+			}
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Set default output directory
+			// Determine directory
 			if outputDir == "" {
-				homeDir, err := os.UserHomeDir()
-				if err != nil {
-					return fmt.Errorf("getting home directory: %w", err)
+				if len(args) == 0 {
+					// Check for legacy ~/.grove-demo
+					homeDir, _ := os.UserHomeDir()
+					legacyDir := filepath.Join(homeDir, ".grove-demo")
+					if _, err := os.Stat(legacyDir); err == nil {
+						outputDir = legacyDir
+					} else {
+						return fmt.Errorf("no demo name provided")
+					}
+				} else {
+					homeDir, _ := os.UserHomeDir()
+					outputDir = filepath.Join(homeDir, ".grove-demos", args[0])
 				}
-				outputDir = filepath.Join(homeDir, ".grove-demo")
 			}
 
 			// Check if demo exists
@@ -252,7 +342,7 @@ func newDemoStatusCmd() *cobra.Command {
 
 			// Check tmux server status
 			tmuxRunning := false
-			client, err := tmux.NewClientWithSocket(demo.TmuxSocketName)
+			client, err := tmux.NewClientWithSocket(meta.TmuxSocket)
 			if err == nil {
 				sessions, _ := client.ListSessions(cmd.Context())
 				tmuxRunning = len(sessions) > 0
@@ -261,28 +351,47 @@ func newDemoStatusCmd() *cobra.Command {
 			// Display status
 			fmt.Printf("Demo Environment Status\n")
 			fmt.Printf("=======================\n")
+			fmt.Printf("Demo:         %s\n", meta.DemoName)
 			fmt.Printf("Location:     %s\n", outputDir)
 			fmt.Printf("Created:      %s\n", meta.CreatedAt.Format("2006-01-02 15:04:05"))
 			fmt.Printf("Tmux Socket:  %s\n", meta.TmuxSocket)
+			if meta.TmuxSessionName != "" {
+				fmt.Printf("Tmux Session: %s\n", meta.TmuxSessionName)
+			}
 			fmt.Printf("Tmux Running: %v\n", tmuxRunning)
 			fmt.Printf("\nEcosystems:\n")
 			for _, eco := range meta.Ecosystems {
-				fmt.Printf("  - %s (%d repos)\n", eco.Name, eco.RepoCount)
+				fmt.Printf("  - %s (%d repos", eco.Name, eco.RepoCount)
+				if eco.Description != "" {
+					fmt.Printf(", %s", eco.Description)
+				}
+				fmt.Printf(")\n")
 			}
 
 			return nil
 		},
 	}
 
-	cmd.Flags().StringVarP(&outputDir, "output-dir", "o", "", "Demo environment directory (default: ~/.grove-demo)")
+	cmd.Flags().StringVarP(&outputDir, "output-dir", "o", "", "Demo directory")
 
 	return cmd
 }
 
 // attachToDemo attaches to the demo tmux session.
 func attachToDemo(demoDir string) error {
+	// Load metadata
+	meta, err := demo.LoadMetadata(demoDir)
+	if err != nil {
+		return fmt.Errorf("loading demo metadata: %w", err)
+	}
+
+	// Check if this demo has a tmux session
+	if meta.TmuxSessionName == "" {
+		return fmt.Errorf("demo '%s' does not have a tmux session", meta.DemoName)
+	}
+
 	// Build environment for the demo
-	env := demo.BuildEnvironment(demoDir)
+	env := demo.BuildEnvironment(demoDir, meta.TmuxSocket)
 
 	// Get current environment and add demo overrides
 	fullEnv := os.Environ()
@@ -297,7 +406,7 @@ func attachToDemo(demoDir string) error {
 	}
 
 	// Check if demo tmux session exists
-	client, err := tmux.NewClientWithSocket(demo.TmuxSocketName)
+	client, err := tmux.NewClientWithSocket(meta.TmuxSocket)
 	if err != nil {
 		return fmt.Errorf("failed to create tmux client: %w", err)
 	}
@@ -313,10 +422,10 @@ func attachToDemo(demoDir string) error {
 	var tmuxArgs []string
 	if os.Getenv("TMUX") != "" {
 		// Inside tmux, switch client
-		tmuxArgs = []string{"tmux", "-L", demo.TmuxSocketName, "switch-client", "-t", "grove-demo"}
+		tmuxArgs = []string{"tmux", "-L", meta.TmuxSocket, "switch-client", "-t", meta.TmuxSessionName}
 	} else {
 		// Outside tmux, attach
-		tmuxArgs = []string{"tmux", "-L", demo.TmuxSocketName, "attach-session", "-t", "grove-demo"}
+		tmuxArgs = []string{"tmux", "-L", meta.TmuxSocket, "attach-session", "-t", meta.TmuxSessionName}
 	}
 
 	// Replace the current process with tmux

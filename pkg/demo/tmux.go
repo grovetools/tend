@@ -4,157 +4,44 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"time"
 
 	"github.com/grovetools/core/pkg/tmux"
 )
 
 // setupTmux creates and configures the demo tmux session.
-func (g *Generator) setupTmux() error {
-	// Use a named socket (not a path) for tmux -L flag
-	socketName := TmuxSocketName
+func (g *Generator) setupTmux(content *DemoContent) error {
+	socketName := g.tmuxSocket
+	sessionName := fmt.Sprintf("grove-demo-%s", g.demoName)
 
-	// Create tmux client with isolated socket
 	client, err := tmux.NewClientWithSocket(socketName)
 	if err != nil {
 		return fmt.Errorf("creating tmux client: %w", err)
 	}
 
 	ctx := context.Background()
+	env := BuildEnvironment(g.rootDir, g.tmuxSocket)
 
-	// Build environment for the demo session
-	env := BuildEnvironment(g.rootDir)
+	// Start in the main ecosystem directory
+	workDir := filepath.Join(g.ecosystemsDir(), "homelab")
 
-	// Convert env map to slice format
-	var envSlice []string
-	for k, v := range env {
-		envSlice = append(envSlice, fmt.Sprintf("%s=%s", k, v))
-	}
-
-	// Main ecosystem directory
-	homelabDir := filepath.Join(g.ecosystemsDir(), "homelab")
-
-	// Create the main session with a layout suitable for screenshots
-	// This also starts the tmux server
+	// Create a simple session with one empty window
 	launchOpts := tmux.LaunchOptions{
-		SessionName:      "grove-demo",
-		WorkingDirectory: homelabDir,
+		SessionName:      sessionName,
+		WorkingDirectory: workDir,
 		WindowIndex:      -1,
 		Panes: []tmux.PaneOptions{
-			{
-				// First pane: Run grove navigator in the main ecosystem
-				Command: "echo 'Welcome to Grove Demo Environment' && echo '' && echo 'Ecosystems:' && ls -la " + g.ecosystemsDir(),
-				Env:     env,
-			},
+			{Env: env},
 		},
 	}
 
 	if err := client.Launch(ctx, launchOpts); err != nil {
-		return fmt.Errorf("launching main session: %w", err)
+		return fmt.Errorf("launching session: %w", err)
 	}
-
-	// Give tmux a moment to start
-	time.Sleep(200 * time.Millisecond)
-
-	// Set global environment at the tmux server level so all new windows/sessions inherit it
-	// This must be done AFTER Launch since Launch starts the server
-	if err := client.SetGlobalEnvironment(ctx, env); err != nil {
-		return fmt.Errorf("setting global environment: %w", err)
-	}
-
-	// Create additional windows for the demo
-	// Window 2: Dashboard worktree (branch name sanitized: feature/gpu-widgets -> feature-gpu-widgets)
-	// Worktrees are inside the repo's .grove-worktrees directory (EcosystemSubProjectWorktree pattern)
-	dashboardWorktree := filepath.Join(homelabDir, "dashboard", ".grove-worktrees", "feature-gpu-widgets")
-	if err := client.NewWindowWithOptions(ctx, tmux.NewWindowOptions{
-		Target:     "grove-demo",
-		WindowName: "dashboard",
-		WorkingDir: dashboardWorktree,
-		Env:        envSlice,
-	}); err != nil {
-		ulog.Warn("Failed to create dashboard window").Err(err).Emit()
-	}
-
-	// Window 3: Sentinel
-	sentinelDir := filepath.Join(homelabDir, "sentinel")
-	if err := client.NewWindowWithOptions(ctx, tmux.NewWindowOptions{
-		Target:     "grove-demo",
-		WindowName: "sentinel",
-		WorkingDir: sentinelDir,
-		Env:        envSlice,
-	}); err != nil {
-		ulog.Warn("Failed to create sentinel window").Err(err).Emit()
-	}
-
-	// Window 4: Git status overview
-	if err := client.NewWindowWithOptions(ctx, tmux.NewWindowOptions{
-		Target:     "grove-demo",
-		WindowName: "git",
-		WorkingDir: homelabDir,
-		Env:        envSlice,
-	}); err != nil {
-		ulog.Warn("Failed to create git window").Err(err).Emit()
-	} else {
-		// Send git status command
-		_ = client.SendKeys(ctx, "grove-demo:git", "git status && echo '' && echo 'Repository structure:' && ls -la")
-	}
-
-	// Rename first window
-	if err := client.RenameWindow(ctx, "grove-demo:0", "overview"); err != nil {
-		ulog.Warn("Failed to rename overview window").Err(err).Emit()
-	}
-
-	// Select the first window
-	_ = client.SelectWindow(ctx, "grove-demo:overview")
 
 	ulog.Info("Tmux session created").
 		Field("socket", socketName).
-		Field("session", "grove-demo").
-		Pretty(fmt.Sprintf("Tmux session 'grove-demo' created with socket: %s", socketName)).
+		Field("session", sessionName).
 		Emit()
-
-	// Show instructions in the overview window
-	welcomeMsg := fmt.Sprintf(`clear && cat << 'EOF'
-╔══════════════════════════════════════════════════════════════════╗
-║                   Grove Demo Environment                          ║
-╠══════════════════════════════════════════════════════════════════╣
-║                                                                    ║
-║  This is a demo environment for Grove using config overlay.        ║
-║  Your real HOME, nvim, shell config, etc. are preserved.          ║
-║                                                                    ║
-║  Ecosystems:                                                       ║
-║    • homelab (main) - 8 repos, 4 worktrees                        ║
-║    • contrib        - 3 repos (plugins & themes)                  ║
-║    • infra          - 2 repos (deployment & charts)               ║
-║                                                                    ║
-║  Demo Features:                                                    ║
-║    • Realistic repository structure                                ║
-║    • Active worktrees with git changes                            ║
-║    • Notes and plans with proper frontmatter                      ║
-║                                                                    ║
-║  Windows:                                                          ║
-║    1. overview   - Main ecosystem view                             ║
-║    2. dashboard  - Dashboard worktree (feature/gpu-widgets)       ║
-║    3. sentinel   - Monitoring service                              ║
-║    4. git        - Git status overview                             ║
-║                                                                    ║
-║  Environment:                                                      ║
-║    GROVE_CONFIG_OVERLAY=%s
-║    GROVE_DEMO=1                                                    ║
-║                                                                    ║
-╚══════════════════════════════════════════════════════════════════╝
-EOF
-`, g.overlayPath())
-
-	_ = client.SendKeys(ctx, "grove-demo:overview", welcomeMsg)
-
-	// Send a command to show the dashboard worktree
-	dashboardCmd := fmt.Sprintf("cd %s && echo 'Dashboard worktree: feature/gpu-widgets' && echo '' && ls -la", dashboardWorktree)
-	_ = client.SendKeys(ctx, "grove-demo:dashboard", dashboardCmd)
-
-	// Send a command to show sentinel structure
-	sentinelCmd := fmt.Sprintf("cd %s && echo 'Sentinel - Metrics & Monitoring' && echo '' && find . -name '*.go' | head -20", sentinelDir)
-	_ = client.SendKeys(ctx, "grove-demo:sentinel", sentinelCmd)
 
 	return nil
 }

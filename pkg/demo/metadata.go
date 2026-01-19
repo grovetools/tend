@@ -10,18 +10,21 @@ import (
 
 // Metadata stores information about a demo environment.
 type Metadata struct {
-	CreatedAt   time.Time       `yaml:"created_at"`
-	TmuxSocket  string          `yaml:"tmux_socket"`
-	Ecosystems  []EcosystemMeta `yaml:"ecosystems"`
-	OverlayPath string          `yaml:"overlay_path"`
-	NotebookDir string          `yaml:"notebook_dir"`
+	DemoName        string          `yaml:"demo_name"`
+	CreatedAt       time.Time       `yaml:"created_at"`
+	TmuxSocket      string          `yaml:"tmux_socket"`
+	TmuxSessionName string          `yaml:"tmux_session_name,omitempty"`
+	Ecosystems      []EcosystemMeta `yaml:"ecosystems"`
+	OverlayPath     string          `yaml:"overlay_path"`
+	NotebookDir     string          `yaml:"notebook_dir"`
 }
 
 // EcosystemMeta contains metadata about a single ecosystem.
 type EcosystemMeta struct {
-	Name      string `yaml:"name"`
-	Path      string `yaml:"path"`
-	RepoCount int    `yaml:"repo_count"`
+	Name        string `yaml:"name"`
+	Path        string `yaml:"path"`
+	RepoCount   int    `yaml:"repo_count"`
+	Description string `yaml:"description"`
 }
 
 // RepoSpec defines the specification for creating a repository.
