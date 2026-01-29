@@ -3,6 +3,7 @@ package demo
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/grovetools/core/pkg/tmux"
@@ -36,6 +37,17 @@ func (g *Generator) setupTmux(content *DemoContent) error {
 
 	if err := client.Launch(ctx, launchOpts); err != nil {
 		return fmt.Errorf("launching session: %w", err)
+	}
+
+	// Set environment variables at the server (global) level so that
+	// ALL new sessions created on this tmux server inherit them.
+	// This ensures tools like `nav` that create new sessions still
+	// have access to GROVE_CONFIG_OVERLAY and other demo env vars.
+	for key, value := range env {
+		cmd := exec.Command("tmux", "-L", socketName, "set-environment", "-g", key, value)
+		if output, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("setting tmux global environment %s: %w\nOutput: %s", key, err, string(output))
+		}
 	}
 
 	ulog.Info("Tmux session created").
