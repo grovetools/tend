@@ -33,6 +33,7 @@ type Context struct {
 	homeDir   string
 	configDir string
 	dataDir   string
+	stateDir  string
 	cacheDir  string
 
 	// State management
@@ -183,9 +184,10 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 	sandboxedHome := filepath.Join(tempMgr.BaseDir(), "home")
 	sandboxedConfig := filepath.Join(sandboxedHome, ".config")
 	sandboxedData := filepath.Join(sandboxedHome, ".local", "share")
+	sandboxedState := filepath.Join(sandboxedHome, ".local", "state")
 	sandboxedCache := filepath.Join(sandboxedHome, ".cache")
 
-	for _, dir := range []string{sandboxedHome, sandboxedConfig, sandboxedData, sandboxedCache} {
+	for _, dir := range []string{sandboxedHome, sandboxedConfig, sandboxedData, sandboxedState, sandboxedCache} {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			result.Success = false
 			result.Error = fmt.Errorf("creating sandboxed home directory structure: %w", err)
@@ -299,6 +301,7 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 		homeDir:       sandboxedHome,
 		configDir:     sandboxedConfig,
 		dataDir:       sandboxedData,
+		stateDir:      sandboxedState,
 		cacheDir:      sandboxedCache,
 		dirs:          make(map[string]string),
 		values:        make(map[string]interface{}),

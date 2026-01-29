@@ -15,6 +15,7 @@ type TestExecutor struct {
 	homeDir       string
 	configDir     string
 	dataDir       string
+	stateDir      string
 	cacheDir      string
 	mockOverrides map[string]string
 }
@@ -26,6 +27,7 @@ func NewTestExecutor(ctx *Context) *TestExecutor {
 		homeDir:       ctx.HomeDir(),
 		configDir:     ctx.ConfigDir(),
 		dataDir:       ctx.DataDir(),
+		stateDir:      ctx.StateDir(),
 		cacheDir:      ctx.CacheDir(),
 		mockOverrides: ctx.mockOverrides,
 	}
@@ -61,6 +63,7 @@ func (e *TestExecutor) applyTestEnvironment(cmd *exec.Cmd) {
 		fmt.Sprintf("HOME=%s", e.homeDir),
 		fmt.Sprintf("XDG_CONFIG_HOME=%s", e.configDir),
 		fmt.Sprintf("XDG_DATA_HOME=%s", e.dataDir),
+		fmt.Sprintf("XDG_STATE_HOME=%s", e.stateDir),
 		fmt.Sprintf("XDG_CACHE_HOME=%s", e.cacheDir),
 	)
 

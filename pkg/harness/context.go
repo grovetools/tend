@@ -150,6 +150,11 @@ func (c *Context) DataDir() string {
 	return c.dataDir
 }
 
+// StateDir returns the path to the sandboxed XDG_STATE_HOME directory.
+func (c *Context) StateDir() string {
+	return c.stateDir
+}
+
 // CacheDir returns the path to the sandboxed XDG_CACHE_HOME directory.
 func (c *Context) CacheDir() string {
 	return c.cacheDir
@@ -203,6 +208,7 @@ func (c *Context) Command(program string, args ...string) *command.Command {
 		fmt.Sprintf("HOME=%s", c.homeDir),
 		fmt.Sprintf("XDG_CONFIG_HOME=%s", c.configDir),
 		fmt.Sprintf("XDG_DATA_HOME=%s", c.dataDir),
+		fmt.Sprintf("XDG_STATE_HOME=%s", c.stateDir),
 		fmt.Sprintf("XDG_CACHE_HOME=%s", c.cacheDir),
 	)
 
@@ -307,6 +313,7 @@ func (c *Context) StartTUI(binaryPath string, args []string, opts ...tui.StartOp
 		fmt.Sprintf("HOME=%s", c.homeDir),
 		fmt.Sprintf("XDG_CONFIG_HOME=%s", c.configDir),
 		fmt.Sprintf("XDG_DATA_HOME=%s", c.dataDir),
+		fmt.Sprintf("XDG_STATE_HOME=%s", c.stateDir),
 		fmt.Sprintf("XDG_CACHE_HOME=%s", c.cacheDir),
 	)
 
