@@ -39,9 +39,9 @@ func (h *HomelabSpec) Generate(rootDir string) (*DemoContent, error) {
 		return nil, err
 	}
 
-	// Update the overlay config with ecosystem/notebook definitions
+	// Update the config with ecosystem/notebook definitions
 	// This MUST happen before seeding notebooks so CLI commands use demo paths
-	if err := gen.createOverlayConfig(ecosystems); err != nil {
+	if err := gen.createConfig(ecosystems); err != nil {
 		return nil, err
 	}
 
@@ -70,8 +70,8 @@ func (g *homelabGenerator) ecosystemsDir() string {
 	return filepath.Join(g.rootDir, "ecosystems")
 }
 
-func (g *homelabGenerator) overlayPath() string {
-	return filepath.Join(g.rootDir, "grove-overlay.yml")
+func (g *homelabGenerator) configPath() string {
+	return filepath.Join(g.rootDir, "config", "grove", "grove.yml")
 }
 
 // createEcosystems creates all three ecosystems.
@@ -118,10 +118,10 @@ func (g *homelabGenerator) createHomelabEcosystem() (*EcosystemMeta, error) {
 	}
 
 	repos := []RepoSpec{
-		{Name: "dashboard", Lang: "typescript", Depth: "hero", Worktree: "feature/gpu-widgets", GitState: "dirty-staged"},
-		{Name: "sentinel", Lang: "go", Depth: "hero", Worktree: "feature/container-stats", GitState: "clean"},
-		{Name: "vault", Lang: "go", Depth: "skeleton", Worktree: "fix/s3-timeout", GitState: "dirty-unstaged"},
-		{Name: "beacon", Lang: "go", Depth: "skeleton", Worktree: "feature/passkey-login", GitState: "dirty-unstaged"},
+		{Name: "dashboard", Lang: "typescript", Depth: "hero", Worktree: "gpu-widgets", GitState: "dirty-staged"},
+		{Name: "sentinel", Lang: "go", Depth: "hero", Worktree: "container-stats", GitState: "clean"},
+		{Name: "vault", Lang: "go", Depth: "skeleton", Worktree: "s3-timeout-fix", GitState: "dirty-unstaged"},
+		{Name: "beacon", Lang: "go", Depth: "skeleton", Worktree: "passkey-login", GitState: "dirty-unstaged"},
 		{Name: "guardian", Lang: "python", Depth: "skeleton", GitState: "clean"},
 		{Name: "relay", Lang: "go", Depth: "skeleton", GitState: "clean"},
 		{Name: "chronicle", Lang: "python", Depth: "skeleton", GitState: "untracked"},
@@ -242,25 +242,17 @@ func (g *homelabGenerator) createRepo(ecoDir string, spec RepoSpec) error {
 		}
 	}
 
-	// Step 3: Create worktree if specified (Go layer)
-	if spec.Worktree != "" {
-		safeBranchName := strings.ReplaceAll(spec.Worktree, "/", "-")
-		worktreeDir := filepath.Join(repoDir, ".grove-worktrees", safeBranchName)
-		repo := git.New(repoDir)
-		if err := repo.CreateWorktree(worktreeDir, spec.Worktree); err != nil {
-			return fmt.Errorf("creating worktree: %w", err)
-		}
+	// Note: Worktrees are created via flow plan init --worktree in seedHomelabPlans
+	// The Worktree field in repoSpec is used to track which repos should get worktrees,
+	// but the actual creation happens through the flow CLI for proper plan integration.
 
-		// Apply git state to worktree
-		if err := g.applyGitState(worktreeDir, spec.GitState); err != nil {
-			return fmt.Errorf("applying git state: %w", err)
-		}
-	} else {
-		// Apply git state to main repo
+	// Apply git state to main repo (worktree states applied after plan creation)
+	if spec.Worktree == "" {
 		if err := g.applyGitState(repoDir, spec.GitState); err != nil {
 			return fmt.Errorf("applying git state: %w", err)
 		}
 	}
+	// If spec.Worktree is set, git state will be applied after worktree creation in seedHomelabPlans
 
 	return nil
 }
@@ -366,9 +358,9 @@ func (g *homelabGenerator) writeEcosystemConfig(ecoDir, name string, workspaces 
 	return fs.WriteFile(filepath.Join(ecoDir, "grove.yml"), data)
 }
 
-// createOverlayConfig creates the GROVE_CONFIG_OVERLAY file with ecosystem definitions.
+// createConfig creates the grove.yml file with ecosystem definitions.
 // This must be called after ecosystems are created but before seeding notebooks.
-func (g *homelabGenerator) createOverlayConfig(ecosystems []EcosystemMeta) error {
+func (g *homelabGenerator) createConfig(ecosystems []EcosystemMeta) error {
 	config := map[string]interface{}{
 		"version": "1.0",
 		"groves":  make(map[string]interface{}),
@@ -418,7 +410,7 @@ func (g *homelabGenerator) createOverlayConfig(ecosystems []EcosystemMeta) error
 	if err != nil {
 		return err
 	}
-	return fs.WriteFile(g.overlayPath(), data)
+	return fs.WriteFile(g.configPath(), data)
 }
 
 // seedNotebooks creates notebook content for the ecosystems.
@@ -1142,11 +1134,12 @@ type jobSpec struct {
 }
 
 // seedHomelabPlans creates plans for the homelab ecosystem using CLI delegation.
+// Plans are created on the appropriate repos with worktrees via flow plan init --worktree.
 func (g *homelabGenerator) seedHomelabPlans() error {
-	// Run from dashboard repo for workspace context (like notes)
-	dashboardDir := filepath.Join(g.ecosystemsDir(), "homelab", "dashboard")
+	homelabDir := filepath.Join(g.ecosystemsDir(), "homelab")
 
-	// Create GPU Monitoring plan - realistic multi-job plan
+	// Plan 1: GPU Monitoring on dashboard with feature/gpu-widgets worktree
+	dashboardDir := filepath.Join(homelabDir, "dashboard")
 	if err := g.createPlanWithJobs(dashboardDir, "gpu-monitoring", []jobSpec{
 		{
 			title:     "Define GPU Monitoring Spec",
@@ -1160,28 +1153,71 @@ func (g *homelabGenerator) seedHomelabPlans() error {
 			jobType:   "headless_agent",
 			prompt:    "Add GPU metrics collector to sentinel using nvidia-smi. Implement the Collector interface and add GPU-specific metrics.",
 			status:    "completed",
-			dependsOn: 0, // depends on job 0
+			dependsOn: 0,
 		},
 		{
 			title:     "Add Dashboard Widget",
 			jobType:   "headless_agent",
 			prompt:    "Create GPU widget component in the dashboard. Display real-time GPU utilization, memory usage, and temperature graphs.",
 			status:    "running",
-			dependsOn: 1, // depends on job 1
+			dependsOn: 1,
 		},
 		{
 			title:     "Write Integration Tests",
 			jobType:   "oneshot",
 			prompt:    "Write e2e tests for GPU monitoring using tend. Test collector data flow and dashboard rendering.",
 			status:    "pending",
-			dependsOn: 2, // depends on job 2
+			dependsOn: 2,
 		},
-	}); err != nil {
+	}, &planConfig{worktree: "gpu-widgets", gitState: "dirty-staged"}); err != nil {
 		return fmt.Errorf("creating gpu-monitoring plan: %w", err)
 	}
 
-	// Create Security Hardening plan - completed plan
-	if err := g.createPlanWithJobs(dashboardDir, "security-hardening", []jobSpec{
+	// Plan 2: Container Stats on sentinel with container-stats worktree
+	sentinelDir := filepath.Join(homelabDir, "sentinel")
+	if err := g.createPlanWithJobs(sentinelDir, "container-stats", []jobSpec{
+		{
+			title:     "Research Container Metrics APIs",
+			jobType:   "oneshot",
+			prompt:    "Research Docker and containerd APIs for collecting container metrics. Document available metrics and collection methods.",
+			status:    "completed",
+			dependsOn: -1,
+		},
+		{
+			title:     "Implement Container Collector",
+			jobType:   "headless_agent",
+			prompt:    "Add container metrics collector to sentinel. Collect CPU, memory, network, and I/O stats per container.",
+			status:    "running",
+			dependsOn: 0,
+		},
+	}, &planConfig{worktree: "container-stats", gitState: "clean"}); err != nil {
+		return fmt.Errorf("creating container-stats plan: %w", err)
+	}
+
+	// Plan 3: S3 Timeout Fix on vault with s3-timeout worktree
+	vaultDir := filepath.Join(homelabDir, "vault")
+	if err := g.createPlanWithJobs(vaultDir, "s3-timeout-fix", []jobSpec{
+		{
+			title:     "Investigate S3 Timeout Issue",
+			jobType:   "oneshot",
+			prompt:    "Analyze logs and trace S3 connection timeouts. Identify root cause and potential fixes.",
+			status:    "completed",
+			dependsOn: -1,
+		},
+		{
+			title:     "Implement Retry Logic",
+			jobType:   "headless_agent",
+			prompt:    "Add exponential backoff retry logic for S3 operations. Configure timeout and retry parameters.",
+			status:    "running",
+			dependsOn: 0,
+		},
+	}, &planConfig{worktree: "s3-timeout-fix", gitState: "dirty-unstaged"}); err != nil {
+		return fmt.Errorf("creating s3-timeout-fix plan: %w", err)
+	}
+
+	// Plan 4: Passkey Login on beacon with passkey-login worktree
+	beaconDir := filepath.Join(homelabDir, "beacon")
+	if err := g.createPlanWithJobs(beaconDir, "passkey-login", []jobSpec{
 		{
 			title:     "Research WebAuthn Passkey",
 			jobType:   "oneshot",
@@ -1203,11 +1239,11 @@ func (g *homelabGenerator) seedHomelabPlans() error {
 			status:    "completed",
 			dependsOn: 1,
 		},
-	}); err != nil {
-		return fmt.Errorf("creating security-hardening plan: %w", err)
+	}, &planConfig{worktree: "passkey-login", gitState: "dirty-unstaged"}); err != nil {
+		return fmt.Errorf("creating passkey-login plan: %w", err)
 	}
 
-	// Create v2 Roadmap plan - pending plan
+	// Plan 5: v2 Roadmap on dashboard (no worktree - roadmap planning)
 	if err := g.createPlanWithJobs(dashboardDir, "v2-roadmap", []jobSpec{
 		{
 			title:     "Gather Community Feedback",
@@ -1230,22 +1266,44 @@ func (g *homelabGenerator) seedHomelabPlans() error {
 			status:    "pending",
 			dependsOn: 1,
 		},
-	}); err != nil {
+	}, nil); err != nil { // nil config = no worktree
 		return fmt.Errorf("creating v2-roadmap plan: %w", err)
 	}
 
 	return nil
 }
 
+// planConfig holds configuration for plan creation including optional worktree.
+type planConfig struct {
+	worktree string // branch name for worktree (empty = no worktree)
+	gitState string // git state to apply to worktree (dirty-staged, dirty-unstaged, etc.)
+}
+
 // createPlanWithJobs creates a plan directory and adds jobs using CLI delegation.
 // repoDir is the repo to run from (for workspace context).
-func (g *homelabGenerator) createPlanWithJobs(repoDir, planName string, jobs []jobSpec) error {
-	// Step 1: Initialize plan directory via CLI (no recipe = minimal plan)
+// config is optional - pass nil for plans without worktrees.
+func (g *homelabGenerator) createPlanWithJobs(repoDir, planName string, jobs []jobSpec, config *planConfig) error {
+	// Step 1: Initialize plan directory via CLI
 	// Running from repoDir gives us workspace context
-	cmd := g.delegatedCommand("flow", "plan", "init", planName)
+	args := []string{"plan", "init", planName}
+	if config != nil && config.worktree != "" {
+		// Use --worktree=value syntax
+		args = append(args, "--worktree="+config.worktree)
+	}
+	cmd := g.delegatedCommand("flow", args...)
 	cmd.Dir = repoDir
 	if err := g.runDelegatedCmd(cmd, "Creating "+planName+" plan"); err != nil {
 		return err
+	}
+
+	// Apply git state to worktree if specified
+	if config != nil && config.worktree != "" && config.gitState != "" {
+		// flow plan init --worktree preserves the branch path structure
+		// e.g., feature/gpu-widgets -> .grove-worktrees/feature/gpu-widgets
+		worktreeDir := filepath.Join(repoDir, ".grove-worktrees", config.worktree)
+		if err := g.applyGitState(worktreeDir, config.gitState); err != nil {
+			return fmt.Errorf("applying git state to worktree: %w", err)
+		}
 	}
 
 	// Find the created plan directory

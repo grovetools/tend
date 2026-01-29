@@ -15,7 +15,7 @@ type Metadata struct {
 	TmuxSocket      string          `yaml:"tmux_socket"`
 	TmuxSessionName string          `yaml:"tmux_session_name,omitempty"`
 	Ecosystems      []EcosystemMeta `yaml:"ecosystems"`
-	OverlayPath     string          `yaml:"overlay_path"`
+	ConfigPath      string          `yaml:"config_path"`
 	NotebookDir     string          `yaml:"notebook_dir"`
 }
 

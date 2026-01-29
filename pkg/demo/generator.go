@@ -3,10 +3,12 @@ package demo
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 
 	grovelogging "github.com/grovetools/core/logging"
+	"github.com/grovetools/core/pkg/paths"
 	"github.com/grovetools/tend/pkg/fs"
 	"gopkg.in/yaml.v3"
 )
@@ -17,6 +19,12 @@ var ulog = grovelogging.NewUnifiedLogger("grove-tend.demo")
 // This is used with tmux's -L flag which creates sockets in the tmux temp directory.
 // For multiple demos, this will be parameterized per demo (e.g., "grove-demo-homelab").
 const TmuxSocketName = "grove-demo"
+
+// DemosDir returns the standard root directory for all demos.
+// Typically ~/.local/share/grove/demos
+func DemosDir() string {
+	return filepath.Join(paths.DataDir(), "demos")
+}
 
 // Generator creates demo environments.
 type Generator struct {
@@ -54,10 +62,16 @@ func (g *Generator) Generate() error {
 		return fmt.Errorf("creating directory structure: %w", err)
 	}
 
-	// Create an empty/minimal overlay config first so that CLI commands
+	// Create an empty/minimal config first so that CLI commands
 	// (grove, nb, flow) work during spec.Generate(). We'll update it after.
-	if err := g.createEmptyOverlay(); err != nil {
-		return fmt.Errorf("creating initial overlay: %w", err)
+	if err := g.createEmptyConfig(); err != nil {
+		return fmt.Errorf("creating initial config: %w", err)
+	}
+
+	// Copy user's grove.override.yml if it exists (for API keys)
+	if err := g.copyUserOverride(); err != nil {
+		// Log but don't fail, this is optional
+		ulog.Warn("Failed to copy user overrides").Field("error", err).Emit()
 	}
 
 	// Let spec generate content (ecosystems, repos, notes, plans)
@@ -85,14 +99,14 @@ func (g *Generator) Generate() error {
 		TmuxSocket:      g.tmuxSocket,
 		TmuxSessionName: fmt.Sprintf("grove-demo-%s", g.demoName),
 		Ecosystems:      content.Ecosystems,
-		OverlayPath:     g.overlayPath(),
+		ConfigPath:      g.configPath(),
 		NotebookDir:     g.notebookDir(),
 	}
 	return SaveMetadata(g.rootDir, meta)
 }
 
-// createEmptyOverlay creates a minimal overlay config so CLI commands work during generation.
-func (g *Generator) createEmptyOverlay() error {
+// createEmptyConfig creates a minimal config so CLI commands work during generation.
+func (g *Generator) createEmptyConfig() error {
 	config := map[string]interface{}{
 		"version": "1.0",
 		"groves":  make(map[string]interface{}),
@@ -105,16 +119,19 @@ func (g *Generator) createEmptyOverlay() error {
 	if err != nil {
 		return err
 	}
-	return writeFile(g.overlayPath(), data)
+	return writeFile(g.configPath(), data)
 }
 
 // createDirectoryStructure creates the base directory structure.
-// Note: We no longer create a sandbox home since we use GROVE_CONFIG_OVERLAY
-// to isolate grove config while using the real HOME.
+// Creates the XDG-compliant directory structure for isolated demo environment.
 func (g *Generator) createDirectoryStructure() error {
 	dirs := []string{
 		g.notebookDir(),
 		g.ecosystemsDir(),
+		filepath.Join(g.rootDir, "config", "grove"),
+		filepath.Join(g.rootDir, "data", "grove"),
+		filepath.Join(g.rootDir, "state", "grove"),
+		filepath.Join(g.rootDir, "cache", "grove"),
 	}
 
 	for _, dir := range dirs {
@@ -126,16 +143,16 @@ func (g *Generator) createDirectoryStructure() error {
 	return nil
 }
 
-// createGlobalConfig creates the GROVE_CONFIG_OVERLAY file.
-// This overlay is merged on top of the user's real grove config,
-// overriding workspaces/groves while preserving API keys and other settings.
+// createGlobalConfig creates the grove.yml file in the demo's config directory.
 func (g *Generator) createGlobalConfig(content *DemoContent) error {
 	config := map[string]interface{}{
+		"name":    "grove-demo-" + g.demoName,
 		"version": "1.0",
 		"groves":  make(map[string]interface{}),
 		"notebooks": map[string]interface{}{
 			"definitions": make(map[string]interface{}),
 		},
+		// No need to override explicit_projects or context as we are creating a fresh config
 	}
 
 	groves := config["groves"].(map[string]interface{})
@@ -179,7 +196,75 @@ func (g *Generator) createGlobalConfig(content *DemoContent) error {
 	if err != nil {
 		return err
 	}
-	return writeFile(g.overlayPath(), data)
+	return writeFile(g.configPath(), data)
+}
+
+// copyUserOverride copies filtered settings from the user's override file to the demo.
+// Only copies API keys and agent config - excludes groves, explicit_projects, notebooks
+// which would break demo isolation.
+func (g *Generator) copyUserOverride() error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
+	// Check standard locations
+	sources := []string{
+		filepath.Join(home, ".config", "grove", "grove.override.yml"),
+		filepath.Join(home, ".config", "grove", "grove.override.yaml"),
+	}
+
+	var sourcePath string
+	for _, p := range sources {
+		if _, err := os.Stat(p); err == nil {
+			sourcePath = p
+			break
+		}
+	}
+
+	if sourcePath == "" {
+		return nil // No override to copy
+	}
+
+	// Read and parse the source file
+	data, err := os.ReadFile(sourcePath)
+	if err != nil {
+		return err
+	}
+
+	var fullConfig map[string]interface{}
+	if err := yaml.Unmarshal(data, &fullConfig); err != nil {
+		return err
+	}
+
+	// Only keep safe keys that don't affect workspace discovery
+	safeKeys := map[string]bool{
+		"anthropic": true,
+		"gemini":    true,
+		"openai":    true,
+		"agent":     true,
+	}
+
+	filteredConfig := make(map[string]interface{})
+	for key, value := range fullConfig {
+		if safeKeys[key] {
+			filteredConfig[key] = value
+		}
+	}
+
+	// If nothing to copy, skip creating the file
+	if len(filteredConfig) == 0 {
+		return nil
+	}
+
+	// Write filtered config
+	filteredData, err := yaml.Marshal(filteredConfig)
+	if err != nil {
+		return err
+	}
+
+	destPath := filepath.Join(g.rootDir, "config", "grove", "grove.override.yml")
+	return os.WriteFile(destPath, filteredData, 0644)
 }
 
 // Helper methods for directory paths
@@ -191,18 +276,22 @@ func (g *Generator) ecosystemsDir() string {
 	return filepath.Join(g.rootDir, "ecosystems")
 }
 
-func (g *Generator) overlayPath() string {
-	return filepath.Join(g.rootDir, "grove-overlay.yml")
+func (g *Generator) configPath() string {
+	return filepath.Join(g.rootDir, "config", "grove", "grove.yml")
 }
 
 // BuildEnvironment returns the environment variables for the demo.
-// Uses GROVE_CONFIG_OVERLAY to isolate grove config discovery while keeping
-// the real HOME, so nvim, LSPs, shell config, etc. all work normally.
+// Uses GROVE_HOME for full XDG isolation (config, data, state, cache all isolated)
+// and GROVE_BIN to preserve access to the real installed binaries for delegation.
 func BuildEnvironment(demoDir, tmuxSocket string) map[string]string {
+	// Capture the real bin directory BEFORE GROVE_HOME would affect it
+	realBinDir := paths.BinDir()
+
 	return map[string]string{
-		"GROVE_CONFIG_OVERLAY": filepath.Join(demoDir, "grove-overlay.yml"),
-		"GROVE_DEMO":           "1",
-		"GROVE_TMUX_SOCKET":    tmuxSocket,
+		"GROVE_HOME":        demoDir,     // Isolates config/data/state/cache
+		"GROVE_BIN":         realBinDir,  // Preserves binary delegation
+		"GROVE_DEMO":        "1",
+		"GROVE_TMUX_SOCKET": tmuxSocket,
 	}
 }
 
