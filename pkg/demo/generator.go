@@ -141,6 +141,13 @@ func (g *Generator) createGlobalConfig(content *DemoContent) error {
 	groves := config["groves"].(map[string]interface{})
 	notebooks := config["notebooks"].(map[string]interface{})["definitions"].(map[string]interface{})
 
+	// Standard workspace categories that nb expects
+	workspaceCategories := []string{
+		"inbox", "issues", "plans", "in_progress", "review",
+		"learn", "concepts", "docgen", "icebox", "llm",
+		"quick", "todos", "completed", "templates", "recipes",
+	}
+
 	for _, eco := range content.Ecosystems {
 		groves[eco.Name] = map[string]interface{}{
 			"path":        eco.Path,
@@ -148,8 +155,23 @@ func (g *Generator) createGlobalConfig(content *DemoContent) error {
 			"description": eco.Description,
 			"notebook":    eco.Name,
 		}
+
+		// Build explicit workspace paths for the ecosystem
+		notebookRoot := filepath.Join(g.notebookDir(), eco.Name)
+		workspaceRoot := filepath.Join(notebookRoot, "workspaces", eco.Name)
+
+		paths := make(map[string]string)
+		for _, cat := range workspaceCategories {
+			paths[cat] = filepath.Join(workspaceRoot, cat)
+		}
+
 		notebooks[eco.Name] = map[string]interface{}{
-			"root_dir": filepath.Join(g.notebookDir(), eco.Name),
+			"root_dir": notebookRoot,
+			"workspaces": map[string]interface{}{
+				eco.Name: map[string]interface{}{
+					"paths": paths,
+				},
+			},
 		}
 	}
 
