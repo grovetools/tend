@@ -1,6 +1,11 @@
 *.go
 
-@a:grove-flow @find: "tend-tester"
-@a:grove-flow @find: "tui-explorer"
-@a:grove-docgen::dev-no-tests
-
+@a:grovetools:hooks/README.md
+@a:grovetools:nav/README.md
+@a:grovetools:grove/README.md
+@a:grovetools:flow/README.md
+@a:grovetools:cx/README.md
+@a:grovetools:nb/README.md
+@a:grovetools:docgen/README.md
+@a:grovetools:agentlogs/README.md
+@a:grovetools:core/README.md

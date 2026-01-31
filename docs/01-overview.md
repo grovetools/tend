@@ -1,81 +1,35 @@
-`grove-tend` is a scenario-based testing framework designed for end-to-end validation of command-line tools and Terminal User Interfaces (TUIs). It provides a structured environment for defining test cases in Go, managing isolated filesystems, and interacting with application subprocesses. Its core components are Scenarios, Steps, the Harness, and the Context.
+`tend` is a command-line tool and Go library for orchestrating end-to-end tests for CLI applications and Terminal User Interfaces (TUIs). It executes scenarios defined in Go code within hermetic, sandboxed environments, managing lifecycle events, process isolation, and dependency mocking.
 
-Tests are defined as `Scenarios` composed of sequential `Steps`. The test `harness` executes these scenarios, managing state, sandboxed filesystems, mock dependencies, and automatic cleanup.
+## Core Mechanisms
 
-When executed, the `tend` CLI acts as a proxy. It discovers the project under test, builds a project-specific test binary containing that project's compiled `Scenario` definitions, and then executes that binary with the specified arguments.
+**Proxy Execution**: When `tend` is executed in a project directory, it detects the project-specific test runner (typically in `tests/e2e/tend`), compiles a binary containing the project's scenarios, and delegates execution to that binary. This allows tests to be versioned with the source code while maintaining a unified CLI experience.
 
-Key capabilities include:
+**Environment Sandboxing**: Each scenario runs in a temporary directory. The harness automatically overrides environment variables (`HOME`, `XDG_CONFIG_HOME`, `XDG_DATA_HOME`) to point to isolated paths within this temporary workspace. This prevents tests from reading or modifying the host user's configuration files.
 
-*   Hermetic test execution via temporary, sandboxed filesystems and home directories.
-*   Mocking of command-line dependencies (e.g., `git`, `docker`, `kubectl`).
-*   Programmatic control and state assertion for TUIs via managed tmux sessions.
-*   Helpers for manipulating Git repositories, running commands, and managing Docker containers.
-*   Interactive debugging modes for step-through execution and live TUI exploration.
+**TUI Integration**: `tend` utilizes `tmux` to run interactive terminal applications in the background. It provides an API to send keystrokes to a session and inspect the screen content (text and ANSI codes) for assertions. This enables black-box testing of complex TUI interactions without requiring a visible terminal window.
 
-### 1. Scenarios and Steps
+**Mocking**: The harness creates a temporary `bin` directory on the `PATH`. Tests can register mock implementations for external dependencies (e.g., `git`, `docker`, `kubectl`). These mocks trap calls and return controlled output, isolating the test from system tools and network resources.
 
-The fundamental building blocks of a `grove-tend` test suite are `Scenarios` and `Steps`.
+## Features
 
-*   A **`Scenario`** is the top-level container for a single test case, representing a complete user workflow or feature validation. It groups a series of actions and assertions. Scenarios are defined using the `harness.NewScenario` constructor.
-*   A **`Step`** is a single, named function within a `Scenario`. Each step performs a discrete action, such as setting up a file, running a command, or verifying output. It receives a `Context` object, which provides the API for interacting with the test environment.
+### Test Execution
+*   **`tend run`**: Executes specific scenarios. Supports filtering by tags or name.
+*   **`tend tui`**: Launches an interactive terminal interface for browsing, filtering, and executing available test scenarios.
+*   **`tend ecosystem run`**: Discovers and executes E2E test suites across multiple projects in a workspace, running them in parallel and aggregating results.
 
-```go
-// A minimal scenario with a single step
-var MyFirstScenario = harness.NewScenario(
-    "my-first-scenario",
-    "Verifies the basic functionality of a command.",
-    []string{"smoke"}, // Tags for filtering
-    []harness.Step{
-        harness.NewStep("Run command and check output", func(ctx *harness.Context) error {
-            // Test logic goes here
-            result := ctx.Command("echo", "hello").Run()
-            return result.AssertStdoutContains("hello")
-        }),
-    },
-)
-```
+### Debugging & Observability
+*   **Interactive Debugging**: The `--debug` flag launches the test in a visible `tmux` session, pausing execution to allow manual inspection of the filesystem and process state.
+*   **Session Management**: `tend sessions` lists and manages background `tmux` sessions created by test runs or debug sessions.
+*   **Recording**: `tend record` captures terminal output and keystrokes from a command execution, saving the session as HTML, Markdown, or JSON for documentation or analysis.
 
-### 2. Scenario Configuration
+### Demo Environments
+*   **`tend demo create`**: Generates isolated, self-contained Grove ecosystems (e.g., "homelab") populated with synthetic repositories, notes, and plans. These environments are used for generating consistent screenshots and demonstrating tool capabilities without exposing private data.
 
-The `harness.Scenario` struct provides several fields to control test execution and organization.
+## Integration
 
-*   `Name` and `Description`: Strings used for identifying the test case in logs and reports.
-*   `Tags`: A slice of strings for categorizing scenarios. Tests can be filtered using the `--tags` flag (e.g., `tend run --tags=smoke`).
-*   `Setup`: A slice of `Step`s that run once before the main test steps. This phase is used for prerequisite tasks like setting up mocks or preparing the test filesystem.
-*   `Steps`: The primary sequence of `Step`s that define the core logic of the test case.
-*   `Teardown`: A slice of `Step`s that run after the main steps have completed, even if a failure occurred. This is used for cleanup tasks that must be performed regardless of the test outcome.
-*   `LocalOnly`: A boolean that, when `true`, causes the scenario to be skipped in CI environments. This is for tests that depend on a local developer machine setup. The `--include-local` flag can override this behavior.
-*   `ExplicitOnly`: A boolean that, when `true`, prevents the scenario from running as part of a general test run (e.g., `tend run`). It must be invoked explicitly by name (`tend run <scenario-name>`) or with the `--explicit` flag. This is for long-running, resource-intensive, or destructive tests.
+`tend` is designed to test the Grove ecosystem itself but can be used for any CLI tool.
 
-### 3. The Harness
+*   **`flow`**: Tests validate the orchestration of agents and job execution by inspecting file modifications and agent log outputs.
+*   **`nav`**: Tests verify `tmux` session management by asserting against the state of the backend `tmux` server.
+*   **`nb`**: Tests confirm note creation and retrieval by inspecting the sandboxed filesystem.
 
-The `Harness` is the engine that executes scenarios. It is an internal component of the `tend` CLI that manages the entire test lifecycle.
-
-Its primary responsibilities include:
-*   **Isolation:** Creating a new, temporary root directory for each scenario run to ensure tests are hermetic.
-*   **Context Management:** Instantiating the `Context` object passed to each step, populating it with paths to the isolated directories and other test state.
-*   **Lifecycle Execution:** Executing the `Setup`, `Steps`, and `Teardown` phases in the correct order.
-*   **Cleanup:** Automatically removing all temporary directories and resources created during a test run, unless disabled with the `--no-cleanup` flag for debugging.
-
-### 4. The Context (`harness.Context`)
-
-The `harness.Context` object is the primary API for test authors. It is passed to every `Step` function and provides methods for interacting with the sandboxed test environment.
-
-Key functionalities include:
-
-*   **Filesystem Management:** Create and retrieve paths to sandboxed directories.
-    *   `NewDir`, `Dir`: Manage named subdirectories within the test's root.
-    *   `HomeDir`, `ConfigDir`, `DataDir`, `CacheDir`: Access paths to a sandboxed user home directory structure (`$HOME`, `$XDG_CONFIG_HOME`, etc.).
-*   **State Management:** Share data between steps within the same scenario.
-    *   `Set(key, value)`: Store a value.
-    *   `Get(key)`, `GetString(key)`, `GetInt(key)`, etc.: Retrieve stored values with type safety.
-    *   `HasKey(key)`, `Keys()`: Introspect the stored state.
-*   **Command Execution:** Run external commands within the sandboxed environment.
-    *   `Command(name, args...)`: Creates a command that automatically runs with a `PATH` that prioritizes mock binaries set up for the test.
-    *   `Bin(args...)`: A convenience wrapper for running the main binary of the project under test.
-*   **Assertions:** Perform validations.
-    *   `Check(description, err)`: A "fail-fast" or hard assertion. If the error is not `nil`, the step fails immediately.
-    *   `Verify(func(v *verify.Collector))`: A "collecting" or soft assertion. It gathers multiple failures within its function block and reports them all at once without stopping on the first failure.
-*   **TUI Control:** Launch and interact with TUI applications.
-    *   `StartTUI(...)`: Starts a TUI application in an isolated `tmux` session, returning a `Session` handle for programmatic interaction (sending keys, capturing screen content).
-    *   `StartHeadless(...)`: Runs a `bubbletea` model in a test mode without a real terminal, allowing for direct inspection of its state and view output.
