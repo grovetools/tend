@@ -354,8 +354,7 @@ func findTendBinary() (string, error) {
 		// Walk up to find the project root
 		currentDir := wd
 		for {
-			groveYml := filepath.Join(currentDir, "grove.yml")
-			if _, err := os.Stat(groveYml); err == nil {
+			if hasGroveConfig(currentDir) {
 				tendPath = filepath.Join(currentDir, "bin", "tend")
 				if _, err := os.Stat(tendPath); err == nil {
 					return tendPath, nil

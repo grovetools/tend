@@ -25,11 +25,11 @@ func FindProjectBinary() (string, error) {
 		return "", fmt.Errorf("could not get working directory: %w", err)
 	}
 
-	// Walk up to find the project root (where grove.yml exists)
+	// Walk up to find the project root (where grove config exists)
 	currentDir := wd
 	for {
-		groveYml := filepath.Join(currentDir, "grove.yml")
-		if _, err := os.Stat(groveYml); err == nil {
+		// Check for any grove config file
+		if hasGroveConfig(currentDir) {
 			// Found project root
 			binaryPath := filepath.Join(currentDir, "bin", "tend-e2e")
 			if _, err := os.Stat(binaryPath); err == nil {
@@ -46,7 +46,7 @@ func FindProjectBinary() (string, error) {
 		currentDir = parent
 	}
 
-	return "", fmt.Errorf("could not find project root (no grove.yml found)")
+	return "", fmt.Errorf("could not find project root (no grove config found)")
 }
 
 // FindTendBinary finds the actual tend binary path (not the test runner).
@@ -68,8 +68,7 @@ func FindTendBinary() (string, error) {
 		// Walk up to find the project root
 		currentDir := wd
 		for {
-			groveYml := filepath.Join(currentDir, "grove.yml")
-			if _, err := os.Stat(groveYml); err == nil {
+			if hasGroveConfig(currentDir) {
 				tendPath = filepath.Join(currentDir, "bin", "tend")
 				if _, err := os.Stat(tendPath); err == nil {
 					return tendPath, nil
@@ -86,4 +85,23 @@ func FindTendBinary() (string, error) {
 	}
 
 	return tendPath, nil
+}
+
+// hasGroveConfig checks if a directory contains a grove config file.
+// Supports .yml, .yaml, and .toml formats.
+func hasGroveConfig(dir string) bool {
+	configNames := []string{
+		"grove.yml",
+		"grove.yaml",
+		"grove.toml",
+		".grove.yml",
+		".grove.yaml",
+		".grove.toml",
+	}
+	for _, name := range configNames {
+		if _, err := os.Stat(filepath.Join(dir, name)); err == nil {
+			return true
+		}
+	}
+	return false
 }
