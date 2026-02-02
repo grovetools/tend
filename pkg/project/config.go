@@ -7,65 +7,42 @@ import (
 	"strings"
 	"time"
 
+	"github.com/grovetools/core/config"
 	"github.com/grovetools/tend/pkg/command"
-	"gopkg.in/yaml.v3"
 )
 
-// GroveConfig defines the structure of a grove.yml file.
-type GroveConfig struct {
-	Binary struct {
-		Name string `yaml:"name"`
-		Path string `yaml:"path"`
-	} `yaml:"binary"`
+// BinaryConfig holds the binary configuration from the grove config's [binary] section.
+type BinaryConfig struct {
+	Name string `yaml:"name"`
+	Path string `yaml:"path"`
 }
 
-// GetBinaryPath finds the project's main binary by searching for grove.yml
-// starting from the given root directory and walking up.
+// GetBinaryPath finds the project's main binary by searching for grove config
+// (grove.toml or grove.yml) starting from the given root directory and walking up.
 func GetBinaryPath(startDir string) (string, error) {
-	configPath, err := findGroveYml(startDir)
+	configPath, err := config.FindConfigFile(startDir)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("config file not found in or above %s: %w", startDir, err)
 	}
 
-	data, err := os.ReadFile(configPath)
+	cfg, err := config.Load(configPath)
 	if err != nil {
-		return "", fmt.Errorf("reading grove.yml at %s: %w", configPath, err)
+		return "", fmt.Errorf("loading config at %s: %w", configPath, err)
 	}
 
-	var config GroveConfig
-	if err := yaml.Unmarshal(data, &config); err != nil {
-		return "", fmt.Errorf("parsing grove.yml at %s: %w", configPath, err)
+	var binaryCfg BinaryConfig
+	if err := cfg.UnmarshalExtension("binary", &binaryCfg); err != nil {
+		return "", fmt.Errorf("parsing binary config at %s: %w", configPath, err)
 	}
 
-	if config.Binary.Path == "" {
+	if binaryCfg.Path == "" {
 		return "", fmt.Errorf("binary.path not defined in %s", configPath)
 	}
 
-	// The path in grove.yml is relative to the directory containing it.
-	binaryFullPath := filepath.Join(filepath.Dir(configPath), config.Binary.Path)
+	// The path in config is relative to the directory containing it.
+	binaryFullPath := filepath.Join(filepath.Dir(configPath), binaryCfg.Path)
 
 	return filepath.Abs(binaryFullPath)
-}
-
-// findGroveYml searches for grove.yml starting from dir and moving upwards.
-func findGroveYml(dir string) (string, error) {
-	currentDir := dir
-	for {
-		configPath := filepath.Join(currentDir, "grove.yml")
-		if _, err := os.Stat(configPath); err == nil {
-			return configPath, nil
-		}
-
-		// Go up one level
-		parentDir := filepath.Dir(currentDir)
-		if parentDir == currentDir {
-			// Reached the root of the filesystem
-			break
-		}
-		currentDir = parentDir
-	}
-
-	return "", fmt.Errorf("grove.yml not found in or above %s", dir)
 }
 
 // gitInfo holds version information from git.
@@ -184,7 +161,7 @@ func buildMocksByConvention(sourceDir string) error {
 // BuildProjectTendBinary finds the project's tend test runner source, builds it, and returns the path to the executable.
 // It always rebuilds to ensure the latest changes are included.
 func BuildProjectTendBinary(startDir string) (string, error) {
-	configPath, err := findGroveYml(startDir)
+	configPath, err := config.FindConfigFile(startDir)
 	if err != nil {
 		// Not a grove project, or no config found, so no project-specific binary.
 		return "", nil
@@ -192,15 +169,15 @@ func BuildProjectTendBinary(startDir string) (string, error) {
 
 	projectRoot := filepath.Dir(configPath)
 
-	// Read the grove.yml to get the binary name
-	data, err := os.ReadFile(configPath)
+	// Load the config to get the binary name
+	cfg, err := config.Load(configPath)
 	if err != nil {
-		return "", fmt.Errorf("reading grove.yml at %s: %w", configPath, err)
+		return "", fmt.Errorf("loading config at %s: %w", configPath, err)
 	}
 
-	var config GroveConfig
-	if err := yaml.Unmarshal(data, &config); err != nil {
-		return "", fmt.Errorf("parsing grove.yml at %s: %w", configPath, err)
+	var binaryCfg BinaryConfig
+	if err := cfg.UnmarshalExtension("binary", &binaryCfg); err != nil {
+		return "", fmt.Errorf("parsing binary config at %s: %w", configPath, err)
 	}
 
 	// 1. Find the source directory for the test runner.
@@ -240,7 +217,7 @@ func BuildProjectTendBinary(startDir string) (string, error) {
 	// If the project's main binary is named "tend", use a different name for the test runner
 	// to avoid overwriting the library binary (important for grove-tend itself).
 	outputName := "tend"
-	if config.Binary.Name == "tend" {
+	if binaryCfg.Name == "tend" {
 		outputName = "tend-e2e"
 	}
 	outputPath := filepath.Join(binDir, outputName)
@@ -256,12 +233,12 @@ func BuildProjectTendBinary(startDir string) (string, error) {
 }
 
 // FindTendBinary searches for a binary containing "tend" in its name within the project.
-// It first finds grove.yml, then looks in common binary locations relative to the project root.
+// It first finds grove config, then looks in common binary locations relative to the project root.
 // Deprecated: Use BuildProjectTendBinary instead, which always rebuilds for latest changes.
 func FindTendBinary(startDir string) (string, error) {
-	configPath, err := findGroveYml(startDir)
+	configPath, err := config.FindConfigFile(startDir)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("config file not found in or above %s: %w", startDir, err)
 	}
 
 	projectRoot := filepath.Dir(configPath)
