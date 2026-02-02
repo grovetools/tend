@@ -1,0 +1,10 @@
+name = "tend"
+description = "Scenario-based testing"
+managed = true
+
+[binary]
+name = "tend"
+path = "./bin/tend"
+
+[context]
+default_rules_path = ".cx/dev-no-tests.rules"
