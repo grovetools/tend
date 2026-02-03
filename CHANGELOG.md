@@ -1,3 +1,93 @@
+## v0.6.0 (2026-02-02)
+
+This release introduces support for creating and managing isolated demo environments. The new `tend demo` command suite allows users to generate ecosystems with realistic repositories, notebooks, and plans for testing and demonstration purposes (56ec205, caf8386). These environments feature robust isolation using XDG standards (aa9b3ef) and configuration overlays (20aa5d7), while optionally symlinking user configurations for a familiar experience (99da9d9).
+
+Improvements to the test harness and configuration handling include support for `grove.toml` configuration files (af376ce, 41b8629) and proper handling of `XDG_STATE_HOME` (5c7c287). The release also addresses resource management by ensuring orphaned tmux servers are cleaned up after test runs (7bab8fb) and standardizes dependencies under the `grovetools` namespace (d5c5222).
+
+### Features
+- Add `tend demo` command for creating demo environments (56ec205)
+- Support multiple named demos with extensible architecture (caf8386)
+- Implement full XDG isolation for demos using GROVE_HOME (aa9b3ef)
+- Add rich notebook structure to demo environments (585d769)
+- Symlink real user configs into demo environments for familiarity (99da9d9)
+- Add XDG_STATE_HOME support to test harness (5c7c287)
+- Update readme/overview (ef1f193)
+
+### Bug Fixes
+- Clean up orphaned tmux servers from test runs (7bab8fb)
+- Set tmux global env so new sessions inherit demo vars (9699230)
+- Use `tmux.Command()` from core for socket-aware tmux calls (d3e650b)
+- Place demo worktrees inside repo .grove-worktrees directories (3718b83)
+- Sanitize branch names in worktree paths (98089bc)
+- Replace auto-created configs with symlinks in demo (775bfae)
+- Update VERSION_PKG to grovetools/core path (1fcf3ca)
+
+### Refactoring
+- Use CLI delegation to dogfood grove ecosystem tools in demos (e11299e)
+- Use GROVE_CONFIG_OVERLAY instead of sandbox HOME for demos (20aa5d7)
+- Support TOML config file detection in e2e tests (66577e2)
+- Use core config discovery for TOML support (41b8629)
+
+### Documentation
+- Add concept lookup instructions to CLAUDE.md (259c092)
+- Add safety comment about symlinks in destroy (378b5e7)
+
+### Chores
+- Add MIT License (54b21e0)
+- Migrate grove.yml to grove.toml (af376ce)
+- Update go.mod for grovetools migration (d5c5222)
+- Move README template to notebook (883cbab)
+- Remove docgen files from repo (4e279e3)
+- Move docs.rules to .cx/ directory (d06e65f)
+- Update docs.json (ad5c3bf)
+- Restore release workflow (ac86c10)
+
+### File Changes
+```
+ .cx/docs.rules                         |   11 +
+ .github/workflows/release.yml          |   64 +-
+ CLAUDE.md                              |   15 +-
+ LICENSE                                |   21 +
+ Makefile                               |    2 +-
+ README.md                              |   95 +--
+ docs/01-introduction.md                |   13 -
+ docs/01-overview.md                    |   35 +
+ docs/02-core-concepts.md               |   69 --
+ docs/README.md.tpl                     |   15 -
+ docs/docgen.config.yml                 |   83 --
+ docs/docs.rules                        |    6 -
+ go.sum                                 |  141 ++++
+ grove.toml                             |   10 +
+ grove.yml                              |    9 -
+ internal/cmd/demo.go                   |  437 ++++++++++
+ internal/cmd/ecosystem.go              |    2 +-
+ internal/cmd/root.go                   |    1 +
+ internal/cmd/run.go                    |   73 +-
+ internal/cmd/sessions.go               |  108 +++
+ internal/tui/sessions/update.go        |    6 +-
+ main.go                                |    1 +
+ pkg/demo/content.go                    |  241 ++++++
+ pkg/demo/generator.go                  |  307 +++++++
+ pkg/demo/homelab_notebook.go           |  361 ++++++++
+ pkg/demo/homelab_spec.go               | 1408 ++++++++++++++++++++++++++++++++
+ pkg/demo/metadata.go                   |   64 ++
+ pkg/demo/registry.go                   |   42 +
+ pkg/demo/spec.go                       |   33 +
+ pkg/demo/tmux.go                       |   59 ++
+ pkg/docs/docs.json                     |  166 ++--
+ pkg/harness/context.go                 |    7 +
+ pkg/harness/executor.go                |    3 +
+ pkg/harness/harness.go                 |   94 ++-
+ pkg/project/config.go                  |   79 +-
+ tests/e2e/fixtures/file-saver/go.sum   |   37 +
+ tests/e2e/fixtures/list-tui/go.sum     |   37 +
+ tests/e2e/fixtures/task-manager/go.mod |    6 +-
+ tests/e2e/fixtures/task-manager/go.sum |   37 +
+ tests/e2e/scenarios_runner_tui.go      |    3 +-
+ tests/e2e/test_utils.go                |   30 +-
+ 41 files changed, 3785 insertions(+), 446 deletions(-)
+```
+
 ## v0.5.0 (2026-01-14)
 
 This release introduces a comprehensive suite of features for interactive test development, debugging, and execution, with special emphasis on TUI testing. Key additions include an interactive TUI for browsing and running tests, an advanced `--debug-session` mode for isolated development environments, and a parallel test runner. 
