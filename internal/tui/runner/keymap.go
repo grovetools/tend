@@ -2,32 +2,32 @@ package runner
 
 import (
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/grovetools/core/config"
 	"github.com/grovetools/core/tui/keymap"
 )
 
 // KeyMap defines the keybindings for the test runner TUI.
+// It embeds keymap.Base for standard navigation, actions, search, selection, and fold bindings.
+// Only TUI-specific bindings that don't exist in Base are defined here.
 type KeyMap struct {
 	keymap.Base
-	Run            key.Binding
-	DebugRun       key.Binding
-	DebugSession   key.Binding
+	// Run operations (TUI-specific)
+	Run          key.Binding
+	DebugRun     key.Binding
+	DebugSession key.Binding
+	// Focus operations (TUI-specific)
 	FocusSelected  key.Binding
 	FocusEcosystem key.Binding
 	ClearFocus     key.Binding
-	GoToTop        key.Binding
-	GoToBottom     key.Binding
-	Fold           key.Binding
-	Unfold         key.Binding
-	FoldPrefix     key.Binding // z
-	Search         key.Binding
-	HalfPageUp     key.Binding
-	HalfPageDown   key.Binding
 }
 
-func newKeyMap() KeyMap {
-	base := keymap.NewBase()
-	return KeyMap{
-		Base: base,
+// newKeyMap creates a new KeyMap with user configuration applied.
+// Base bindings (navigation, actions, search, selection, fold) come from keymap.Load().
+// Only TUI-specific bindings are defined here.
+func newKeyMap(cfg *config.Config) KeyMap {
+	km := KeyMap{
+		Base: keymap.Load(cfg, "tend.runner"),
+		// Run operations
 		Run: key.NewBinding(
 			key.WithKeys("r", "enter"),
 			key.WithHelp("r/⏎", "run"),
@@ -40,6 +40,7 @@ func newKeyMap() KeyMap {
 			key.WithKeys("D"),
 			key.WithHelp("D", "run in debug session"),
 		),
+		// Focus operations
 		FocusSelected: key.NewBinding(
 			key.WithKeys("."),
 			key.WithHelp(".", "focus selected"),
@@ -52,50 +53,43 @@ func newKeyMap() KeyMap {
 			key.WithKeys("ctrl+g"),
 			key.WithHelp("ctrl+g", "clear focus"),
 		),
-		GoToTop: key.NewBinding(
-			key.WithKeys("g"),
-			key.WithHelp("gg", "go to top"),
-		),
-		GoToBottom: key.NewBinding(
-			key.WithKeys("G"),
-			key.WithHelp("G", "go to bottom"),
-		),
-		Fold: key.NewBinding(
-			key.WithKeys("h", "left"),
-			key.WithHelp("h/←", "close fold"),
-		),
-		Unfold: key.NewBinding(
-			key.WithKeys("l", "right"),
-			key.WithHelp("l/→", "open fold"),
-		),
-		FoldPrefix: key.NewBinding(
-			key.WithKeys("z"),
-			key.WithHelp("z*", "fold commands (za, zc, zo, zR, zM)"),
-		),
-		Search: key.NewBinding(
-			key.WithKeys("/"),
-			key.WithHelp("/", "search"),
-		),
-		HalfPageUp: key.NewBinding(
-			key.WithKeys("ctrl+u"),
-			key.WithHelp("C-u", "half page up"),
-		),
-		HalfPageDown: key.NewBinding(
-			key.WithKeys("ctrl+d"),
-			key.WithHelp("C-d", "half page down"),
-		),
 	}
+
+	// Apply TUI-specific overrides from config (uses reflection to map all bindings)
+	if cfg != nil && cfg.TUI != nil && cfg.TUI.Keybindings != nil {
+		if tendOverrides, ok := cfg.TUI.Keybindings.Overrides["tend"]; ok {
+			if overrides, ok := tendOverrides["runner"]; ok {
+				keymap.ApplyOverrides(&km, overrides)
+			}
+		}
+	}
+
+	return km
 }
 
 func (k KeyMap) ShortHelp() []key.Binding {
 	return []key.Binding{k.Help, k.Quit}
 }
 
-func (k KeyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{
-		{k.Up, k.Down, k.HalfPageUp, k.HalfPageDown, k.GoToTop, k.GoToBottom},
-		{k.Fold, k.Unfold, k.FoldPrefix},
-		{k.FocusSelected, k.FocusEcosystem, k.ClearFocus},
-		{k.Run, k.DebugRun, k.DebugSession, k.Search, k.Help, k.Quit},
+// Sections returns all keybinding sections for the tend runner TUI.
+// It includes the base sections plus runner-specific sections.
+func (k KeyMap) Sections() []keymap.Section {
+	return []keymap.Section{
+		{
+			Name:     "Navigation",
+			Bindings: []key.Binding{k.Up, k.Down, k.PageUp, k.PageDown, k.Top, k.Bottom},
+		},
+		{
+			Name:     "Fold",
+			Bindings: []key.Binding{k.FoldClose, k.FoldOpen, k.FoldToggle, k.FoldOpenAll, k.FoldCloseAll},
+		},
+		{
+			Name:     "Focus",
+			Bindings: []key.Binding{k.FocusSelected, k.FocusEcosystem, k.ClearFocus},
+		},
+		{
+			Name:     "Actions",
+			Bindings: []key.Binding{k.Run, k.DebugRun, k.DebugSession, k.Search, k.Help, k.Quit},
+		},
 	}
 }

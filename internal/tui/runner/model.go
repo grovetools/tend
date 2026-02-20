@@ -6,8 +6,10 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/grovetools/core/config"
 	"github.com/grovetools/core/pkg/workspace"
 	"github.com/grovetools/core/tui/components/help"
+	"github.com/grovetools/core/tui/keymap"
 	"github.com/grovetools/tend/pkg/harness"
 )
 
@@ -72,7 +74,7 @@ type Model struct {
 	initialFocusPath string                   // Path of workspace to focus on startup
 	focusedProject   *workspace.WorkspaceNode // Currently focused workspace
 	collapsedNodes   map[string]bool          // Key is a unique node ID
-	lastKey          string                   // For detecting 'gg' and 'z' chords
+	sequence         *keymap.SequenceState    // For detecting multi-key sequences (gg, z*)
 	statusMessage    string
 	statusTimeout    time.Time
 
@@ -90,8 +92,12 @@ type Model struct {
 // New creates a new TUI model.
 // If initialFocusPath is provided (non-empty), the TUI will only show tests from that workspace and its children.
 func New(initialFocusPath string) Model {
+	// Load user-configurable keybindings
+	cfg, _ := config.LoadDefault() // Ignore error - newKeyMap handles nil config gracefully
+	keys := newKeyMap(cfg)
+
 	helpModel := help.NewBuilder().
-		WithKeys(newKeyMap()).
+		WithKeys(keys).
 		WithTitle("Tend Test Runner - Help").
 		Build()
 
@@ -102,10 +108,11 @@ func New(initialFocusPath string) Model {
 
 	return Model{
 		isLoading:          true,
-		keys:               newKeyMap(),
+		keys:               keys,
 		help:               helpModel,
 		scenariosByProject: make(map[string]map[string][]*harness.Scenario),
 		collapsedNodes:     make(map[string]bool),
+		sequence:           keymap.NewSequenceState(),
 		initialFocusPath:   initialFocusPath,
 		filterInput:        ti,
 		testStatuses:       make(map[string]TestStatus),

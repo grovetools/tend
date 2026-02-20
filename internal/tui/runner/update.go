@@ -15,6 +15,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/grovetools/core/pkg/workspace"
+	"github.com/grovetools/core/tui/keymap"
 	"github.com/grovetools/tend/pkg/harness/reporters"
 	"github.com/sirupsen/logrus"
 )
@@ -114,28 +115,42 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		// Handle 'gg' and 'z' chords
-		if m.lastKey == "g" && msg.String() == "g" {
+		// Process sequence state for multi-key commands
+		sequenceBindings := keymap.CommonSequenceBindings(m.keys.Base)
+		result, _ := m.sequence.Process(msg, sequenceBindings...)
+		buffer := m.sequence.Buffer()
+
+		// Handle 'gg' sequence - go to top
+		if result == keymap.SequenceMatch && keymap.Matches(buffer, m.keys.Top) {
 			m.cursor = 0
 			m.adjustScrollOffset()
-			m.lastKey = ""
+			m.sequence.Clear()
 			return m, nil
 		}
-		if m.lastKey == "z" {
-			switch msg.String() {
-			case "a": // za - toggle fold
+
+		// Handle z* fold commands
+		if result == keymap.SequenceMatch {
+			if keymap.Matches(buffer, m.keys.FoldToggle) {
 				m.toggleFold()
-			case "c": // zc - close fold
+				m.sequence.Clear()
+				return m, nil
+			} else if keymap.Matches(buffer, m.keys.FoldClose) {
 				m.closeFold()
-			case "o": // zo - open fold
+				m.sequence.Clear()
+				return m, nil
+			} else if keymap.Matches(buffer, m.keys.FoldOpen) {
 				m.openFold()
-			case "R": // zR - open all folds
+				m.sequence.Clear()
+				return m, nil
+			} else if keymap.Matches(buffer, m.keys.FoldOpenAll) {
 				m.openAllFolds()
-			case "M": // zM - close all folds
+				m.sequence.Clear()
+				return m, nil
+			} else if keymap.Matches(buffer, m.keys.FoldCloseAll) {
 				m.closeAllFolds()
+				m.sequence.Clear()
+				return m, nil
 			}
-			m.lastKey = ""
-			return m, nil
 		}
 
 		switch {
@@ -151,7 +166,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor++
 			}
 			m.adjustScrollOffset()
-		case key.Matches(msg, m.keys.HalfPageUp):
+		case key.Matches(msg, m.keys.PageUp):
 			halfPage := m.getVisibleNodeCount() / 2
 			if halfPage < 1 {
 				halfPage = 1
@@ -161,7 +176,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor = 0
 			}
 			m.adjustScrollOffset()
-		case key.Matches(msg, m.keys.HalfPageDown):
+		case key.Matches(msg, m.keys.PageDown):
 			halfPage := m.getVisibleNodeCount() / 2
 			if halfPage < 1 {
 				halfPage = 1
@@ -174,19 +189,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor = 0
 			}
 			m.adjustScrollOffset()
-		case key.Matches(msg, m.keys.GoToTop):
-			m.lastKey = "g" // Wait for second 'g'
-		case key.Matches(msg, m.keys.GoToBottom):
+		case key.Matches(msg, m.keys.Bottom):
 			if len(m.displayNodes) > 0 {
 				m.cursor = len(m.displayNodes) - 1
 			}
 			m.adjustScrollOffset()
-		case key.Matches(msg, m.keys.Fold):
+		case key.Matches(msg, m.keys.Left):
 			m.closeFold()
-		case key.Matches(msg, m.keys.Unfold):
+		case key.Matches(msg, m.keys.Right):
 			m.openFold()
-		case key.Matches(msg, m.keys.FoldPrefix):
-			m.lastKey = "z"
 		case key.Matches(msg, m.keys.FocusSelected):
 			if m.cursor < len(m.displayNodes) {
 				node := m.displayNodes[m.cursor]
@@ -253,7 +264,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.keys.Help):
 			m.help.Toggle()
 		default:
-			m.lastKey = "" // Reset chord on any other key
+			// Clear sequence buffer for keys that aren't part of sequences
+			// unless we're in the middle of a potential sequence
+			if result != keymap.SequencePending {
+				m.sequence.Clear()
+			}
 		}
 	}
 
