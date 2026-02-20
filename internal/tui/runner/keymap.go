@@ -93,3 +93,15 @@ func (k KeyMap) Sections() []keymap.Section {
 		},
 	}
 }
+
+// KeymapInfo returns the keymap metadata for the tend runner TUI.
+// Used by the grove keys registry generator to aggregate all TUI keybindings.
+func KeymapInfo() keymap.TUIInfo {
+	km := newKeyMap(nil)
+	return keymap.MakeTUIInfo(
+		"tend-runner",
+		"tend",
+		"Test runner and e2e test browser",
+		km,
+	)
+}
