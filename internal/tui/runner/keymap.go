@@ -57,7 +57,8 @@ func newKeyMap(cfg *config.Config) KeyMap {
 
 	// Apply TUI-specific overrides from config (uses reflection to map all bindings)
 	if cfg != nil && cfg.TUI != nil && cfg.TUI.Keybindings != nil {
-		if tendOverrides, ok := cfg.TUI.Keybindings.Overrides["tend"]; ok {
+		tuiOverrides := cfg.TUI.Keybindings.GetTUIOverrides()
+		if tendOverrides, ok := tuiOverrides["tend"]; ok {
 			if overrides, ok := tendOverrides["runner"]; ok {
 				keymap.ApplyOverrides(&km, overrides)
 			}
