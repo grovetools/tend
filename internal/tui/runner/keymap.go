@@ -75,22 +75,10 @@ func (k KeyMap) ShortHelp() []key.Binding {
 // It includes the base sections plus runner-specific sections.
 func (k KeyMap) Sections() []keymap.Section {
 	return []keymap.Section{
-		{
-			Name:     "Navigation",
-			Bindings: []key.Binding{k.Up, k.Down, k.PageUp, k.PageDown, k.Top, k.Bottom},
-		},
-		{
-			Name:     "Fold",
-			Bindings: []key.Binding{k.FoldClose, k.FoldOpen, k.FoldToggle, k.FoldOpenAll, k.FoldCloseAll},
-		},
-		{
-			Name:     "Focus",
-			Bindings: []key.Binding{k.FocusSelected, k.FocusEcosystem, k.ClearFocus},
-		},
-		{
-			Name:     "Actions",
-			Bindings: []key.Binding{k.Run, k.DebugRun, k.DebugSession, k.Search, k.Help, k.Quit},
-		},
+		keymap.NavigationSection(k.Up, k.Down, k.PageUp, k.PageDown, k.Top, k.Bottom),
+		keymap.FoldSection(k.FoldClose, k.FoldOpen, k.FoldToggle, k.FoldOpenAll, k.FoldCloseAll),
+		keymap.NewSection(keymap.SectionFocus, k.FocusSelected, k.FocusEcosystem, k.ClearFocus),
+		keymap.ActionsSection(k.Run, k.DebugRun, k.DebugSession, k.Search, k.Help, k.Quit),
 	}
 }
 
