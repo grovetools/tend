@@ -4,6 +4,7 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/grovetools/core/config"
 	"github.com/grovetools/core/tui/theme"
 )
 
@@ -28,10 +29,15 @@ type Model struct {
 	ready         bool
 	err           error
 	previewActive bool
+	keyMap        KeyMap
 }
 
 // NewModel creates a new sessions TUI model.
 func NewModel() (*Model, error) {
+	// Load user-configurable keybindings
+	cfg, _ := config.LoadDefault() // Ignore error - newKeyMap handles nil config gracefully
+	keyMap := newKeyMap(cfg)
+
 	// Create list with themed delegate
 	delegate := list.NewDefaultDelegate()
 
@@ -63,6 +69,7 @@ func NewModel() (*Model, error) {
 		list:     l,
 		viewport: vp,
 		sessions: []string{},
+		keyMap:   keyMap,
 	}
 
 	return m, nil

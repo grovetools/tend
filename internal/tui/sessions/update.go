@@ -5,10 +5,11 @@ import (
 	"os"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
-	"github.com/grovetools/core/pkg/tmux"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/grovetools/core/pkg/tmux"
 )
 
 // Update handles messages and updates the model.
@@ -89,11 +90,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, listTendSessionsCmd
 
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c", "q":
+		// Handle keybindings using key.Matches for user-configurable keys
+		if key.Matches(msg, m.keyMap.Quit) {
 			return m, tea.Quit
+		}
 
-		case "enter":
+		if key.Matches(msg, m.keyMap.Attach) {
 			// Switch to the selected session
 			if selectedItem, ok := m.list.SelectedItem().(item); ok {
 				sessionName := selectedItem.sessionName
@@ -110,15 +112,17 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, tea.Quit
 			}
+		}
 
-		case "x", "X":
+		if key.Matches(msg, m.keyMap.Kill) {
 			// Kill the selected session
 			if selectedItem, ok := m.list.SelectedItem().(item); ok {
 				sessionName := selectedItem.sessionName
 				return m, killSessionCmd(sessionName)
 			}
+		}
 
-		case "r":
+		if key.Matches(msg, m.keyMap.Refresh) {
 			// Refresh session list
 			return m, listTendSessionsCmd
 		}

@@ -2,6 +2,7 @@ package sessions
 
 import (
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/grovetools/core/config"
 	"github.com/grovetools/core/tui/keymap"
 )
 
@@ -13,10 +14,12 @@ type KeyMap struct {
 	Refresh key.Binding
 }
 
-// newKeyMap creates a new KeyMap with default bindings.
-func newKeyMap() KeyMap {
-	return KeyMap{
-		Base: keymap.NewBase(),
+// newKeyMap creates a new KeyMap with user configuration applied.
+// Base bindings (navigation, actions, search, selection, fold) come from keymap.Load().
+// Only TUI-specific bindings are defined here.
+func newKeyMap(cfg *config.Config) KeyMap {
+	km := KeyMap{
+		Base: keymap.Load(cfg, "tend.sessions"),
 		Attach: key.NewBinding(
 			key.WithKeys("enter"),
 			key.WithHelp("enter", "attach to session"),
@@ -30,6 +33,18 @@ func newKeyMap() KeyMap {
 			key.WithHelp("r", "refresh list"),
 		),
 	}
+
+	// Apply TUI-specific overrides from config (uses reflection to map all bindings)
+	if cfg != nil && cfg.TUI != nil && cfg.TUI.Keybindings != nil {
+		tuiOverrides := cfg.TUI.Keybindings.GetTUIOverrides()
+		if tendOverrides, ok := tuiOverrides["tend"]; ok {
+			if overrides, ok := tendOverrides["sessions"]; ok {
+				keymap.ApplyOverrides(&km, overrides)
+			}
+		}
+	}
+
+	return km
 }
 
 func (k KeyMap) ShortHelp() []key.Binding {
@@ -62,7 +77,7 @@ func (k KeyMap) Sections() []keymap.Section {
 // KeymapInfo returns the keymap metadata for the tend sessions TUI.
 // Used by the grove keys registry generator to aggregate all TUI keybindings.
 func KeymapInfo() keymap.TUIInfo {
-	km := newKeyMap()
+	km := newKeyMap(nil)
 	return keymap.MakeTUIInfo(
 		"tend-sessions",
 		"tend",
