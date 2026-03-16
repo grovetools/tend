@@ -17,6 +17,7 @@ type TestExecutor struct {
 	dataDir       string
 	stateDir      string
 	cacheDir      string
+	runtimeDir    string
 	mockOverrides map[string]string
 }
 
@@ -29,6 +30,7 @@ func NewTestExecutor(ctx *Context) *TestExecutor {
 		dataDir:       ctx.DataDir(),
 		stateDir:      ctx.StateDir(),
 		cacheDir:      ctx.CacheDir(),
+		runtimeDir:    ctx.RuntimeDir(),
 		mockOverrides: ctx.mockOverrides,
 	}
 }
@@ -65,6 +67,7 @@ func (e *TestExecutor) applyTestEnvironment(cmd *exec.Cmd) {
 		fmt.Sprintf("XDG_DATA_HOME=%s", e.dataDir),
 		fmt.Sprintf("XDG_STATE_HOME=%s", e.stateDir),
 		fmt.Sprintf("XDG_CACHE_HOME=%s", e.cacheDir),
+		fmt.Sprintf("XDG_RUNTIME_DIR=%s", e.runtimeDir),
 	)
 
 	// Inject mock override environment variables

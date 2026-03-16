@@ -30,11 +30,12 @@ type Context struct {
 	TestID      string // Unique ID for this test run
 
 	// Sandboxed home environment
-	homeDir   string
-	configDir string
-	dataDir   string
-	stateDir  string
-	cacheDir  string
+	homeDir    string
+	configDir  string
+	dataDir    string
+	stateDir   string
+	cacheDir   string
+	runtimeDir string // Short path for XDG_RUNTIME_DIR to avoid Unix socket length limits
 
 	// State management
 	dirs              map[string]string      // Named directories created during test
@@ -197,6 +198,20 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 		}
 	}
 
+	// Generate a unique test ID based on the temp directory early (needed for runtime dir)
+	testID := filepath.Base(tempMgr.BaseDir())
+
+	// Create short runtime dir for Unix socket paths (groved, etc.)
+	// Unix sockets have ~104 char path limit on macOS, so we must use /tmp directly
+	sandboxedRuntime, err := fs.CreateShortTempDir(fmt.Sprintf("tend-%s-", testID))
+	if err != nil {
+		result.Success = false
+		result.Error = fmt.Errorf("creating short runtime dir: %w", err)
+		result.EndTime = time.Now()
+		result.Duration = result.EndTime.Sub(result.StartTime)
+		return result, result.Error
+	}
+
 	// Declare testCtx variable here so defer can reference it
 	var testCtx *Context
 
@@ -242,6 +257,12 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 				}
 			}
 		}
+		// Clean up the short runtime dir (created outside tempMgr for socket path length)
+		if testCtx != nil && testCtx.runtimeDir != "" {
+			if cleanErr := os.RemoveAll(testCtx.runtimeDir); cleanErr != nil {
+				ui.Error("Runtime dir cleanup failed", cleanErr)
+			}
+		}
 		if cleanErr := tempMgr.Cleanup(); cleanErr != nil {
 			ui.Error("Cleanup failed", cleanErr)
 		}
@@ -273,9 +294,6 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 	if h.opts.Verbose || h.opts.VeryVerbose {
 		ui.Info("Grove binary", groveBinary)
 	}
-	// Generate a unique test ID based on the temp directory
-	testID := filepath.Base(tempMgr.BaseDir())
-
 	// Generate unique socket name for isolated TUI test server
 	// Using testID makes it traceable (matches temp directory name)
 	socketName := fmt.Sprintf("tend-test-%s", testID)
@@ -303,6 +321,7 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 		dataDir:       sandboxedData,
 		stateDir:      sandboxedState,
 		cacheDir:      sandboxedCache,
+		runtimeDir:    sandboxedRuntime,
 		dirs:          make(map[string]string),
 		values:        make(map[string]interface{}),
 		UseRealDeps:   realDepsMap,

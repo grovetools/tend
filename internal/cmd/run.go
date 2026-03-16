@@ -16,6 +16,7 @@ import (
 	"github.com/grovetools/core/tui/theme"
 	"github.com/spf13/cobra"
 
+	"github.com/grovetools/tend/pkg/fs"
 	"github.com/grovetools/tend/pkg/harness"
 	"github.com/grovetools/tend/pkg/harness/reporters"
 	"github.com/grovetools/tend/pkg/ui"
@@ -227,6 +228,14 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 			}
 		}
 
+		// Create short runtime dir for Unix socket paths (groved, etc.)
+		// Unix sockets have ~104 char path limit on macOS, so we must use /tmp directly
+		runtimeDir, err := fs.CreateShortTempDir("tend-debug-")
+		if err != nil {
+			return fmt.Errorf("failed to create short runtime dir for debug session: %w", err)
+		}
+		renderer.RenderInfo(fmt.Sprintf("Debug session runtime directory: %s", runtimeDir))
+
 		// 1. Prepare Environments
 		// Sandboxed environment for 'runner', 'term', and 'logs' windows
 		sandboxEnvSlice := []string{
@@ -234,6 +243,7 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 			fmt.Sprintf("XDG_CONFIG_HOME=%s", configDir),
 			fmt.Sprintf("XDG_DATA_HOME=%s", dataDir),
 			fmt.Sprintf("XDG_CACHE_HOME=%s", cacheDir),
+			fmt.Sprintf("XDG_RUNTIME_DIR=%s", runtimeDir),
 		}
 
 		// Real environment for editor windows to ensure user's nvim config loads

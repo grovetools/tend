@@ -4,8 +4,28 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
+
+// CreateShortTempDir creates a temporary directory guaranteeing a short path
+// (explicitly using /tmp on macOS/Linux) to avoid Unix socket length limits.
+// Unix domain sockets have a maximum path length of ~104 characters on macOS
+// and ~108 characters on Linux. The default TMPDIR on macOS (e.g.,
+// /var/folders/4j/w6twdjd14r97l3n80z2t64n00000gn/T) consumes most of this
+// budget, causing socket creation to fail for paths like groved.sock.
+//
+// This function forces temp directory creation in /tmp on Unix systems,
+// ensuring socket paths remain short enough to be valid.
+func CreateShortTempDir(prefix string) (string, error) {
+	dir := ""
+	// Force /tmp on macOS/Linux; let Windows use default
+	if runtime.GOOS != "windows" {
+		dir = "/tmp"
+	}
+	// MkdirTemp creates directories with 0700 permissions (required by XDG_RUNTIME_DIR spec)
+	return os.MkdirTemp(dir, prefix)
+}
 
 // TempDirManager manages temporary directories for tests
 type TempDirManager struct {

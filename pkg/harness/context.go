@@ -160,6 +160,12 @@ func (c *Context) CacheDir() string {
 	return c.cacheDir
 }
 
+// RuntimeDir returns the path to the short XDG_RUNTIME_DIR.
+// This uses /tmp directly to keep Unix socket paths under the ~104 char limit on macOS.
+func (c *Context) RuntimeDir() string {
+	return c.runtimeDir
+}
+
 // CommandExecutor creates a new TestExecutor configured with the current context.
 // This is the preferred way to get a command executor within a test step, as it
 // encapsulates all necessary test environment setup.
@@ -210,6 +216,7 @@ func (c *Context) Command(program string, args ...string) *command.Command {
 		fmt.Sprintf("XDG_DATA_HOME=%s", c.dataDir),
 		fmt.Sprintf("XDG_STATE_HOME=%s", c.stateDir),
 		fmt.Sprintf("XDG_CACHE_HOME=%s", c.cacheDir),
+		fmt.Sprintf("XDG_RUNTIME_DIR=%s", c.runtimeDir),
 	)
 
 	// Preserve or detect DOCKER_HOST to ensure Docker client can connect
@@ -315,6 +322,7 @@ func (c *Context) StartTUI(binaryPath string, args []string, opts ...tui.StartOp
 		fmt.Sprintf("XDG_DATA_HOME=%s", c.dataDir),
 		fmt.Sprintf("XDG_STATE_HOME=%s", c.stateDir),
 		fmt.Sprintf("XDG_CACHE_HOME=%s", c.cacheDir),
+		fmt.Sprintf("XDG_RUNTIME_DIR=%s", c.runtimeDir),
 	)
 
 	// If using isolated tmux socket, pass it to spawned processes
