@@ -59,8 +59,8 @@ func newDemoCreateCmd() *cobra.Command {
 Available demos:
   homelab   - Full ecosystem with 3 ecosystems, 13 repos, worktrees, notes, and plans
 
-The environment is created at ~/.grove-demos/<name> by default, or at the path
-specified with --output-dir. Use --force to overwrite an existing demo environment.
+The environment is created at ~/.local/share/grove/demos/<name> by default (XDG_DATA_HOME),
+or at the path specified with --output-dir. Use --force to overwrite an existing demo environment.
 
 After creation, use 'tend demo attach <name>' to connect to the demo tmux session.`,
 		Args: cobra.ExactArgs(1),
@@ -78,13 +78,9 @@ After creation, use 'tend demo attach <name>' to connect to the demo tmux sessio
 				return fmt.Errorf("unknown demo '%s'. Available: %v", demoName, demo.List())
 			}
 
-			// Set default output directory
+			// Set default output directory (uses XDG data directory)
 			if outputDir == "" {
-				homeDir, err := os.UserHomeDir()
-				if err != nil {
-					return fmt.Errorf("getting home directory: %w", err)
-				}
-				outputDir = filepath.Join(homeDir, ".grove-demos", demoName)
+				outputDir = filepath.Join(demo.DemosDir(), demoName)
 			}
 
 			// Check if already exists
@@ -129,7 +125,7 @@ After creation, use 'tend demo attach <name>' to connect to the demo tmux sessio
 		},
 	}
 
-	cmd.Flags().StringVarP(&outputDir, "output-dir", "o", "", "Output directory (default: ~/.grove-demos/<name>)")
+	cmd.Flags().StringVarP(&outputDir, "output-dir", "o", "", "Output directory (default: XDG_DATA_HOME/grove/demos/<name>)")
 	cmd.Flags().BoolVarP(&attach, "attach", "a", false, "Attach to the demo session immediately after creation")
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "Overwrite existing demo environment")
 
@@ -167,8 +163,7 @@ to the demo's tmux server.`,
 						return fmt.Errorf("no demo name provided")
 					}
 				} else {
-					homeDir, _ := os.UserHomeDir()
-					outputDir = filepath.Join(homeDir, ".grove-demos", args[0])
+					outputDir = filepath.Join(demo.DemosDir(), args[0])
 				}
 			}
 
@@ -187,12 +182,7 @@ to the demo's tmux server.`,
 
 // listExistingDemos returns a list of existing demo directories.
 func listExistingDemos() []string {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return nil
-	}
-
-	demosDir := filepath.Join(homeDir, ".grove-demos")
+	demosDir := demo.DemosDir()
 	entries, err := os.ReadDir(demosDir)
 	if err != nil {
 		return nil
@@ -238,8 +228,7 @@ This kills the demo tmux server and removes all demo files.`,
 						return fmt.Errorf("no demo name provided")
 					}
 				} else {
-					homeDir, _ := os.UserHomeDir()
-					outputDir = filepath.Join(homeDir, ".grove-demos", args[0])
+					outputDir = filepath.Join(demo.DemosDir(), args[0])
 				}
 			}
 
@@ -320,8 +309,7 @@ func newDemoStatusCmd() *cobra.Command {
 						return fmt.Errorf("no demo name provided")
 					}
 				} else {
-					homeDir, _ := os.UserHomeDir()
-					outputDir = filepath.Join(homeDir, ".grove-demos", args[0])
+					outputDir = filepath.Join(demo.DemosDir(), args[0])
 				}
 			}
 
