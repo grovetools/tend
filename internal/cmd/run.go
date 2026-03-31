@@ -15,6 +15,7 @@ import (
 	"github.com/grovetools/core/pkg/tmux"
 	"github.com/grovetools/core/tui/theme"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 
 	"github.com/grovetools/tend/pkg/fs"
 	"github.com/grovetools/tend/pkg/harness"
@@ -456,6 +457,13 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 		return nil
 	}
 
+	// When --format json, redirect all pretty/styled output to stderr so that
+	// only the JSON report is written to stdout.
+	if outputFormat == "json" {
+		grovelogging.SetGlobalOutput(os.Stderr)
+		renderer = ui.NewRenderer(os.Stderr, verbose, 80)
+	}
+
 	// Display selected scenarios
 	scenarioNames := make([]string, len(selectedScenarios))
 	for i, scenario := range selectedScenarios {
@@ -494,13 +502,23 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 	// Create harness
 	h := harness.New(opts)
 	
+	// Determine if we can use the interactive TUI for parallel mode.
+	// Fall back to sequential runner when stdout is not a terminal (e.g., piped
+	// to a file, captured by a subprocess, or running inside a non-interactive agent).
+	isTTY := term.IsTerminal(int(os.Stdout.Fd()))
+	useTUI := parallel && isTTY && outputFormat != "json"
+
+	if parallel && !isTTY && outputFormat != "json" {
+		fmt.Fprintf(os.Stderr, "Note: stdout is not a TTY, running parallel tests without TUI\n")
+	}
+
 	// Run scenarios
 	var results []*harness.Result
 	var scenarioStates []*prunner.ScenarioState
 	var totalSuccess int
 	var err error
 
-	if parallel {
+	if useTUI {
 		results, scenarioStates, err = runScenariosParallel(ctx, h, selectedScenarios, renderer, rootDir)
 
 		// Clean up orphaned tmux servers from parallel test runs
@@ -524,20 +542,26 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 		}
 	}
 
-	// Write reports
+	// Write file-based reports (--json <file>, --junit <file>)
 	if err := writeReports(results); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to write reports: %v\n", err)
 	}
 
-	// Display summary
-	// In parallel mode, show summary table then detailed failures
-	if !parallel {
-		renderFinalSummary(renderer, results, totalSuccess, len(selectedScenarios))
+	// When --format json is set, write JSON to stdout and skip styled output
+	if outputFormat == "json" {
+		reporter := reporters.NewJSONReporter(true, true)
+		if err := reporter.WriteReport(os.Stdout, results); err != nil {
+			return fmt.Errorf("writing json to stdout: %w", err)
+		}
 	} else {
-		// For parallel mode, show summary and then detailed failures
-		renderFinalSummary(renderer, results, totalSuccess, len(selectedScenarios))
-		if totalSuccess < len(selectedScenarios) {
-			printParallelFailureDetails(scenarioStates)
+		// Display styled summary
+		if !parallel || !useTUI {
+			renderFinalSummary(renderer, results, totalSuccess, len(selectedScenarios))
+		} else {
+			renderFinalSummary(renderer, results, totalSuccess, len(selectedScenarios))
+			if totalSuccess < len(selectedScenarios) {
+				printParallelFailureDetails(scenarioStates)
+			}
 		}
 	}
 
