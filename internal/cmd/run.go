@@ -526,6 +526,13 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 		if err := cleanupOrphanedTmuxServers(ctx); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to cleanup orphaned tmux servers: %v\n", err)
 		}
+	} else if parallel {
+		results, err = runScenariosParallelHeadless(ctx, selectedScenarios, rootDir)
+
+		// Clean up orphaned tmux servers from parallel test runs
+		if cleanupErr := cleanupOrphanedTmuxServers(ctx); cleanupErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to cleanup orphaned tmux servers: %v\n", cleanupErr)
+		}
 	} else {
 		results, err = runScenariosSequential(ctx, h, selectedScenarios, renderer)
 	}
@@ -645,6 +652,45 @@ func runScenariosParallel(ctx context.Context, h *harness.Harness, scenarios []*
 	results := runnerModel.Results()
 	states := runnerModel.ScenarioStates()
 	return results, states, nil
+}
+
+func runScenariosParallelHeadless(ctx context.Context, scenarios []*harness.Scenario, projectRoot string) ([]*harness.Result, error) {
+	eventsChan := prunner.Run(ctx, scenarios, projectRoot, jobs)
+	var results []*harness.Result
+
+	for event := range eventsChan {
+		switch event.Type {
+		case "start":
+			ulogRun.Info("Scenario started").
+				Field("scenario", scenarios[event.Index].Name).
+				Emit()
+		case "finish":
+			results = append(results, event.Result)
+
+			if event.Result.Success {
+				ulogRun.Success("Scenario completed").
+					Field("scenario", event.Result.ScenarioName).
+					Field("duration", event.Result.Duration).
+					Emit()
+			} else {
+				errMsg := ""
+				if event.Result.Error != nil {
+					errMsg = event.Result.Error.Error()
+				}
+				ulogRun.Error("Scenario failed").
+					Field("scenario", event.Result.ScenarioName).
+					Field("duration", event.Result.Duration).
+					Field("error", errMsg).
+					Emit()
+
+				// Print raw output to aid debugging in headless/CI environments
+				if output := strings.TrimSpace(event.Output); output != "" {
+					fmt.Fprintf(os.Stderr, "\n--- Output: %s ---\n%s\n---\n\n", event.Result.ScenarioName, output)
+				}
+			}
+		}
+	}
+	return results, nil
 }
 
 func runSingleScenario(ctx context.Context, h *harness.Harness, scenario *harness.Scenario, renderer *ui.Renderer) (*harness.Result, error) {

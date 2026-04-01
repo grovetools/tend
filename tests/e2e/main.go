@@ -92,6 +92,8 @@ func main() {
 		ParallelRunWithFailuresScenario(),
 		ParallelRunJobsFlagScenario(),
 		ParallelRunInteractiveQuitScenario(),
+		ParallelRunHeadlessJSONScenario(),
+		ParallelRunHeadlessNonTTYScenario(),
 		ParallelRunNoScenariosScenario(),
 	}
 

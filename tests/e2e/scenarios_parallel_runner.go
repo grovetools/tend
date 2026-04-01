@@ -416,12 +416,11 @@ func ParallelRunWithFailuresScenario() *harness.Scenario {
 }
 
 // ParallelRunJobsFlagScenario tests the --jobs flag for concurrency control
-// NOTE: Currently disabled due to timing issues - both --jobs=2 and --jobs=4 take ~4s
 func ParallelRunJobsFlagScenario() *harness.Scenario {
 	return harness.NewScenarioWithOptions(
 		"parallel-run-jobs-flag",
 		"Verifies that the --jobs flag correctly limits concurrency",
-		[]string{"parallel", "concurrency", "disabled"},
+		[]string{"parallel", "concurrency"},
 		[]harness.Step{
 			harness.NewStep("Run with --jobs=2 and measure time", func(ctx *harness.Context) error {
 				tendBinary, err := findE2EBinary()
@@ -506,8 +505,8 @@ func ParallelRunJobsFlagScenario() *harness.Scenario {
 				return nil
 			}),
 		},
-		true, // localOnly - requires tmux for TUI
-		true, // explicitOnly - disabled due to --jobs flag not working as expected
+		true,  // localOnly - requires tmux for TUI
+		false, // explicitOnly
 	)
 }
 
@@ -569,6 +568,121 @@ func ParallelRunInteractiveQuitScenario() *harness.Scenario {
 			}),
 		},
 		true,  // localOnly - requires tmux
+		false, // explicitOnly
+	)
+}
+
+// ParallelRunHeadlessJSONScenario tests headless parallel execution with --format json
+func ParallelRunHeadlessJSONScenario() *harness.Scenario {
+	return harness.NewScenarioWithOptions(
+		"parallel-run-headless-json",
+		"Verifies that --parallel --format json runs headlessly and outputs clean JSON",
+		[]string{"parallel", "headless", "json"},
+		[]harness.Step{
+			harness.NewStep("Run tests headlessly with JSON format", func(ctx *harness.Context) error {
+				tendBinary, err := findE2EBinary()
+				if err != nil {
+					return err
+				}
+
+				// command.New runs without a TTY, so this triggers headless parallel mode
+				result := command.New(tendBinary,
+					"run",
+					"fixture-passing-1",
+					"fixture-passing-2",
+					"fixture-failing-1",
+					"--parallel",
+					"--format", "json",
+				).Dir(ctx.ProjectRoot).Env("TEND_IS_CHILD_PROCESS=true").Run()
+
+				ctx.Set("result", result)
+
+				// We expect exit code 1 because fixture-failing-1 is included
+				if result.ExitCode != 1 {
+					return fmt.Errorf("expected exit code 1, got %d\nStdout: %s\nStderr: %s", result.ExitCode, result.Stdout, result.Stderr)
+				}
+				return nil
+			}),
+			harness.NewStep("Verify JSON on stdout and logs on stderr", func(ctx *harness.Context) error {
+				result := ctx.Get("result").(*command.Result)
+
+				// Verify stdout is valid JSON
+				var report reporters.JSONReport
+				if err := json.Unmarshal([]byte(result.Stdout), &report); err != nil {
+					return fmt.Errorf("stdout is not valid JSON: %w\nStdout:\n%s", err, result.Stdout)
+				}
+
+				return ctx.Verify(func(v *verify.Collector) {
+					// Verify report contents
+					v.Equal("total tests is 3", 3, report.TotalTests)
+					v.Equal("passed is 2", 2, report.Passed)
+					v.Equal("failed is 1", 1, report.Failed)
+
+					// Verify stderr contains the headless progress logs
+					v.Contains("stderr has start log", result.Stderr, "Scenario started")
+					v.Contains("stderr has completion log", result.Stderr, "Scenario completed")
+					v.Contains("stderr has failure log", result.Stderr, "Scenario failed")
+
+					// Verify stdout doesn't contain the logs (pure JSON)
+					v.NotContains("stdout is pure JSON (no start logs)", result.Stdout, "Scenario started")
+				})
+			}),
+		},
+		false, // localOnly
+		false, // explicitOnly
+	)
+}
+
+// ParallelRunHeadlessNonTTYScenario tests headless parallel in non-TTY without --format json
+func ParallelRunHeadlessNonTTYScenario() *harness.Scenario {
+	return harness.NewScenarioWithOptions(
+		"parallel-run-headless-non-tty",
+		"Verifies that --parallel defaults to headless parallel (not sequential) when TTY is unavailable",
+		[]string{"parallel", "headless", "tty"},
+		[]harness.Step{
+			harness.NewStep("Run slow tests in non-TTY environment", func(ctx *harness.Context) error {
+				tendBinary, err := findE2EBinary()
+				if err != nil {
+					return err
+				}
+
+				startTime := time.Now()
+				// Run without --format json. Lack of TTY triggers headless mode.
+				result := command.New(tendBinary,
+					"run",
+					"fixture-slow-1",
+					"fixture-slow-2",
+					"--parallel",
+				).Dir(ctx.ProjectRoot).Env("TEND_IS_CHILD_PROCESS=true").Run()
+
+				duration := time.Since(startTime)
+				ctx.Set("duration", duration)
+				ctx.Set("result", result)
+
+				if result.ExitCode != 0 {
+					return fmt.Errorf("expected exit code 0, got %d\nStdout: %s\nStderr: %s", result.ExitCode, result.Stdout, result.Stderr)
+				}
+				return nil
+			}),
+			harness.NewStep("Verify parallel execution and headless logs", func(ctx *harness.Context) error {
+				duration := ctx.Get("duration").(time.Duration)
+				result := ctx.Get("result").(*command.Result)
+
+				return ctx.Verify(func(v *verify.Collector) {
+					// If it ran sequentially, it would take > 4 seconds
+					v.True("execution was parallel (took < 3.5s)", duration < 3500*time.Millisecond)
+
+					// Headless progress logs should be present
+					combined := result.Stderr + result.Stdout
+					v.Contains("output has headless start log", combined, "Scenario started")
+					v.Contains("output has headless complete log", combined, "Scenario completed")
+
+					// Non-TTY note should be printed
+					v.Contains("prints non-TTY note", result.Stderr, "Note: stdout is not a TTY, running parallel tests without TUI")
+				})
+			}),
+		},
+		false, // localOnly
 		false, // explicitOnly
 	)
 }
