@@ -642,6 +642,77 @@ func (s *Session) postDebug(path string, body interface{}) error {
 	return nil
 }
 
+// DiagnosticOutput is implemented by types that can display labelled output
+// (e.g. harness.Context). Defined here to avoid a circular import.
+type DiagnosticOutput interface {
+	ShowCommandOutput(command, stdout, stderr string)
+}
+
+// DiagnosticSnapshot returns a formatted string combining the visual tmux
+// capture with the structural debug state (if the debug server is available).
+// When the debug server is not configured the structural section is omitted.
+func (s *Session) DiagnosticSnapshot() string {
+	var b strings.Builder
+
+	// Visual capture
+	visual, err := s.Capture(WithCleanedOutput())
+	if err != nil {
+		visual = fmt.Sprintf("(capture error: %v)", err)
+	}
+	b.WriteString("[Visual Capture]\n")
+	b.WriteString(visual)
+	b.WriteString("\n")
+
+	// Structural state — gracefully degrade when unavailable
+	snap, err := s.GetDebugState()
+	if err == nil && snap != nil {
+		b.WriteString("\n[Structural State]\n")
+
+		// HUD
+		b.WriteString(fmt.Sprintf("HUD:          %q\n", snap.HUD))
+
+		// Active panel
+		b.WriteString(fmt.Sprintf("Active Panel: %s\n", snap.ActivePanelID))
+
+		// Rail
+		if len(snap.Rail) > 0 {
+			var items []string
+			for _, ri := range snap.Rail {
+				if ri.IsActive {
+					items = append(items, fmt.Sprintf("*%s*", ri.Label))
+				} else {
+					items = append(items, ri.Label)
+				}
+			}
+			b.WriteString(fmt.Sprintf("Rail:         %s\n", strings.Join(items, " | ")))
+		}
+
+		// Panels
+		b.WriteString("Panels:\n")
+		for _, pi := range snap.Panels {
+			focus := "-"
+			if pi.IsFocused {
+				focus = "*"
+			}
+			b.WriteString(fmt.Sprintf("  %s [%s] (type: %s)\n", focus, pi.ID, pi.Type))
+			b.WriteString(fmt.Sprintf("    Bounds: x=%d, y=%d, w=%d, h=%d\n",
+				pi.Bounds.X, pi.Bounds.Y, pi.Bounds.W, pi.Bounds.H))
+			if len(pi.State) > 0 {
+				stateJSON, _ := json.Marshal(pi.State)
+				b.WriteString(fmt.Sprintf("    State:  %s\n", string(stateJSON)))
+			}
+		}
+	}
+
+	return b.String()
+}
+
+// LogDiagnostic captures a diagnostic snapshot and displays it via the given
+// output sink (typically a *harness.Context).
+func (s *Session) LogDiagnostic(out DiagnosticOutput, label string) {
+	out.ShowCommandOutput(label, s.DiagnosticSnapshot(), "")
+}
+
 // Panel returns a PanelLocator for the given panel ID.
 func (s *Session) Panel(id string) *PanelLocator {
 	return &PanelLocator{session: s, panelID: id}
