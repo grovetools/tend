@@ -2,7 +2,9 @@ package tui
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -18,10 +20,12 @@ import (
 // Session represents an active TUI application running in a tmux session.
 // It provides a high-level API for interaction and assertion.
 type Session struct {
-	sessionName string
-	client      *tmux.Client
-	recording   *SessionRecording // For recording and debugging
-	rootDir     string
+	sessionName     string
+	client          *tmux.Client
+	recording       *SessionRecording // For recording and debugging
+	rootDir         string
+	debugClient     *http.Client // HTTP client connected via Unix socket to the terminal debug server
+	debugSocketPath string       // Path to the terminal's debug Unix socket
 }
 
 // NewSession creates a new TUI session handle. It is intended for internal use by the harness.
@@ -575,4 +579,56 @@ func (s *Session) SendKeysAndWaitForChange(timeout time.Duration, keys ...string
 // This is typically called automatically by the test harness on cleanup.
 func (s *Session) Close() error {
 	return s.client.KillSession(context.Background(), s.sessionName)
+}
+
+// ---------------------------------------------------------------------------
+// Debug server integration (Locator API)
+// ---------------------------------------------------------------------------
+
+// SetDebugSocket configures the session to talk to the terminal's debug server
+// over the given Unix domain socket path. It creates the HTTP client and waits
+// for the server to become ready.
+func (s *Session) SetDebugSocket(socketPath string, readyTimeout time.Duration) error {
+	s.debugSocketPath = socketPath
+	s.debugClient = newDebugHTTPClient(socketPath)
+	return waitForDebugServer(s.debugClient, readyTimeout)
+}
+
+// GetDebugState fetches the current debug snapshot from the terminal via the
+// debug Unix socket. Returns an error if the debug client is not configured.
+func (s *Session) GetDebugState() (*DebugSnapshot, error) {
+	if s.debugClient == nil {
+		return nil, fmt.Errorf("debug client not configured (no GROVETERM_DEBUG_SOCKET)")
+	}
+
+	resp, err := s.debugClient.Get("http://unix/debug/state")
+	if err != nil {
+		return nil, fmt.Errorf("GET /debug/state: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GET /debug/state returned %d", resp.StatusCode)
+	}
+
+	var snap DebugSnapshot
+	if err := json.NewDecoder(resp.Body).Decode(&snap); err != nil {
+		return nil, fmt.Errorf("decode debug state: %w", err)
+	}
+	return &snap, nil
+}
+
+// Panel returns a PanelLocator for the given panel ID.
+func (s *Session) Panel(id string) *PanelLocator {
+	return &PanelLocator{session: s, panelID: id}
+}
+
+// RailItem returns a RailLocator for the given rail item label.
+func (s *Session) RailItem(label string) *RailLocator {
+	return &RailLocator{session: s, label: label}
+}
+
+// HUD returns a HUDLocator for the head-up display.
+func (s *Session) HUD() *HUDLocator {
+	return &HUDLocator{session: s}
 }
