@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -616,6 +617,29 @@ func (s *Session) GetDebugState() (*DebugSnapshot, error) {
 		return nil, fmt.Errorf("decode debug state: %w", err)
 	}
 	return &snap, nil
+}
+
+// postDebug sends a POST request with a JSON body to the given debug API endpoint.
+func (s *Session) postDebug(path string, body interface{}) error {
+	if s.debugClient == nil {
+		return fmt.Errorf("debug client not configured (no GROVETERM_DEBUG_SOCKET)")
+	}
+
+	data, err := json.Marshal(body)
+	if err != nil {
+		return fmt.Errorf("marshal debug request: %w", err)
+	}
+
+	resp, err := s.debugClient.Post("http://unix"+path, "application/json", bytes.NewReader(data))
+	if err != nil {
+		return fmt.Errorf("POST %s: %w", path, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("POST %s returned %d", path, resp.StatusCode)
+	}
+	return nil
 }
 
 // Panel returns a PanelLocator for the given panel ID.

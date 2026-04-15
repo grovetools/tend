@@ -216,6 +216,19 @@ func (l *PanelLocator) Bounds() (x, y, w, h int, err error) {
 	return b.X, b.Y, b.W, b.H, nil
 }
 
+// Focus sends a POST /debug/focus request to switch focus to this panel.
+func (l *PanelLocator) Focus() error {
+	return l.session.postDebug("/debug/focus", map[string]string{"panel_id": l.panelID})
+}
+
+// SendKeys sends a POST /debug/keys request to inject keystrokes into this panel.
+// The keys string uses standard notation: individual characters are sent as-is,
+// special keys use C-<char> for ctrl, and names like Enter, Esc, Tab, Space,
+// Backspace, Up, Down, Left, Right.
+func (l *PanelLocator) SendKeys(keys string) error {
+	return l.session.postDebug("/debug/keys", map[string]string{"panel_id": l.panelID, "keys": keys})
+}
+
 // ---------------------------------------------------------------------------
 // RailLocator
 // ---------------------------------------------------------------------------
@@ -245,6 +258,21 @@ func (l *RailLocator) AssertExists() error {
 		PollInterval: defaultLocatorPoll,
 		Immediate:    true,
 	})
+}
+
+// Click sends a POST /debug/focus request with the rail item's panel ID,
+// effectively focusing the panel associated with this rail item.
+func (l *RailLocator) Click() error {
+	snap, err := l.session.GetDebugState()
+	if err != nil {
+		return fmt.Errorf("failed to fetch debug state for rail click: %w", err)
+	}
+	for _, item := range snap.Rail {
+		if item.Label == l.label {
+			return l.session.postDebug("/debug/focus", map[string]string{"panel_id": item.ID})
+		}
+	}
+	return fmt.Errorf("rail item %q not found", l.label)
 }
 
 // AssertActive polls the debug state until the rail item with the given label is active.
