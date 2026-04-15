@@ -63,7 +63,7 @@ type PanelLocator struct {
 
 // AssertExists polls the debug state until the panel appears in the snapshot.
 func (l *PanelLocator) AssertExists() error {
-	return wait.ForWithMessage(func() (bool, string, error) {
+	err := wait.ForWithMessage(func() (bool, string, error) {
 		snap, err := l.session.GetDebugState()
 		if err != nil {
 			return false, "failed to fetch debug state", err
@@ -77,11 +77,15 @@ func (l *PanelLocator) AssertExists() error {
 		PollInterval: defaultLocatorPoll,
 		Immediate:    true,
 	})
+	if err != nil {
+		return fmt.Errorf("%w\n\n=== Diagnostic Context ===\n%s", err, l.session.DiagnosticSnapshot())
+	}
+	return nil
 }
 
 // AssertFocused polls the debug state until the panel is the active panel.
 func (l *PanelLocator) AssertFocused() error {
-	return wait.ForWithMessage(func() (bool, string, error) {
+	err := wait.ForWithMessage(func() (bool, string, error) {
 		snap, err := l.session.GetDebugState()
 		if err != nil {
 			return false, "failed to fetch debug state", err
@@ -99,11 +103,15 @@ func (l *PanelLocator) AssertFocused() error {
 		PollInterval: defaultLocatorPoll,
 		Immediate:    true,
 	})
+	if err != nil {
+		return fmt.Errorf("%w\n\n=== Diagnostic Context ===\n%s", err, l.session.DiagnosticSnapshot())
+	}
+	return nil
 }
 
 // AssertBounds polls the debug state until the panel has the exact given bounds.
 func (l *PanelLocator) AssertBounds(x, y, w, h int) error {
-	return wait.ForWithMessage(func() (bool, string, error) {
+	err := wait.ForWithMessage(func() (bool, string, error) {
 		snap, err := l.session.GetDebugState()
 		if err != nil {
 			return false, "failed to fetch debug state", err
@@ -123,6 +131,10 @@ func (l *PanelLocator) AssertBounds(x, y, w, h int) error {
 		PollInterval: defaultLocatorPoll,
 		Immediate:    true,
 	})
+	if err != nil {
+		return fmt.Errorf("%w\n\n=== Diagnostic Context ===\n%s", err, l.session.DiagnosticSnapshot())
+	}
+	return nil
 }
 
 // WaitForText polls until the panel's rendered text contains the given substring.
@@ -242,7 +254,7 @@ type RailLocator struct {
 
 // AssertExists polls the debug state until a rail item with the given label exists.
 func (l *RailLocator) AssertExists() error {
-	return wait.ForWithMessage(func() (bool, string, error) {
+	err := wait.ForWithMessage(func() (bool, string, error) {
 		snap, err := l.session.GetDebugState()
 		if err != nil {
 			return false, "failed to fetch debug state", err
@@ -258,6 +270,10 @@ func (l *RailLocator) AssertExists() error {
 		PollInterval: defaultLocatorPoll,
 		Immediate:    true,
 	})
+	if err != nil {
+		return fmt.Errorf("%w\n\n=== Diagnostic Context ===\n%s", err, l.session.DiagnosticSnapshot())
+	}
+	return nil
 }
 
 // Click sends a POST /debug/focus request with the rail item's panel ID,
@@ -277,7 +293,7 @@ func (l *RailLocator) Click() error {
 
 // AssertActive polls the debug state until the rail item with the given label is active.
 func (l *RailLocator) AssertActive() error {
-	return wait.ForWithMessage(func() (bool, string, error) {
+	err := wait.ForWithMessage(func() (bool, string, error) {
 		snap, err := l.session.GetDebugState()
 		if err != nil {
 			return false, "failed to fetch debug state", err
@@ -296,6 +312,10 @@ func (l *RailLocator) AssertActive() error {
 		PollInterval: defaultLocatorPoll,
 		Immediate:    true,
 	})
+	if err != nil {
+		return fmt.Errorf("%w\n\n=== Diagnostic Context ===\n%s", err, l.session.DiagnosticSnapshot())
+	}
+	return nil
 }
 
 // ---------------------------------------------------------------------------
@@ -310,7 +330,7 @@ type HUDLocator struct {
 
 // WaitForText polls the debug state until the HUD text contains the given substring.
 func (l *HUDLocator) WaitForText(text string, timeout time.Duration) error {
-	return wait.ForWithMessage(func() (bool, string, error) {
+	err := wait.ForWithMessage(func() (bool, string, error) {
 		snap, err := l.session.GetDebugState()
 		if err != nil {
 			return false, "failed to fetch debug state", err
@@ -324,6 +344,10 @@ func (l *HUDLocator) WaitForText(text string, timeout time.Duration) error {
 		PollInterval: defaultLocatorPoll,
 		Immediate:    true,
 	})
+	if err != nil {
+		return fmt.Errorf("%w\n\n=== Diagnostic Context ===\n%s", err, l.session.DiagnosticSnapshot())
+	}
+	return nil
 }
 
 // Text returns the current HUD text (ANSI-stripped).
