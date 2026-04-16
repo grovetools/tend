@@ -713,6 +713,69 @@ func (s *Session) LogDiagnostic(out DiagnosticOutput, label string) {
 	out.ShowCommandOutput(label, s.DiagnosticSnapshot(), "")
 }
 
+// GetEvents returns the navigation event log from the debug server.
+// Calls GET /debug/events.
+func (s *Session) GetEvents() ([]string, error) {
+	if s.debugClient == nil {
+		return nil, fmt.Errorf("debug client not configured")
+	}
+
+	resp, err := s.debugClient.Get("http://unix/debug/events")
+	if err != nil {
+		return nil, fmt.Errorf("GET /debug/events: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GET /debug/events returned %d", resp.StatusCode)
+	}
+
+	var result struct {
+		Events []string `json:"events"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode events response: %w", err)
+	}
+
+	return result.Events, nil
+}
+
+// ClearEvents resets the navigation event log on the debug server.
+// Calls DELETE /debug/events.
+func (s *Session) ClearEvents() error {
+	if s.debugClient == nil {
+		return fmt.Errorf("debug client not configured")
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, "http://unix/debug/events", nil)
+	if err != nil {
+		return fmt.Errorf("create DELETE request: %w", err)
+	}
+
+	resp, err := s.debugClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("DELETE /debug/events: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("DELETE /debug/events returned %d", resp.StatusCode)
+	}
+	return nil
+}
+
+// SendKittyKey injects a synthesized KittyKeyMsg into the bubbletea event
+// loop for the given panel. This simulates a CSI-u key event from the host
+// terminal. keycode is a Unicode codepoint, mods is the kitty modifier
+// bitmask (shift=1, alt=2, ctrl=4, super=8).
+func (s *Session) SendKittyKey(panelID string, keycode int, mods int) error {
+	return s.postDebug("/debug/kitty-keys", map[string]interface{}{
+		"panel_id": panelID,
+		"keycode":  keycode,
+		"mods":     mods,
+	})
+}
+
 // Panel returns a PanelLocator for the given panel ID.
 func (s *Session) Panel(id string) *PanelLocator {
 	return &PanelLocator{session: s, panelID: id}

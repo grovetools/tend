@@ -1,7 +1,10 @@
 package tui
 
 import (
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -239,6 +242,67 @@ func (l *PanelLocator) Focus() error {
 // Backspace, Up, Down, Left, Right.
 func (l *PanelLocator) SendKeys(keys string) error {
 	return l.session.postDebug("/debug/keys", map[string]string{"panel_id": l.panelID, "keys": keys})
+}
+
+// PTYWrites returns the raw bytes recorded by the panel's PTY write tap.
+// Calls GET /debug/pty-writes?panel_id=<id> and hex-decodes the response.
+func (l *PanelLocator) PTYWrites() ([]byte, error) {
+	if l.session.debugClient == nil {
+		return nil, fmt.Errorf("debug client not configured")
+	}
+
+	resp, err := l.session.debugClient.Get("http://unix/debug/pty-writes?panel_id=" + l.panelID)
+	if err != nil {
+		return nil, fmt.Errorf("GET /debug/pty-writes: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GET /debug/pty-writes returned %d", resp.StatusCode)
+	}
+
+	var result struct {
+		WritesHex string `json:"writes_hex"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode pty-writes response: %w", err)
+	}
+
+	return hex.DecodeString(result.WritesHex)
+}
+
+// ClearPTYWrites resets the panel's PTY write tap buffer.
+// Calls DELETE /debug/pty-writes?panel_id=<id>.
+func (l *PanelLocator) ClearPTYWrites() error {
+	if l.session.debugClient == nil {
+		return fmt.Errorf("debug client not configured")
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, "http://unix/debug/pty-writes?panel_id="+l.panelID, nil)
+	if err != nil {
+		return fmt.Errorf("create DELETE request: %w", err)
+	}
+
+	resp, err := l.session.debugClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("DELETE /debug/pty-writes: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("DELETE /debug/pty-writes returned %d", resp.StatusCode)
+	}
+	return nil
+}
+
+// InjectOutputHex injects hex-encoded bytes into the panel's PTY output
+// parser (OSC scanners + terminal emulator). Used to simulate PTY output
+// like OSC 777 sequences without a real child process.
+func (l *PanelLocator) InjectOutputHex(hexData string) error {
+	return l.session.postDebug("/debug/pty-out", map[string]string{
+		"panel_id": l.panelID,
+		"data_hex": hexData,
+	})
 }
 
 // ---------------------------------------------------------------------------
