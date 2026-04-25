@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -267,6 +268,22 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 			ui.Error("Cleanup failed", cleanErr)
 		}
 	}
+
+	// Always reap groved daemons spawned in the sandbox, even with
+	// --no-cleanup. Auto-spawned scoped daemons only self-terminate after
+	// 2m without a terminal websocket client (see groved --auto-shutdown),
+	// but RPC-only test scenarios never connect one — without explicit
+	// kill they accumulate by the thousands across runs.
+	defer func() {
+		if testCtx != nil && testCtx.runtimeDir != "" {
+			killDaemonsInTree(testCtx.runtimeDir)
+		}
+		if tempMgr != nil {
+			if base := tempMgr.BaseDir(); base != "" {
+				killDaemonsInTree(base)
+			}
+		}
+	}()
 
 	// Setup cleanup
 	if !h.opts.NoCleanup {
@@ -859,3 +876,36 @@ func (h *Harness) setupDebugPanes(ctx *Context, ui *UI, scenario *Scenario) erro
 	return nil
 }
 
+
+// killDaemonsInTree finds groved.pid files anywhere under root and kills
+// the recorded PIDs. Best-effort: missing files, malformed contents, and
+// already-dead PIDs are silently ignored. Used to reap auto-spawned
+// scoped daemons before tearing down a scenario sandbox so they do not
+// leak across runs.
+func killDaemonsInTree(root string) {
+	_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		if d.Name() != "groved.pid" {
+			return nil
+		}
+		data, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return nil
+		}
+		pid, parseErr := strconv.Atoi(strings.TrimSpace(string(data)))
+		if parseErr != nil || pid <= 1 {
+			return nil
+		}
+		proc, findErr := os.FindProcess(pid)
+		if findErr != nil {
+			return nil
+		}
+		// SIGTERM first; the daemons handle it for graceful shutdown.
+		// We do not wait — the process will exit asynchronously and the
+		// pidfile/dir is about to be removed anyway.
+		_ = proc.Signal(syscall.SIGTERM)
+		return nil
+	})
+}
