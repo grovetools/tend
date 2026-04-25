@@ -22,7 +22,9 @@ import (
 // contextMutex protects concurrent access to context maps
 var contextMutex sync.RWMutex
 
-// NewDir creates and tracks a named directory within the test
+// NewDir creates and tracks a named directory within the test.
+// The directory is created on disk so callers can immediately chdir into it
+// (or write files inside it) without an extra os.MkdirAll step.
 func (c *Context) NewDir(name string) string {
 	contextMutex.Lock()
 	defer contextMutex.Unlock()
@@ -32,6 +34,7 @@ func (c *Context) NewDir(name string) string {
 		c.dirs = make(map[string]string)
 	}
 	c.dirs[name] = dir
+	_ = os.MkdirAll(dir, 0o755)
 	return dir
 }
 
