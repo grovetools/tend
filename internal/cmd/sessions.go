@@ -274,8 +274,14 @@ tend test tmux servers.`,
 			dryRun, _ := cmd.Flags().GetBool("dry-run")
 			removeStale, _ := cmd.Flags().GetBool("remove-stale")
 
-			// Get the tmux socket directory
-			socketDir := "/tmp/tmux-" + fmt.Sprintf("%d", os.Getuid())
+			// Get the tmux socket directory. Respect TMUX_TMPDIR/TMPDIR — the tmux
+			// client uses the same precedence and on macOS the system TMPDIR is
+			// not /tmp.
+			tmpDir := os.Getenv("TMUX_TMPDIR")
+			if tmpDir == "" {
+				tmpDir = os.TempDir()
+			}
+			socketDir := filepath.Join(tmpDir, fmt.Sprintf("tmux-%d", os.Getuid()))
 
 			// Check if directory exists
 			entries, err := os.ReadDir(socketDir)
@@ -296,8 +302,10 @@ tend test tmux servers.`,
 			var tendSockets []string
 
 			for _, entry := range entries {
-				if strings.HasPrefix(entry.Name(), "tend-test-") {
-					tendSockets = append(tendSockets, entry.Name())
+				// Match both legacy "tend-test-" sockets and the new short "tt-" prefix.
+				name := entry.Name()
+				if strings.HasPrefix(name, "tend-test-") || strings.HasPrefix(name, "tt-") {
+					tendSockets = append(tendSockets, name)
 				}
 			}
 

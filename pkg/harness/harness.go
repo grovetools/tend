@@ -311,9 +311,15 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 	if h.opts.Verbose || h.opts.VeryVerbose {
 		ui.Info("Grove binary", groveBinary)
 	}
-	// Generate unique socket name for isolated TUI test server
-	// Using testID makes it traceable (matches temp directory name)
-	socketName := fmt.Sprintf("tend-test-%s", testID)
+	// Unix socket paths are limited to 104 chars on macOS (sun_path). tmux places
+	// sockets in $TMPDIR/tmux-<uid>/ which can already be ~50 chars on macOS, so
+	// the socket name itself must stay short. Use a short prefix of testID for log
+	// traceability plus a timestamp-derived hash for uniqueness.
+	shortPrefix := testID
+	if len(shortPrefix) > 8 {
+		shortPrefix = shortPrefix[:8]
+	}
+	socketName := fmt.Sprintf("tt-%s-%x", shortPrefix, time.Now().UnixNano()%0x100000000)
 
 	// Populate the map for real dependencies
 	realDepsMap := make(map[string]bool)

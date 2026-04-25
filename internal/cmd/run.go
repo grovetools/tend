@@ -865,8 +865,13 @@ func writeReports(results []*harness.Result) error {
 // cleanupOrphanedTmuxServers kills all tend-test tmux servers and removes their socket files.
 // This is called after parallel test runs to clean up servers left by --no-cleanup.
 func cleanupOrphanedTmuxServers(ctx context.Context) error {
-	// Get the tmux socket directory
-	socketDir := fmt.Sprintf("/tmp/tmux-%d", os.Getuid())
+	// Get the tmux socket directory. Respect TMUX_TMPDIR/TMPDIR — the tmux client
+	// uses the same precedence and on macOS the system TMPDIR is not /tmp.
+	tmpDir := os.Getenv("TMUX_TMPDIR")
+	if tmpDir == "" {
+		tmpDir = os.TempDir()
+	}
+	socketDir := filepath.Join(tmpDir, fmt.Sprintf("tmux-%d", os.Getuid()))
 
 	// Check if directory exists
 	entries, err := os.ReadDir(socketDir)
@@ -880,8 +885,10 @@ func cleanupOrphanedTmuxServers(ctx context.Context) error {
 	// Find all tend-test sockets
 	var tendSockets []string
 	for _, entry := range entries {
-		if strings.HasPrefix(entry.Name(), "tend-test-") {
-			tendSockets = append(tendSockets, entry.Name())
+		// Match both legacy "tend-test-" sockets and the new short "tt-" prefix.
+		name := entry.Name()
+		if strings.HasPrefix(name, "tend-test-") || strings.HasPrefix(name, "tt-") {
+			tendSockets = append(tendSockets, name)
 		}
 	}
 
