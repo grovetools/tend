@@ -108,6 +108,13 @@ func FailingScenario2() *harness.Scenario {
 	)
 }
 
+// slowFixtureDuration is the per-fixture sleep used by the parallel-runner
+// concurrency tests. It must be large enough that the parallelism signal
+// (jobs=4 finishing in 1 batch vs jobs=2 in 2 batches) clears the per-test
+// overhead (process spawn + sub-TUI render cadence). 3s gives a clean 2x
+// gap on a healthy machine.
+const slowFixtureDuration = 3 * time.Second
+
 // SlowScenario1 is a slow scenario for concurrency testing
 func SlowScenario1() *harness.Scenario {
 	return harness.NewScenarioWithOptions(
@@ -115,8 +122,8 @@ func SlowScenario1() *harness.Scenario {
 		"A slow scenario for concurrency testing",
 		[]string{"parallel-fixture", "slow"},
 		[]harness.Step{
-			harness.NewStep("Sleep for 2 seconds", func(ctx *harness.Context) error {
-				time.Sleep(2 * time.Second)
+			harness.NewStep("Sleep", func(ctx *harness.Context) error {
+				time.Sleep(slowFixtureDuration)
 				return nil
 			}),
 		},
@@ -132,8 +139,8 @@ func SlowScenario2() *harness.Scenario {
 		"Another slow scenario for concurrency testing",
 		[]string{"parallel-fixture", "slow"},
 		[]harness.Step{
-			harness.NewStep("Sleep for 2 seconds", func(ctx *harness.Context) error {
-				time.Sleep(2 * time.Second)
+			harness.NewStep("Sleep", func(ctx *harness.Context) error {
+				time.Sleep(slowFixtureDuration)
 				return nil
 			}),
 		},
@@ -149,8 +156,8 @@ func SlowScenario3() *harness.Scenario {
 		"Yet another slow scenario for concurrency testing",
 		[]string{"parallel-fixture", "slow"},
 		[]harness.Step{
-			harness.NewStep("Sleep for 2 seconds", func(ctx *harness.Context) error {
-				time.Sleep(2 * time.Second)
+			harness.NewStep("Sleep", func(ctx *harness.Context) error {
+				time.Sleep(slowFixtureDuration)
 				return nil
 			}),
 		},
@@ -166,8 +173,8 @@ func SlowScenario4() *harness.Scenario {
 		"Fourth slow scenario for concurrency testing",
 		[]string{"parallel-fixture", "slow"},
 		[]harness.Step{
-			harness.NewStep("Sleep for 2 seconds", func(ctx *harness.Context) error {
-				time.Sleep(2 * time.Second)
+			harness.NewStep("Sleep", func(ctx *harness.Context) error {
+				time.Sleep(slowFixtureDuration)
 				return nil
 			}),
 		},
@@ -442,8 +449,14 @@ func ParallelRunJobsFlagScenario() *harness.Scenario {
 					return fmt.Errorf("failed to start parallel runner: %w", err)
 				}
 
-				// Wait for completion by checking for test completion markers
-				if err := session.WaitForText(theme.IconSuccess, 15*time.Second); err != nil {
+				// Wait for the *all-done* summary banner, not any single test's
+				// success icon. WaitForText(IconSuccess) matches the first
+				// per-test success in the inner TUI, which appears at the same
+				// time regardless of --jobs (the first fixture finishes at
+				// slowFixtureDuration in either configuration). To measure the
+				// concurrency benefit we need wall-clock to *all* fixtures
+				// completing.
+				if err := session.WaitForText("All 4 scenario(s) passed", 30*time.Second); err != nil {
 					content, _ := session.Capture()
 					return fmt.Errorf("parallel runner did not show completed tests: %w\nContent:\n%s", err, content)
 				}
@@ -451,14 +464,17 @@ func ParallelRunJobsFlagScenario() *harness.Scenario {
 
 				ctx.Set("jobs2_duration", duration)
 
-				// With 4 tests of 2s each, and --jobs=2, we expect ~4s total
-				// (2 tests run, then 2 more tests run)
-				// Allow for some overhead from process spawning
-				if duration < 3*time.Second {
-					return fmt.Errorf("duration was %v, expected at least 3s (tests should run in 2 pairs)", duration)
+				// With 4 fixtures of slowFixtureDuration each and --jobs=2, we
+				// expect ~2 * slowFixtureDuration total (2 tests, then 2 more)
+				// plus per-test overhead. Bound generously on both sides — the
+				// concurrency assertion is the next step's job.
+				minD := 2 * slowFixtureDuration
+				maxD := 4*slowFixtureDuration + 5*time.Second
+				if duration < minD {
+					return fmt.Errorf("duration was %v, expected at least %v (tests should run in 2 batches)", duration, minD)
 				}
-				if duration >= 6*time.Second {
-					return fmt.Errorf("duration was %v, expected less than 6s", duration)
+				if duration >= maxD {
+					return fmt.Errorf("duration was %v, expected less than %v", duration, maxD)
 				}
 				return nil
 			}),
@@ -483,24 +499,38 @@ func ParallelRunJobsFlagScenario() *harness.Scenario {
 					return fmt.Errorf("failed to start parallel runner: %w", err)
 				}
 
-				// Wait for completion by checking for test completion markers
-				if err := session.WaitForText(theme.IconSuccess, 10*time.Second); err != nil {
+				// Wait for the *all-done* summary banner, not any single test's
+				// success icon. WaitForText(IconSuccess) matches the first
+				// per-test success in the inner TUI, which appears at the same
+				// time regardless of --jobs (the first fixture finishes at
+				// slowFixtureDuration in either configuration). To measure the
+				// concurrency benefit we need wall-clock to *all* fixtures
+				// completing.
+				if err := session.WaitForText("All 4 scenario(s) passed", 30*time.Second); err != nil {
 					content, _ := session.Capture()
 					return fmt.Errorf("parallel runner did not show completed tests: %w\nContent:\n%s", err, content)
 				}
 				duration := time.Since(startTime)
 
-				// With 4 tests of 2s each, and --jobs=4, we expect ~2s total
-				// (all 4 tests run concurrently)
-				// Allow for process spawning overhead - should be significantly faster than --jobs=2
-				// The key validation is that it's faster than the --jobs=2 run
+				// With 4 fixtures of slowFixtureDuration and --jobs=4, all 4 run
+				// concurrently — wall-clock should be roughly slowFixtureDuration
+				// plus overhead. The concurrency assertion is a *ratio* against
+				// the --jobs=2 run rather than an absolute gap, since per-test
+				// overhead (process spawn, sub-TUI render cadence) varies by
+				// machine and a fixed-millisecond threshold flakes when overhead
+				// gets close to the fixture sleep duration.
 				jobs2Duration := ctx.Get("jobs2_duration").(time.Duration)
-				if duration < 1500*time.Millisecond {
+				minD := slowFixtureDuration / 2
+				if duration < minD {
 					return fmt.Errorf("duration was %v, too fast - tests might not have run properly", duration)
 				}
-				// Should be noticeably faster than jobs=2 (which takes ~4s)
-				if duration >= jobs2Duration-500*time.Millisecond {
-					return fmt.Errorf("duration was %v, expected to be faster than --jobs=2 (%v)", duration, jobs2Duration)
+				// jobs=4 should be no more than 75% of jobs=2: a healthy run is
+				// ~50%, so 75% leaves headroom for noise while still detecting
+				// a real regression in --jobs concurrency.
+				maxRatioPct := int64(75)
+				if duration*100 >= jobs2Duration*time.Duration(maxRatioPct) {
+					return fmt.Errorf("--jobs=4 duration %v not sufficiently faster than --jobs=2 %v (ratio %d%%, expected <%d%%)",
+						duration, jobs2Duration, int64(duration*100/jobs2Duration), maxRatioPct)
 				}
 				return nil
 			}),
