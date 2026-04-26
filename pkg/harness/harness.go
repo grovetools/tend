@@ -269,12 +269,9 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 		}
 	}
 
-	// Always reap groved daemons spawned in the sandbox, even with
-	// --no-cleanup. Auto-spawned scoped daemons only self-terminate after
-	// 2m without a terminal websocket client (see groved --auto-shutdown),
-	// but RPC-only test scenarios never connect one — without explicit
-	// kill they accumulate by the thousands across runs.
-	defer func() {
+	// reapDaemons kills any groved processes spawned inside the sandbox.
+	// Must run BEFORE directory removal so PID files are still readable.
+	reapDaemons := func() {
 		if testCtx != nil && testCtx.runtimeDir != "" {
 			killDaemonsInTree(testCtx.runtimeDir)
 		}
@@ -283,11 +280,19 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 				killDaemonsInTree(base)
 			}
 		}
-	}()
+	}
+
+	// Always reap groved daemons, even with --no-cleanup.
+	// When cleanup IS enabled, reapDaemons also runs inside cleanupFunc
+	// (before dir removal); this defer catches the --no-cleanup path.
+	defer reapDaemons()
 
 	// Setup cleanup
 	if !h.opts.NoCleanup {
-		defer cleanupFunc()
+		defer func() {
+			reapDaemons()
+			cleanupFunc()
+		}()
 
 		// Setup signal handler to ensure cleanup happens even on interrupt
 		sigChan := make(chan os.Signal, 1)
@@ -299,6 +304,7 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 		go func() {
 			<-sigChan
 			ulogHarness.Info("Received interrupt signal, cleaning up...").Emit()
+			reapDaemons()
 			cleanupFunc()
 			os.Exit(130) // Standard exit code for SIGINT
 		}()
@@ -883,17 +889,17 @@ func (h *Harness) setupDebugPanes(ctx *Context, ui *UI, scenario *Scenario) erro
 }
 
 
-// killDaemonsInTree finds groved.pid files anywhere under root and kills
-// the recorded PIDs. Best-effort: missing files, malformed contents, and
-// already-dead PIDs are silently ignored. Used to reap auto-spawned
-// scoped daemons before tearing down a scenario sandbox so they do not
-// leak across runs.
+// killDaemonsInTree finds groved PID files anywhere under root and kills
+// the recorded PIDs. Matches both the unscoped "groved.pid" and scoped
+// "groved-<name>-<hash>.pid" variants. Best-effort: missing files,
+// malformed contents, and already-dead PIDs are silently ignored.
 func killDaemonsInTree(root string) {
 	_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return nil
 		}
-		if d.Name() != "groved.pid" {
+		name := d.Name()
+		if !strings.HasPrefix(name, "groved") || !strings.HasSuffix(name, ".pid") {
 			return nil
 		}
 		data, readErr := os.ReadFile(path)
