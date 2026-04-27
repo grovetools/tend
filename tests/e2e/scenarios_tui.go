@@ -22,7 +22,7 @@ func AutoPathMocksScenario() *harness.Scenario {
 	return harness.NewScenarioWithOptions(
 		"auto-path-mocks",
 		"Tests automatic PATH prepending for mock binaries in TUI sessions",
-		[]string{"tui", "mocks", "path"},
+		[]string{"tui", "mocks", "path", "slow"},
 		[]harness.Step{
 			harness.NewStep("Create mock binaries", func(ctx *harness.Context) error {
 				mockDir := ctx.NewDir("mocks")
@@ -83,7 +83,7 @@ func EnvPassingTestScenario() *harness.Scenario {
 	return harness.NewScenarioWithOptions(
 		"env-passing-test",
 		"Tests that environment variables are correctly passed to TUI subprocess",
-		[]string{"tui", "env"},
+		[]string{"tui", "env", "slow"},
 		[]harness.Step{
 			harness.NewStep("Create test script that prints env vars", func(ctx *harness.Context) error {
 				scriptDir := ctx.NewDir("env-test")
@@ -122,7 +122,7 @@ func ExampleAdvancedTuiNavigation() *harness.Scenario {
 	return harness.NewScenarioWithOptions(
 		"example-advanced-tui-navigation",
 		"Demonstrates TUI navigation with arrow keys, FindTextLocation, and WaitForUIStable",
-		[]string{"example", "tui", "navigation"},
+		[]string{"example", "tui", "navigation", "slow"},
 		[]harness.Step{
 			harness.NewStep("Launch TUI and wait for it to stabilize", func(ctx *harness.Context) error {
 				// Use the pre-built list-tui fixture from tests/e2e/fixtures/bin
@@ -250,7 +250,7 @@ func ExampleConditionalFlowsAndRecording() *harness.Scenario {
 	return harness.NewScenarioWithOptions(
 		"example-conditional-flows-recording",
 		"Demonstrates WaitForAnyText, pattern matching, SelectItem, and session recording",
-		[]string{"example", "tui", "conditional", "recording"},
+		[]string{"example", "tui", "conditional", "recording", "slow"},
 		[]harness.Step{
 			harness.NewStep("Launch task manager TUI and start recording", func(ctx *harness.Context) error {
 				// Use pre-built task-manager fixture
@@ -386,7 +386,7 @@ func ExampleFilesystemInteractionScenario() *harness.Scenario {
 	return harness.NewScenarioWithOptions(
 		"example-tui-filesystem",
 		"Tests a TUI that writes to the filesystem",
-		[]string{"example", "tui", "filesystem"},
+		[]string{"example", "tui", "filesystem", "slow"},
 		[]harness.Step{
 			harness.NewStep("Launch file-saver TUI", func(ctx *harness.Context) error {
 				// Use pre-built file-saver fixture

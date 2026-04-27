@@ -29,7 +29,7 @@ MOCK_SRC_DIR=tests/mocks
 MOCK_BIN_DIR=bin
 MOCKS ?= $(shell find $(MOCK_SRC_DIR) -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
 
-.PHONY: all build test clean fmt vet lint run check dev build-all help build-mocks generate-docs \
+.PHONY: all build test clean fmt fmt-check vet lint run check dev build-all help build-mocks generate-docs \
         build-custom-example build-tmux-example build-examples test-tmux test-headless \
         test-tui-verbose test-tui-interactive run-scenarios test-e2e build-e2e-mocks build-e2e-runner
 
@@ -53,7 +53,15 @@ clean:
 
 fmt:
 	@echo "Formatting code..."
-	@go fmt ./...
+	@gofumpt -w .
+
+fmt-check:
+	@unformatted="$$(gofumpt -l . 2>/dev/null)"; \
+	if [ -n "$$unformatted" ]; then \
+		echo "Unformatted files (run 'make fmt'):"; \
+		echo "$$unformatted" | sed 's/^/  /'; \
+		exit 1; \
+	fi
 
 vet:
 	@echo "Running go vet..."
@@ -72,7 +80,7 @@ run: build
 	@$(BIN_DIR)/$(BINARY_NAME) $(ARGS)
 
 # Run all checks
-check: fmt vet test
+check: fmt-check vet lint test
 
 # Development build with race detector
 dev:

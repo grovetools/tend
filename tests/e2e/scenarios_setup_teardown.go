@@ -309,7 +309,7 @@ func FullLifecycleScenario() *harness.Scenario {
 	return harness.NewScenario(
 		"full-lifecycle",
 		"Tests the complete lifecycle: setup -> test -> teardown",
-		[]string{"setup", "teardown", "lifecycle"},
+		[]string{"setup", "teardown", "lifecycle", "slow"},
 		[]harness.Step{
 			harness.NewStep("Verify setup completed", func(ctx *harness.Context) error {
 				workspace := ctx.GetString("workspace")
