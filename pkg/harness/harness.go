@@ -107,6 +107,8 @@ type Options struct {
 	RunSteps string
 	// RecordTUIDir specifies the directory to save TUI session recordings for failed tests.
 	RecordTUIDir string
+	SkipTags     []string
+	RunTags      []string
 }
 
 // Harness runs scenarios

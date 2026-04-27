@@ -48,7 +48,7 @@ func listScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sc
 	renderer := ui.NewRenderer(cmd.OutOrStdout(), verbose, 80)
 
 	// Filter scenarios by tags and keyword if specified
-	filteredScenarios := filterScenarios(allScenarios, []string{}, tags)
+	filteredScenarios := filterScenarios(allScenarios, []string{}, tags, nil, nil)
 
 	// Apply keyword filtering if specified
 	if keyword != "" {

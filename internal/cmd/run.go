@@ -50,6 +50,8 @@ var (
 	runSteps            string
 	recordTUIDir        string
 	jobs                int
+	skipTags            []string
+	runTags             []string
 )
 
 // newRunCmd creates the run command with the provided scenarios
@@ -98,6 +100,8 @@ Examples:
 	runCmd.Flags().BoolVar(&runSetup, "run-setup", false, "Run setup phase then pause (or switch to interactive if no setup)")
 	runCmd.Flags().StringVar(&runSteps, "run-steps", "", "Run specific test steps at startup then pause (e.g., '1,2,3')")
 	_ = runCmd.Flags().MarkHidden("run-setup")
+	runCmd.Flags().StringSliceVar(&skipTags, "skip-tags", nil, "Skip scenarios with any of these tags (comma-separated)")
+	runCmd.Flags().StringSliceVar(&runTags, "run-tags", nil, "Only run scenarios with these tags (comma-separated)")
 
 	return runCmd
 }
@@ -156,7 +160,7 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 		renderer.RenderInfo(fmt.Sprintf("Running %d explicit-only scenario(s) (--no-cleanup enabled)", len(selectedScenarios)))
 	} else {
 		// Normal filtering
-		selectedScenarios = filterScenarios(allScenarios, args, tags)
+		selectedScenarios = filterScenarios(allScenarios, args, tags, skipTags, runTags)
 
 		// Filter ExplicitOnly scenarios when running all (and not using --explicit)
 		if len(args) == 0 && len(selectedScenarios) > 0 {
@@ -491,6 +495,8 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 		RunSetup:         runSetup,
 		RunSteps:         runSteps,
 		RecordTUIDir:     recordTUIDir,
+		SkipTags:         skipTags,
+		RunTags:          runTags,
 	}
 
 	// Configure for CI if needed
@@ -703,7 +709,18 @@ func runSingleScenario(ctx context.Context, h *harness.Harness, scenario *harnes
 	return result, err
 }
 
-func filterScenarios(scenarios []*harness.Scenario, names, tags []string) []*harness.Scenario {
+func tagsIntersect(a, b []string) bool {
+	for _, tagA := range a {
+		for _, tagB := range b {
+			if tagA == tagB {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func filterScenarios(scenarios []*harness.Scenario, names, tags, skip, run []string) []*harness.Scenario {
 	var filtered []*harness.Scenario
 
 	for _, scenario := range scenarios {
@@ -721,23 +738,19 @@ func filterScenarios(scenarios []*harness.Scenario, names, tags []string) []*har
 			}
 		}
 
-		// Filter by tags if specified
-		if len(tags) > 0 {
-			tagMatch := false
-			for _, requiredTag := range tags {
-				for _, scenarioTag := range scenario.Tags {
-					if scenarioTag == requiredTag {
-						tagMatch = true
-						break
-					}
-				}
-				if tagMatch {
-					break
-				}
-			}
-			if !tagMatch {
-				continue
-			}
+		// Filter by tags if specified (include)
+		if len(tags) > 0 && !tagsIntersect(tags, scenario.Tags) {
+			continue
+		}
+
+		// Skip scenarios matching skip-tags
+		if len(skip) > 0 && tagsIntersect(skip, scenario.Tags) {
+			continue
+		}
+
+		// Only run scenarios matching run-tags
+		if len(run) > 0 && !tagsIntersect(run, scenario.Tags) {
+			continue
 		}
 
 		filtered = append(filtered, scenario)
