@@ -231,13 +231,13 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 					Emit()
 				client, err := tmux.NewClientWithSocket(testCtx.tmuxSocket)
 				if err != nil {
-					ulogHarness.Error("Failed to create tmux client for cleanup").
+					ulogHarness.Debug("Tmux client not available for cleanup").
 						Field("socket", testCtx.tmuxSocket).
 						Field("error", err.Error()).
 						Emit()
 				} else {
 					if err := client.KillServer(context.Background()); err != nil {
-						ulogHarness.Error("Failed to kill tmux server").
+						ulogHarness.Debug("Tmux server already stopped").
 							Field("socket", testCtx.tmuxSocket).
 							Field("error", err.Error()).
 							Emit()
