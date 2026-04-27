@@ -12,6 +12,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
 	grovelogging "github.com/grovetools/core/logging"
+	"github.com/grovetools/core/pkg/daemon"
+	"github.com/grovetools/core/pkg/models"
 	"github.com/grovetools/core/pkg/tmux"
 	"github.com/grovetools/core/tui/theme"
 	"github.com/spf13/cobra"
@@ -560,6 +562,9 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 		fmt.Fprintf(os.Stderr, "Failed to write reports: %v\n", err)
 	}
 
+	// Fire-and-forget: report structured results to daemon
+	reportTestResultsToDaemon(ctx, results)
+
 	// When --format json is set, write JSON to stdout and skip styled output
 	if outputFormat == "json" {
 		reporter := reporters.NewJSONReporter(true, true)
@@ -873,6 +878,73 @@ func writeReports(results []*harness.Result) error {
 	}
 
 	return nil
+}
+
+func reportTestResultsToDaemon(ctx context.Context, results []*harness.Result) {
+	client := daemon.New()
+	if !client.IsRunning() {
+		return
+	}
+
+	verb := os.Getenv("GROVE_TASK_VERB")
+	if verb == "" {
+		verb = "test-e2e"
+	}
+
+	wd, err := os.Getwd()
+	if err != nil {
+		return
+	}
+
+	var scenarios []models.ScenarioResult
+	var passed, failed, skipped int
+	var totalDurationMs int64
+
+	for _, r := range results {
+		durationMs := r.Duration.Milliseconds()
+		totalDurationMs += durationMs
+
+		status := "pass"
+		if !r.Success {
+			if r.FailedStep == "" {
+				status = "skip"
+				skipped++
+			} else {
+				status = "fail"
+				failed++
+			}
+		} else {
+			passed++
+		}
+
+		errMsg := ""
+		if r.Error != nil {
+			errMsg = r.Error.Error()
+		}
+
+		scenarios = append(scenarios, models.ScenarioResult{
+			Name:       r.ScenarioName,
+			Status:     status,
+			DurationMs: durationMs,
+			Steps:      len(r.StepResults),
+			FailedStep: r.FailedStep,
+			Error:      errMsg,
+		})
+	}
+
+	report := &models.TestReport{
+		Verb:      verb,
+		Scenarios: scenarios,
+		Summary: models.TestSummary{
+			Total:      len(results),
+			Passed:     passed,
+			Failed:     failed,
+			Skipped:    skipped,
+			DurationMs: totalDurationMs,
+		},
+	}
+
+	_ = client.ReportTestResults(ctx, wd, report)
 }
 
 // cleanupOrphanedTmuxServers kills all tend-test tmux servers and removes their socket files.
