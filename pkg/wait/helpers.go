@@ -58,7 +58,7 @@ func ForPort(host string, port int, timeout time.Duration) error {
 	opts := DefaultOptions()
 	opts.Timeout = timeout
 
-	address := fmt.Sprintf("%s:%d", host, port)
+	address := net.JoinHostPort(host, fmt.Sprintf("%d", port))
 
 	return ForWithMessage(func() (bool, string, error) {
 		conn, err := net.DialTimeout("tcp", address, 2*time.Second)
