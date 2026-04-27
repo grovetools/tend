@@ -22,7 +22,8 @@ linters-settings:
     checks: ["all", "-ST1000", "-ST1003", "-ST1016", "-ST1020", "-ST1021", "-ST1022"]
 
 run:
-  allow-parallel-runners: true  timeout: 5m
+  allow-parallel-runners: true
+  timeout: 5m
   build-tags:
     - integration
 
