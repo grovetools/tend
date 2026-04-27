@@ -727,7 +727,7 @@ func Default() *Config {
 	}
 
 	// internal files
-	files["internal/server/server.go"] = fmt.Sprintf(`package server
+	files["internal/server/server.go"] = `package server
 
 import (
 	"context"
@@ -755,7 +755,7 @@ func (s *Server) Start() error {
 func (s *Server) Shutdown(ctx context.Context) error {
 	return s.srv.Shutdown(ctx)
 }
-`)
+`
 }
 
 // addTypeScriptHeroFiles adds full-depth TypeScript project files.

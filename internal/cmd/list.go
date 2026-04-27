@@ -120,13 +120,13 @@ func listScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sc
 		// Style based on column
 		switch col {
 		case 0: // Name column
-			return theme.DefaultTheme.Title.Copy().Bold(true)
+			return theme.DefaultTheme.Title.Bold(true)
 		case 2, 3: // Local and Explicit columns (centered)
 			return lipgloss.NewStyle().Padding(0, 1).Align(lipgloss.Center)
 		case 4: // Tags column
-			return theme.DefaultTheme.Info.Copy().Padding(0, 1)
+			return theme.DefaultTheme.Info.Padding(0, 1)
 		case 5: // Steps column
-			return theme.DefaultTheme.Success.Copy().Padding(0, 1)
+			return theme.DefaultTheme.Success.Padding(0, 1)
 		default:
 			return lipgloss.NewStyle().Padding(0, 1)
 		}

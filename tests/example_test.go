@@ -40,7 +40,7 @@ func TestFilesystemHelpers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir manager: %v", err)
 	}
-	defer tempMgr.Cleanup()
+	defer func() { _ = tempMgr.Cleanup() }()
 
 	// Test file operations
 	testDir, err := tempMgr.CreateDir("test")
@@ -85,7 +85,7 @@ func TestGitHelpers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer tempMgr.Cleanup()
+	defer func() { _ = tempMgr.Cleanup() }()
 
 	repoDir, err := tempMgr.CreateDir("repo")
 	if err != nil {

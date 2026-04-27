@@ -40,7 +40,7 @@ func TestSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to launch test session: %v", err)
 	}
-	defer client.KillSession(ctx, sessionName)
+	defer func() { _ = client.KillSession(ctx, sessionName) }()
 
 	session := NewSession(sessionName, client, t.TempDir())
 
@@ -115,7 +115,7 @@ printf "> "`
 	if err != nil {
 		t.Fatalf("Failed to launch test session: %v", err)
 	}
-	defer client.KillSession(ctx, sessionName)
+	defer func() { _ = client.KillSession(ctx, sessionName) }()
 
 	session := NewSession(sessionName, client, t.TempDir())
 
@@ -203,7 +203,7 @@ fi`
 	if err != nil {
 		t.Fatalf("Failed to launch test session: %v", err)
 	}
-	defer client.KillSession(ctx, sessionName)
+	defer func() { _ = client.KillSession(ctx, sessionName) }()
 
 	session := NewSession(sessionName, client, t.TempDir())
 
@@ -245,7 +245,7 @@ echo "Processing complete"`
 	if err != nil {
 		t.Fatalf("Failed to launch test session: %v", err)
 	}
-	defer client.KillSession(ctx, sessionName)
+	defer func() { _ = client.KillSession(ctx, sessionName) }()
 
 	session := NewSession(sessionName, client, t.TempDir())
 
@@ -292,7 +292,7 @@ printf "> "`
 	if err != nil {
 		t.Fatalf("Failed to launch test session: %v", err)
 	}
-	defer client.KillSession(ctx, sessionName)
+	defer func() { _ = client.KillSession(ctx, sessionName) }()
 
 	session := NewSession(sessionName, client, t.TempDir())
 	
@@ -341,7 +341,7 @@ func TestSession_Recording(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to launch test session: %v", err)
 	}
-	defer client.KillSession(ctx, sessionName)
+	defer func() { _ = client.KillSession(ctx, sessionName) }()
 
 	session := NewSession(sessionName, client, t.TempDir())
 	
@@ -354,9 +354,9 @@ func TestSession_Recording(t *testing.T) {
 	}
 
 	// Perform some actions
-	session.SendKeys("echo", "Space", "Hello", "Enter")
+	_ = session.SendKeys("echo", "Space", "Hello", "Enter")
 	time.Sleep(200 * time.Millisecond)
-	session.WaitForText("Hello", 1*time.Second)
+	_ = session.WaitForText("Hello", 1*time.Second)
 	
 	// Take a screenshot
 	screenshotPath := filepath.Join(tempDir, "screenshot.ansi")
@@ -407,7 +407,7 @@ func TestSession_Type(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to launch test session: %v", err)
 	}
-	defer client.KillSession(ctx, sessionName)
+	defer func() { _ = client.KillSession(ctx, sessionName) }()
 
 	session := NewSession(sessionName, client, t.TempDir())
 
@@ -448,7 +448,7 @@ func TestSession_AssertLine(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to launch test session: %v", err)
 	}
-	defer client.KillSession(ctx, sessionName)
+	defer func() { _ = client.KillSession(ctx, sessionName) }()
 
 	session := NewSession(sessionName, client, t.TempDir())
 

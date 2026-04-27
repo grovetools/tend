@@ -309,13 +309,13 @@ func (m *Model) buildDisplayTree() {
 	logger.Debugf("[TEND TUI buildDisplayTree] Projects to display: %d", len(projectsToDisplay))
 
 	for _, p := range projectsToDisplay {
-		logger.Debugf("[TEND TUI buildDisplayTree] Processing: Name=%q Path=%q Depth=%d Prefix=%q", p.Name, p.Path, p.Depth, p.TreePrefix)
-
 		// Skip workspaces with empty names (defensive check)
 		if p == nil || p.Name == "" {
-			logger.Warnf("[TEND TUI buildDisplayTree] Skipping workspace with empty name: Path=%q", p.Path)
+			logger.Warnf("[TEND TUI buildDisplayTree] Skipping workspace with empty name")
 			continue
 		}
+
+		logger.Debugf("[TEND TUI buildDisplayTree] Processing: Name=%q Path=%q Depth=%d Prefix=%q", p.Name, p.Path, p.Depth, p.TreePrefix)
 
 		if _, hasScenarios := m.scenariosByProject[p.Path]; !hasScenarios && !p.IsEcosystem() {
 			if m.focusedProject == nil && p.Depth > 0 { // In global view, only show top-level or ecosystems

@@ -35,7 +35,7 @@ func (r *Recorder) Run(command []string) ([]Frame, error) {
 	signal.Notify(ch, syscall.SIGWINCH)
 	go func() {
 		for range ch {
-			pty.InheritSize(os.Stdin, ptmx)
+			_ = pty.InheritSize(os.Stdin, ptmx)
 		}
 	}()
 	ch <- syscall.SIGWINCH
@@ -51,7 +51,7 @@ func (r *Recorder) Run(command []string) ([]Frame, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to set terminal to raw mode: %w", err)
 	}
-	defer term.Restore(stdinFd, oldState)
+	defer func() { _ = term.Restore(stdinFd, oldState) }()
 
 	var frames []Frame
 	startTime := time.Now()
@@ -109,12 +109,11 @@ func (r *Recorder) Run(command []string) ([]Frame, error) {
 			if collectingOutput && currentInput.Len() > 0 {
 				frames = append(frames, Frame{
 					Timestamp: time.Since(startTime),
-					Input:     string(currentInput.Bytes()),
-					Output:    string(currentOutput.Bytes()),
+					Input:     currentInput.String(),
+					Output:    currentOutput.String(),
 				})
 				currentInput.Reset()
 				currentOutput.Reset()
-				collectingOutput = false
 			}
 
 			// Write input to PTY
@@ -146,8 +145,8 @@ func (r *Recorder) Run(command []string) ([]Frame, error) {
 			if collectingOutput && currentInput.Len() > 0 {
 				frames = append(frames, Frame{
 					Timestamp: time.Since(startTime),
-					Input:     string(currentInput.Bytes()),
-					Output:    string(currentOutput.Bytes()),
+					Input:     currentInput.String(),
+					Output:    currentOutput.String(),
 				})
 				currentInput.Reset()
 				currentOutput.Reset()
@@ -166,8 +165,8 @@ end_loop:
 	if currentInput.Len() > 0 || currentOutput.Len() > 0 {
 		frames = append(frames, Frame{
 			Timestamp: time.Since(startTime),
-			Input:     string(currentInput.Bytes()),
-			Output:    string(currentOutput.Bytes()),
+			Input:     currentInput.String(),
+			Output:    currentOutput.String(),
 		})
 	}
 

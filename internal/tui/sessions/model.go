@@ -28,8 +28,7 @@ type Model struct {
 	height        int
 	ready         bool
 	err           error
-	previewActive bool
-	keyMap        KeyMap
+	keyMap KeyMap
 }
 
 // NewModel creates a new sessions TUI model.
@@ -42,13 +41,13 @@ func NewModel() (*Model, error) {
 	delegate := list.NewDefaultDelegate()
 
 	// Apply grove-core theme to the delegate
-	delegate.Styles.SelectedTitle = theme.DefaultTheme.Selected.Copy()
-	delegate.Styles.SelectedDesc = theme.DefaultTheme.Selected.Copy()
-	delegate.Styles.NormalTitle = theme.DefaultTheme.Normal.Copy()
-	delegate.Styles.NormalDesc = theme.DefaultTheme.Muted.Copy()
-	delegate.Styles.DimmedTitle = theme.DefaultTheme.Muted.Copy()
-	delegate.Styles.DimmedDesc = theme.DefaultTheme.Muted.Copy()
-	delegate.Styles.FilterMatch = theme.DefaultTheme.Highlight.Copy()
+	delegate.Styles.SelectedTitle = theme.DefaultTheme.Selected
+	delegate.Styles.SelectedDesc = theme.DefaultTheme.Selected
+	delegate.Styles.NormalTitle = theme.DefaultTheme.Normal
+	delegate.Styles.NormalDesc = theme.DefaultTheme.Muted
+	delegate.Styles.DimmedTitle = theme.DefaultTheme.Muted
+	delegate.Styles.DimmedDesc = theme.DefaultTheme.Muted
+	delegate.Styles.FilterMatch = theme.DefaultTheme.Highlight
 
 	l := list.New([]list.Item{}, delegate, 0, 0)
 	l.Title = "Test Sessions"
@@ -56,11 +55,11 @@ func NewModel() (*Model, error) {
 	l.SetShowHelp(true)
 
 	// Apply theme to list title and status bar
-	l.Styles.Title = theme.DefaultTheme.Header.Copy()
-	l.Styles.TitleBar = theme.DefaultTheme.Normal.Copy()
-	l.Styles.StatusBar = theme.DefaultTheme.Muted.Copy()
-	l.Styles.FilterPrompt = theme.DefaultTheme.Accent.Copy()
-	l.Styles.FilterCursor = theme.DefaultTheme.Cursor.Copy()
+	l.Styles.Title = theme.DefaultTheme.Header
+	l.Styles.TitleBar = theme.DefaultTheme.Normal
+	l.Styles.StatusBar = theme.DefaultTheme.Muted
+	l.Styles.FilterPrompt = theme.DefaultTheme.Accent
+	l.Styles.FilterCursor = theme.DefaultTheme.Cursor
 
 	// Create viewport for preview pane
 	vp := viewport.New(0, 0)

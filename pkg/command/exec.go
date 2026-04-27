@@ -73,7 +73,7 @@ func (c *Command) Run() *Result {
 	case <-ctx.Done():
 		// Kill the process on timeout
 		if c.cmd.Process != nil {
-			c.cmd.Process.Kill()
+			_ = c.cmd.Process.Kill()
 		}
 
 		return &Result{

@@ -491,13 +491,13 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 			if err == nil && tmuxClient != nil && editorTarget != "" {
 				// Check if the step is in a different file and switch if needed
 				if step.File != testCtx.currentEditorFile {
-					tmuxClient.SendKeys(context.Background(), editorTarget, fmt.Sprintf(":e %s", step.File), "C-m")
+					_ = tmuxClient.SendKeys(context.Background(), editorTarget, fmt.Sprintf(":e %s", step.File), "C-m")
 					testCtx.currentEditorFile = step.File
 					time.Sleep(100 * time.Millisecond) // Give nvim time to open the file
 				}
 				// Now, jump to the line
 				jumpCmd := fmt.Sprintf(":%d", step.Line)
-				tmuxClient.SendKeys(context.Background(), editorTarget, jumpCmd, "C-m")
+				_ = tmuxClient.SendKeys(context.Background(), editorTarget, jumpCmd, "C-m")
 			}
 		}
 
@@ -776,7 +776,7 @@ func setupTmuxPane(client *tmux.Client, ui *UI, paneType string, splitHorizontal
 			if currentCmd, err := client.GetPaneCommand(context.Background(), paneID); err == nil {
 				currentCmd = strings.TrimSpace(currentCmd)
 				if currentCmd == "nvim" || currentCmd == "vim" || currentCmd == "vi" {
-					client.SendKeys(context.Background(), paneID, "Escape", ":qa!", "C-m")
+					_ = client.SendKeys(context.Background(), paneID, "Escape", ":qa!", "C-m")
 					time.Sleep(100 * time.Millisecond)
 				}
 			}
@@ -880,7 +880,7 @@ func (h *Harness) setupDebugPanes(ctx *Context, ui *UI, scenario *Scenario) erro
 			if editorPaneID != "" && initialLine > 0 {
 				time.Sleep(100 * time.Millisecond) // Give nvim time to start
 				jumpCmd := fmt.Sprintf(":%d", initialLine)
-				tmuxClient.SendKeys(context.Background(), editorPaneID, jumpCmd, "C-m")
+				_ = tmuxClient.SendKeys(context.Background(), editorPaneID, jumpCmd, "C-m")
 			}
 		}
 	}

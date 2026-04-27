@@ -795,7 +795,7 @@ func renderFinalSummary(renderer *ui.Renderer, results []*harness.Result, succes
 	
 	// Define styles
 	baseStyle := re.NewStyle().Padding(0, 1)
-	headerStyle := baseStyle.Copy().Bold(true).Foreground(lipgloss.Color("#5FAFFF"))
+	headerStyle := baseStyle.Bold(true).Foreground(lipgloss.Color("#5FAFFF"))
 	
 	// Create the table
 	t := table.New().

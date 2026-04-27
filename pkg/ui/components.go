@@ -40,7 +40,7 @@ func Header(title, description string) string {
 func Box(title, content string) string {
 	style := theme.DefaultTheme.Box
 	if title != "" {
-		style = style.Copy().BorderTop(true).BorderTopForeground(theme.DefaultTheme.Colors.Orange)
+		style = style.BorderTop(true).BorderTopForeground(theme.DefaultTheme.Colors.Orange)
 		titleLine := lipgloss.JoinHorizontal(lipgloss.Left,
 			" ",
 			theme.DefaultTheme.Header.Render(title),
@@ -71,7 +71,7 @@ func ProgressBar(current, total int, width int) string {
 		Height(1)
 
 	return lipgloss.JoinHorizontal(lipgloss.Left,
-		progressBarStyle.Copy().Width(width).Render(bar),
+		progressBarStyle.Width(width).Render(bar),
 		fmt.Sprintf(" %d/%d (%.1f%%)", current, total, percentage*100),
 	)
 }
@@ -129,7 +129,7 @@ func StepStatus(number int, name string, status StepStatusType, duration time.Du
 		Align(lipgloss.Right)
 
 	numberStr := stepNumberStyle.Render(fmt.Sprintf("%d.", number))
-	iconStr := style.Copy().Width(2).Render(icon)
+	iconStr := style.Width(2).Render(icon)
 	nameStr := style.Render(statusText)
 
 	return lipgloss.JoinHorizontal(lipgloss.Left, numberStr, iconStr, nameStr)
@@ -142,7 +142,7 @@ func ErrorBox(err error) string {
 	}
 
 	content := theme.DefaultTheme.Error.Render("Error: ") + err.Error()
-	return theme.DefaultTheme.Box.Copy().
+	return theme.DefaultTheme.Box.
 		BorderForeground(theme.DefaultTheme.Colors.Red).
 		Render(content)
 }
@@ -150,7 +150,7 @@ func ErrorBox(err error) string {
 // SuccessBox renders a success message in a styled box
 func SuccessBox(message string) string {
 	content := theme.DefaultTheme.Success.Render("Success: ") + message
-	return theme.DefaultTheme.Box.Copy().
+	return theme.DefaultTheme.Box.
 		BorderForeground(theme.DefaultTheme.Colors.Green).
 		Render(content)
 }
@@ -158,7 +158,7 @@ func SuccessBox(message string) string {
 // InfoBox renders an info message in a styled box
 func InfoBox(message string) string {
 	content := theme.DefaultTheme.Info.Render("Info: ") + message
-	return theme.DefaultTheme.Box.Copy().
+	return theme.DefaultTheme.Box.
 		BorderForeground(theme.DefaultTheme.Colors.Cyan).
 		Render(content)
 }

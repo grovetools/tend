@@ -46,7 +46,7 @@ func (p *Process) Wait(timeout time.Duration) *Result {
 
 	case <-ctx.Done():
 		// Timeout reached, kill the process
-		p.Kill()
+		_ = p.Kill()
 		return &Result{
 			Stdout:   p.stdout.String(),
 			Stderr:   p.stderr.String(),

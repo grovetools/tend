@@ -48,7 +48,7 @@ func (m *Model) View() string {
 
 // renderEmptyState shows the empty state when no sessions are found.
 func (m *Model) renderEmptyState() string {
-	emptyStyle := theme.DefaultTheme.Muted.Copy().Italic(true).Align(lipgloss.Center)
+	emptyStyle := theme.DefaultTheme.Muted.Italic(true).Align(lipgloss.Center)
 	content := emptyStyle.Render(
 		"\n\n" +
 			"No active test sessions\n\n" +
@@ -78,7 +78,7 @@ func (m *Model) renderPreview() string {
 
 	content := m.viewport.View()
 	if strings.TrimSpace(content) == "" {
-		emptyStyle := theme.DefaultTheme.Muted.Copy().Italic(true).Align(lipgloss.Center)
+		emptyStyle := theme.DefaultTheme.Muted.Italic(true).Align(lipgloss.Center)
 		content = emptyStyle.Render("\n\nNo preview available\n\n")
 	}
 
@@ -89,7 +89,7 @@ func (m *Model) renderPreview() string {
 		content,
 	)
 
-	borderStyle := theme.DefaultTheme.Box.Copy().
+	borderStyle := theme.DefaultTheme.Box.
 		Width(m.viewport.Width + 2).
 		Height(m.viewport.Height + 4)
 

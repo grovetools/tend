@@ -51,7 +51,6 @@ func Run(ctx context.Context, scenarios []*harness.Scenario, projectRoot string,
 				}
 				jsonPath := jsonFile.Name()
 				jsonFile.Close()
-				defer os.Remove(jsonPath)
 
 				// Get path to current executable
 				executable, err := os.Executable()
@@ -90,6 +89,7 @@ func Run(ctx context.Context, scenarios []*harness.Scenario, projectRoot string,
 						}
 					}
 				}
+				os.Remove(jsonPath)
 
 				// If we couldn't parse the report, create a synthetic result
 				if finalResult == nil {

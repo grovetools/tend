@@ -14,12 +14,8 @@ type HeadlessSession struct {
 
 // NewHeadlessSession creates a new headless session for a BubbleTea model.
 func NewHeadlessSession(m tea.Model) *HeadlessSession {
-	// Initialize the model
-	if initCmd := m.Init(); initCmd != nil {
-		// We would need to handle the Cmd here in a real implementation
-		// For now, we'll keep it simple
-	}
-	
+	_ = m.Init()
+
 	return &HeadlessSession{
 		model: m,
 		msgs:  []tea.Msg{},

@@ -38,7 +38,7 @@ func GenerateHTMLReport(frames []Frame, out io.Writer) error {
 	var htmlFrames []htmlFrame
 	for _, frame := range frames {
 		// Feed the raw ANSI output to the terminal emulator
-		vt.Write([]byte(frame.Output))
+		_, _ = vt.Write([]byte(frame.Output))
 
 		// Render the state of the emulator to HTML
 		snapshotHTML := renderEmulatorToHTML(state)
@@ -197,7 +197,7 @@ func generateMarkdownReportInternal(frames []Frame, out io.Writer, preserveANSI 
 			snapshot = frame.Output
 		} else {
 			// Feed the raw ANSI output to the terminal emulator
-			vt.Write([]byte(frame.Output))
+			_, _ = vt.Write([]byte(frame.Output))
 			// Get plain text representation
 			snapshot = renderEmulatorToPlainText(state)
 		}
@@ -244,7 +244,7 @@ func generateXMLReportInternal(frames []Frame, out io.Writer, preserveANSI bool)
 			snapshot = frame.Output
 		} else {
 			// Feed the raw ANSI output to the terminal emulator
-			vt.Write([]byte(frame.Output))
+			_, _ = vt.Write([]byte(frame.Output))
 			// Get plain text representation
 			snapshot = renderEmulatorToPlainText(state)
 		}

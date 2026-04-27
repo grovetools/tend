@@ -65,7 +65,6 @@ func Run(ctx context.Context, projects []*ProjectState, numWorkers int) <-chan E
 				}
 				jsonPath := jsonFile.Name()
 				jsonFile.Close()
-				defer os.Remove(jsonPath)
 
 				// Execute `make <target>` for the project
 				makeArgs := fmt.Sprintf("ARGS=--json %s", jsonPath)

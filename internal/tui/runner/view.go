@@ -30,7 +30,7 @@ func highlightMatch(text, filter string) string {
 	match := text[idx : idx+len(filter)]
 	after := text[idx+len(filter):]
 
-	highlightStyle := theme.DefaultTheme.Success.Copy().Reverse(true)
+	highlightStyle := theme.DefaultTheme.Success.Reverse(true)
 	return before + highlightStyle.Render(match) + after
 }
 
@@ -164,7 +164,7 @@ func (m Model) View() string {
 	var mainContent string
 	if m.outputVisible {
 		// Output pane title
-		outputTitle := "Test Output"
+		var outputTitle string
 		if m.testRunning {
 			outputTitle = "Test Output (running...)"
 		} else {

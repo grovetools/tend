@@ -74,7 +74,7 @@ func (r *Result) AssertFailure() error {
 // AssertExitCode asserts that the command exited with the specified code.
 func (r *Result) AssertExitCode(expectedCode int) error {
 	return assert.Equal(expectedCode, r.ExitCode,
-		fmt.Sprintf("command exit code mismatch"))
+		"command exit code mismatch")
 }
 
 // AssertStdoutEmpty asserts that stdout is empty.
