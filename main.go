@@ -15,7 +15,6 @@ import (
 	"github.com/grovetools/tend/pkg/project"
 )
 
-
 var ulog = grovelogging.NewUnifiedLogger("grove-tend.main")
 
 const childProcessEnvVar = "TEND_IS_CHILD_PROCESS"
@@ -64,7 +63,7 @@ func main() {
 
 	go func() {
 		<-sigChan
-  ulog.Info("\nReceived interrupt signal, shutting down...").Pretty("\nReceived interrupt signal, shutting down...").PrettyOnly().Emit()
+		ulog.Info("\nReceived interrupt signal, shutting down...").Pretty("\nReceived interrupt signal, shutting down...").PrettyOnly().Emit()
 		cancel()
 	}()
 

@@ -21,14 +21,14 @@ type UI struct {
 	verbose     bool
 	veryVerbose bool
 	reader      *bufio.Reader
-	
+
 	// Container monitoring
-	monitor          *ContainerMonitor
-	monitorEnabled   bool
-	lastContainerIDs map[string]bool // Track container IDs to detect changes
-	testID           string          // ID of current test for filtering containers
+	monitor            *ContainerMonitor
+	monitorEnabled     bool
+	lastContainerIDs   map[string]bool // Track container IDs to detect changes
+	testID             string          // ID of current test for filtering containers
 	baselineContainers map[string]bool // Containers that existed before test started
-	mu               sync.Mutex
+	mu                 sync.Mutex
 }
 
 // NewUI creates a new UI instance
@@ -206,20 +206,20 @@ func (ui *UI) SetTestID(testID string) {
 // EnableMonitoring starts container monitoring
 func (ui *UI) EnableMonitoring(filter string) {
 	ui.mu.Lock()
-	
+
 	if ui.monitor != nil {
 		ui.monitor.Stop()
 	}
-	
+
 	ui.monitor = NewContainerMonitor(filter, 2*time.Second)
 	ui.monitorEnabled = true
-	
+
 	// Get baseline containers before test starts
 	firstUpdate := true
 	ui.monitor.Start(func(containers []ContainerInfo) {
 		ui.mu.Lock()
 		defer ui.mu.Unlock()
-		
+
 		if firstUpdate {
 			// First update - capture baseline
 			for _, c := range containers {
@@ -233,9 +233,9 @@ func (ui *UI) EnableMonitoring(filter string) {
 			ui.handleContainerUpdate(containers)
 		}
 	})
-	
+
 	ui.mu.Unlock()
-	
+
 	// Give it a moment to capture baseline
 	time.Sleep(100 * time.Millisecond)
 }
@@ -244,7 +244,7 @@ func (ui *UI) EnableMonitoring(filter string) {
 func (ui *UI) DisableMonitoring() {
 	ui.mu.Lock()
 	defer ui.mu.Unlock()
-	
+
 	if ui.monitor != nil {
 		ui.monitor.Stop()
 		ui.monitor = nil
@@ -255,15 +255,15 @@ func (ui *UI) DisableMonitoring() {
 // handleContainerUpdate processes container updates and prints changes
 func (ui *UI) handleContainerUpdate(containers []ContainerInfo) {
 	// Note: caller already holds the lock
-	
+
 	if !ui.monitorEnabled {
 		return
 	}
-	
+
 	// Filter only grove agent containers created by this test
 	var agentContainers []ContainerInfo
 	currentIDs := make(map[string]bool)
-	
+
 	for _, c := range containers {
 		if strings.Contains(c.Names, "grove") && strings.Contains(c.Names, "agent") {
 			// Skip containers that existed before the test started
@@ -273,7 +273,7 @@ func (ui *UI) handleContainerUpdate(containers []ContainerInfo) {
 			}
 		}
 	}
-	
+
 	// Check if there are changes
 	changed := len(currentIDs) != len(ui.lastContainerIDs)
 	if !changed {
@@ -292,7 +292,7 @@ func (ui *UI) handleContainerUpdate(containers []ContainerInfo) {
 			}
 		}
 	}
-	
+
 	// Print table only if there are changes
 	if changed {
 		ui.lastContainerIDs = currentIDs
@@ -411,12 +411,11 @@ func (ui *UI) CommandOutput(command, stdout, stderr string) {
 		return
 	}
 
-
 	// ANSI color codes
-	cyan := "\033[36m"    // Cyan for box borders
-	green := "\033[32m"   // Green for command prompt
-	red := "\033[31m"     // Red for stderr
-	reset := "\033[0m"    // Reset colors
+	cyan := "\033[36m"  // Cyan for box borders
+	green := "\033[32m" // Green for command prompt
+	red := "\033[31m"   // Red for stderr
+	reset := "\033[0m"  // Reset colors
 
 	// Terminal-like separator with colored borders
 	prettyMsg := fmt.Sprintf("  %s┌─────────────────────────────────────────────%s\n", cyan, reset)

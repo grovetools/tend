@@ -264,7 +264,7 @@ func (g *Generator) copyUserOverride() error {
 	}
 
 	destPath := filepath.Join(g.rootDir, "config", "grove", "grove.override.yml")
-	return os.WriteFile(destPath, filteredData, 0644)
+	return os.WriteFile(destPath, filteredData, 0o644)
 }
 
 // Helper methods for directory paths
@@ -288,8 +288,8 @@ func BuildEnvironment(demoDir, tmuxSocket string) map[string]string {
 	realBinDir := paths.BinDir()
 
 	return map[string]string{
-		"GROVE_HOME":        demoDir,     // Isolates config/data/state/cache
-		"GROVE_BIN":         realBinDir,  // Preserves binary delegation
+		"GROVE_HOME":        demoDir,    // Isolates config/data/state/cache
+		"GROVE_BIN":         realBinDir, // Preserves binary delegation
 		"GROVE_DEMO":        "1",
 		"GROVE_TMUX_SOCKET": tmuxSocket,
 	}

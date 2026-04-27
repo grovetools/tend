@@ -27,7 +27,7 @@ func NewRootCmd(allScenarios []*harness.Scenario) *cobra.Command {
 		"tend",
 		"End-to-end scenario testing",
 	)
-	
+
 	rootCmd.Long = `A modern, Go-based end-to-end testing framework for Grove.
 
 This tool provides structured, maintainable testing capabilities to replace
@@ -41,14 +41,14 @@ Features:
   • Git worktree support for multi-branch testing
   • Docker container management
   • Grove-specific command helpers`
-	
+
 	// Initialize configuration
 	cobra.OnInitialize(func() {
 		// Get verbose flag value from cobra
 		if flag := rootCmd.Flag("verbose"); flag != nil {
 			verbose, _ = rootCmd.Flags().GetBool("verbose")
 		}
-		
+
 		if rootDir == "" {
 			wd, err := os.Getwd()
 			if err != nil {

@@ -48,9 +48,10 @@ func NewSession(sessionName string, client *tmux.Client, rootDir string) *Sessio
 // This ensures vim chord commands like "gg" are properly recognized.
 //
 // Example:
-//   session.Type("j")           // Navigate down and wait
-//   session.Type("g", "g")      // Go to top (sends separately for chord recognition)
-//   session.Type("/", "search") // Open search and type
+//
+//	session.Type("j")           // Navigate down and wait
+//	session.Type("g", "g")      // Go to top (sends separately for chord recognition)
+//	session.Type("/", "search") // Open search and type
 func (s *Session) Type(keys ...string) error {
 	// Detect vim chord commands: exactly 2 single-character keys
 	// Examples: "g"+"g" (go to top), "z"+"M" (close all), "z"+"R" (open all)
@@ -168,7 +169,7 @@ func (s *Session) WaitForText(text string, timeout time.Duration) error {
 		}
 		return false, fmt.Sprintf("text '%s' not found", text), nil
 	}, opts)
-	
+
 	// Record the wait event
 	data := map[string]interface{}{"text": text, "timeout": timeout.String()}
 	result := ""
@@ -176,7 +177,7 @@ func (s *Session) WaitForText(text string, timeout time.Duration) error {
 		result = fmt.Sprintf("found text '%s'", text)
 	}
 	s.recordEvent("wait", data, result, err)
-	
+
 	return err
 }
 
@@ -191,7 +192,6 @@ func (s *Session) WaitForText(text string, timeout time.Duration) error {
 //
 // For most use cases, use WaitStable() instead, which provides sensible defaults.
 func (s *Session) WaitForUIStable(timeout time.Duration, pollInterval time.Duration, stableDuration time.Duration) error {
-
 	var lastContent string
 	var stableSince time.Time
 	var initialized bool
@@ -243,7 +243,8 @@ func (s *Session) WaitStable() error {
 
 // AssertContains immediately checks if the TUI's current content contains the specified text.
 // NOTE: For better test reporting, it is recommended to use this with the harness context:
-//   err := ctx.Check("should show welcome message", session.AssertContains("Welcome"))
+//
+//	err := ctx.Check("should show welcome message", session.AssertContains("Welcome"))
 func (s *Session) AssertContains(text string) error {
 	content, err := s.Capture()
 	if err != nil {
@@ -254,7 +255,8 @@ func (s *Session) AssertContains(text string) error {
 
 // AssertNotContains immediately checks if the TUI's current content does not contain the specified text.
 // NOTE: For better test reporting, it is recommended to use this with the harness context:
-//   err := ctx.Check("should not show error", session.AssertNotContains("Error:"))
+//
+//	err := ctx.Check("should not show error", session.AssertNotContains("Error:"))
 func (s *Session) AssertNotContains(text string) error {
 	content, err := s.Capture()
 	if err != nil {

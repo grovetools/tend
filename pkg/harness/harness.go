@@ -136,7 +136,6 @@ type StepResult struct {
 	Assertions []*AssertionResult
 }
 
-
 // New creates a new test harness
 func New(opts Options) *Harness {
 	return &Harness{
@@ -156,7 +155,7 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 	// Setup phase
 	ui := NewUI(h.opts.Interactive, h.opts.Verbose || h.opts.VeryVerbose, h.opts.VeryVerbose)
 	ui.ScenarioStart(scenario.Name, scenario.Description)
-	
+
 	// Enable Docker monitoring if requested
 	if h.opts.MonitorDocker {
 		filter := h.opts.DockerFilter
@@ -165,7 +164,7 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 		}
 		ui.EnableMonitoring(filter)
 		defer ui.DisableMonitoring()
-		
+
 		// Show initial container state
 		if h.opts.Verbose {
 			ui.ShowDockerStatus()
@@ -190,7 +189,7 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 	sandboxedCache := filepath.Join(sandboxedHome, ".cache")
 
 	for _, dir := range []string{sandboxedHome, sandboxedConfig, sandboxedData, sandboxedState, sandboxedCache} {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
 			result.Success = false
 			result.Error = fmt.Errorf("creating sandboxed home directory structure: %w", err)
 			result.EndTime = time.Now()
@@ -359,7 +358,7 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 		tmuxSocket:    socketName,
 		ui:            ui,
 	}
-	
+
 	// Set the test ID in the UI for container filtering
 	ui.SetTestID(testID)
 
@@ -537,7 +536,7 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 			case "attach":
 				if sessionName := testCtx.GetString("active_tui_session_name"); sessionName != "" {
 					ui.Info("Attach", fmt.Sprintf("Attaching to tmux session '%s'. Detach with 'Ctrl-b d' to continue test.", sessionName))
-					
+
 					// Temporarily suspend the runner to attach
 					cmd := tmux.Command("attach-session", "-t", sessionName)
 					cmd.Stdin = os.Stdin
@@ -737,7 +736,7 @@ func (h *Harness) resolveBinary() string {
 	if h.opts.GroveBinary != "" {
 		return h.opts.GroveBinary
 	}
-	
+
 	// Check environment variable
 	if bin := os.Getenv("GROVE_BINARY"); bin != "" {
 		return bin
@@ -748,7 +747,7 @@ func (h *Harness) resolveBinary() string {
 	if rootDir == "" {
 		rootDir, _ = os.Getwd()
 	}
-	
+
 	if binaryPath, err := project.GetBinaryPath(rootDir); err == nil {
 		return binaryPath
 	}
@@ -793,7 +792,7 @@ func setupTmuxPane(client *tmux.Client, ui *UI, paneType string, splitHorizontal
 			return "", fmt.Errorf("failed to split tmux window for %s pane: %w", paneType, err)
 		}
 		paneID = newPaneID
-		_ = os.WriteFile(paneIDFile, []byte(paneID), 0644)
+		_ = os.WriteFile(paneIDFile, []byte(paneID), 0o644)
 	}
 
 	// Send the command to the pane
@@ -807,7 +806,7 @@ func setupTmuxPane(client *tmux.Client, ui *UI, paneType string, splitHorizontal
 				return "", fmt.Errorf("failed to split tmux window for %s pane: %w", paneType, createErr)
 			}
 			paneID = newPaneID
-			_ = os.WriteFile(paneIDFile, []byte(paneID), 0644)
+			_ = os.WriteFile(paneIDFile, []byte(paneID), 0o644)
 
 			// Retry sending keys to the new pane
 			if retryErr := client.SendKeys(context.Background(), paneID, commandStr, "C-m"); retryErr != nil {
@@ -887,7 +886,6 @@ func (h *Harness) setupDebugPanes(ctx *Context, ui *UI, scenario *Scenario) erro
 
 	return nil
 }
-
 
 // killDaemonsInTree finds groved PID files anywhere under root and kills
 // the recorded PIDs. Matches both the unscoped "groved.pid" and scoped

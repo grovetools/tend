@@ -132,13 +132,13 @@ printf "> "`
 		t.Fatalf("Failed to capture content: %v", err)
 	}
 	t.Logf("Captured content:\n%s", content)
-	
+
 	row, col, found, err := session.FindTextLocation("File 2.md")
 	if err != nil || !found {
 		t.Fatalf("FindTextLocation failed. err: %v, found: %v", err, found)
 	}
 	t.Logf("Found 'File 2.md' at (%d, %d)", row, col)
-	
+
 	// The exact position will depend on the shell script output format
 	// Just verify we found it somewhere reasonable
 	if row < 1 || col < 1 {
@@ -168,7 +168,7 @@ printf "> "`
 		t.Fatalf("GetCursorPosition after navigation failed: %v", err)
 	}
 	t.Logf("Cursor after navigation: (%d, %d)", finalRow, finalCol)
-	
+
 	// Just verify the cursor moved somewhere reasonable
 	if finalRow < 1 || finalCol < 1 {
 		t.Errorf("Expected positive cursor position after navigation, got (%d, %d)", finalRow, finalCol)
@@ -212,7 +212,7 @@ fi`
 	if err != nil {
 		t.Fatalf("WaitForAnyText failed: %v", err)
 	}
-	
+
 	// Verify we got one of the expected results
 	validResults := map[string]bool{"* Success": true, "x Failed": true, "WARNING: Warning": true}
 	if !validResults[result] {
@@ -237,7 +237,7 @@ sleep 0.1
 echo "Found 42 files modified"
 echo "Found 7 files added"
 echo "Processing complete"`
-	
+
 	err := client.Launch(ctx, tmux.LaunchOptions{
 		SessionName: sessionName,
 		Panes:       []tmux.PaneOptions{{Command: script}},
@@ -255,7 +255,7 @@ echo "Processing complete"`
 	if err != nil {
 		t.Fatalf("WaitForTextPattern failed: %v", err)
 	}
-	
+
 	if match == "" {
 		t.Error("Expected pattern match but got empty string")
 	}
@@ -284,7 +284,7 @@ echo "  1. First option"
 echo "  2. Second option"
 echo "  3. Third option"
 printf "> "`
-	
+
 	err := client.Launch(ctx, tmux.LaunchOptions{
 		SessionName: sessionName,
 		Panes:       []tmux.PaneOptions{{Command: script}},
@@ -295,7 +295,7 @@ printf "> "`
 	defer func() { _ = client.KillSession(ctx, sessionName) }()
 
 	session := NewSession(sessionName, client, t.TempDir())
-	
+
 	// Wait for menu to appear
 	time.Sleep(500 * time.Millisecond)
 
@@ -304,11 +304,11 @@ printf "> "`
 	if err != nil {
 		t.Fatalf("GetVisibleLines failed: %v", err)
 	}
-	
+
 	if len(lines) < 4 {
 		t.Errorf("Expected at least 4 lines, got %d", len(lines))
 	}
-	
+
 	// Test SelectItem with a predicate
 	// Note: In a real terminal, navigation might work differently
 	// This is a simplified test
@@ -319,7 +319,7 @@ printf "> "`
 			break
 		}
 	}
-	
+
 	if !foundSecond {
 		t.Error("Could not find 'Second option' in visible lines")
 	}
@@ -344,7 +344,7 @@ func TestSession_Recording(t *testing.T) {
 	defer func() { _ = client.KillSession(ctx, sessionName) }()
 
 	session := NewSession(sessionName, client, t.TempDir())
-	
+
 	// Start recording
 	tempDir := t.TempDir()
 	recordingPath := filepath.Join(tempDir, "test-recording")
@@ -357,20 +357,20 @@ func TestSession_Recording(t *testing.T) {
 	_ = session.SendKeys("echo", "Space", "Hello", "Enter")
 	time.Sleep(200 * time.Millisecond)
 	_ = session.WaitForText("Hello", 1*time.Second)
-	
+
 	// Take a screenshot
 	screenshotPath := filepath.Join(tempDir, "screenshot.ansi")
 	err = session.TakeScreenshot(screenshotPath)
 	if err != nil {
 		t.Errorf("TakeScreenshot failed: %v", err)
 	}
-	
+
 	// Stop recording
 	err = session.StopRecording()
 	if err != nil {
 		t.Fatalf("StopRecording failed: %v", err)
 	}
-	
+
 	// Check that files were created
 	if _, err := os.Stat(recordingPath + ".html"); os.IsNotExist(err) {
 		t.Error("HTML recording file was not created")
@@ -381,7 +381,7 @@ func TestSession_Recording(t *testing.T) {
 	if _, err := os.Stat(screenshotPath); os.IsNotExist(err) {
 		t.Error("Screenshot file was not created")
 	}
-	
+
 	// Test GetKeyHistory
 	history := session.GetKeyHistory()
 	if len(history) == 0 {

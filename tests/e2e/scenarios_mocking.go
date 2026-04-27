@@ -21,11 +21,11 @@ var GitWorkflowScenario = harness.NewScenario(
 		harness.NewStep("Create test directory", func(ctx *harness.Context) error {
 			testDir := ctx.NewDir("git-test")
 			ctx.Set("repo_dir", testDir)
-			if err := os.MkdirAll(testDir, 0755); err != nil {
+			if err := os.MkdirAll(testDir, 0o755); err != nil {
 				return fmt.Errorf("failed to create directory: %w", err)
 			}
 			testFile := filepath.Join(testDir, "test.txt")
-			return os.WriteFile(testFile, []byte("Hello from mock test!\n"), 0644)
+			return os.WriteFile(testFile, []byte("Hello from mock test!\n"), 0o644)
 		}),
 		harness.NewStep("Initialize git repository", func(ctx *harness.Context) error {
 			repoDir := ctx.GetString("repo_dir")
@@ -122,7 +122,7 @@ var MixedDependenciesScenario = harness.NewScenario(
 		),
 		harness.NewStep("Create integration script", func(ctx *harness.Context) error {
 			scriptDir := ctx.NewDir("scripts")
-			if err := os.MkdirAll(scriptDir, 0755); err != nil {
+			if err := os.MkdirAll(scriptDir, 0o755); err != nil {
 				return fmt.Errorf("failed to create scripts directory: %w", err)
 			}
 			scriptPath := filepath.Join(scriptDir, "deploy.sh")
@@ -135,7 +135,7 @@ docker version | head -1
 echo "3. Checking Kubernetes..."
 kubectl version --client=true 2>/dev/null || echo "kubectl mock: ready"
 `
-			if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
+			if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
 				return err
 			}
 			ctx.Set("script_path", scriptPath)

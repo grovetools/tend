@@ -12,13 +12,13 @@ import (
 
 // ContainerMonitor monitors Docker containers during test execution
 type ContainerMonitor struct {
-	mu          sync.Mutex
-	running     bool
-	ctx         context.Context
-	cancel      context.CancelFunc
-	updateFunc  func(containers []ContainerInfo)
-	filter      string
-	interval    time.Duration
+	mu         sync.Mutex
+	running    bool
+	ctx        context.Context
+	cancel     context.CancelFunc
+	updateFunc func(containers []ContainerInfo)
+	filter     string
+	interval   time.Duration
 }
 
 // ContainerInfo holds simplified container information
@@ -57,7 +57,7 @@ func (m *ContainerMonitor) Start(updateFunc func(containers []ContainerInfo)) {
 func (m *ContainerMonitor) Stop() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	if m.running {
 		m.cancel()
 		m.running = false
@@ -89,7 +89,7 @@ func (m *ContainerMonitor) updateContainers() {
 	if m.filter != "" {
 		cmd = command.New("docker", "ps", "--filter", m.filter, "--format", "table {{.Image}}\t{{.CreatedAt}}\t{{.Names}}")
 	}
-	
+
 	result := cmd.Run()
 	if result.Error != nil {
 		return
@@ -109,16 +109,16 @@ func (m *ContainerMonitor) updateContainers() {
 			// Skip header
 			continue
 		}
-		
+
 		fields := strings.Fields(line)
 		if len(fields) >= 3 {
 			// Handle multi-word fields by reconstructing
 			image := fields[0]
 			names := fields[len(fields)-1]
-			
+
 			// Created time is everything in between
 			created := strings.Join(fields[1:len(fields)-1], " ")
-			
+
 			containers = append(containers, ContainerInfo{
 				Image:   image,
 				Created: created,
@@ -136,7 +136,7 @@ func GetContainerSnapshot(filter string) ([]ContainerInfo, error) {
 	if filter != "" {
 		cmd = command.New("docker", "ps", "--filter", filter, "--format", "table {{.Image}}\t{{.CreatedAt}}\t{{.Names}}")
 	}
-	
+
 	result := cmd.Run()
 	if result.Error != nil {
 		return nil, fmt.Errorf("failed to get containers: %w", result.Error)
@@ -153,13 +153,13 @@ func GetContainerSnapshot(filter string) ([]ContainerInfo, error) {
 		if i == 0 && strings.Contains(line, "IMAGE") {
 			continue
 		}
-		
+
 		fields := strings.Fields(line)
 		if len(fields) >= 3 {
 			image := fields[0]
 			names := fields[len(fields)-1]
 			created := strings.Join(fields[1:len(fields)-1], " ")
-			
+
 			containers = append(containers, ContainerInfo{
 				Image:   image,
 				Created: created,

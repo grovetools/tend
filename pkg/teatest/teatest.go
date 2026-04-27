@@ -27,7 +27,7 @@ func (s *HeadlessSession) Send(msg tea.Msg) {
 	s.msgs = append(s.msgs, msg)
 	newModel, cmd := s.model.Update(msg)
 	s.model = newModel
-	
+
 	// In a real implementation, we'd handle the Cmd here
 	_ = cmd
 }

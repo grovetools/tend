@@ -37,9 +37,9 @@ func (s ProjectState) Description() string { return "" }
 func (s ProjectState) FilterValue() string { return s.projectName }
 
 // Accessor methods for ProjectState
-func (s *ProjectState) Status() Status         { return s.status }
+func (s *ProjectState) Status() Status          { return s.status }
 func (s *ProjectState) Duration() time.Duration { return s.duration }
-func (s *ProjectState) Output() string         { return s.output }
+func (s *ProjectState) Output() string          { return s.output }
 
 // Model is the main Bubble Tea model for the ecosystem parallel runner.
 type Model struct {

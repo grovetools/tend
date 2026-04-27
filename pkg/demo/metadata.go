@@ -44,7 +44,7 @@ func SaveMetadata(demoDir string, meta *Metadata) error {
 	}
 
 	path := filepath.Join(demoDir, ".grove-demo.yml")
-	return os.WriteFile(path, data, 0644)
+	return os.WriteFile(path, data, 0o644)
 }
 
 // LoadMetadata loads the demo metadata from disk.

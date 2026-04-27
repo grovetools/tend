@@ -9,7 +9,7 @@ import (
 
 // CreateDir creates a directory with all parent directories
 func CreateDir(path string) error {
-	return os.MkdirAll(path, 0755)
+	return os.MkdirAll(path, 0o755)
 }
 
 // WriteFile writes content to a file, creating parent directories as needed
@@ -19,7 +19,7 @@ func WriteFile(path string, content []byte) error {
 		return fmt.Errorf("creating parent directory: %w", err)
 	}
 
-	return os.WriteFile(path, content, 0644)
+	return os.WriteFile(path, content, 0o644)
 }
 
 // WriteString writes a string to a file

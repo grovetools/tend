@@ -41,18 +41,18 @@ func (s *ScenarioState) Output() string              { return s.output }
 
 // Model is the main Bubble Tea model for the parallel runner.
 type Model struct {
-	scenarios    []*ScenarioState
-	list         list.Model
-	spinner      spinner.Model
+	scenarios     []*ScenarioState
+	list          list.Model
+	spinner       spinner.Model
 	width, height int
-	running      int
-	success      int
-	failed       int
-	finished     bool
-	results      []*harness.Result
-	eventsChan   <-chan Event
-	projectRoot  string
-	numJobs      int
+	running       int
+	success       int
+	failed        int
+	finished      bool
+	results       []*harness.Result
+	eventsChan    <-chan Event
+	projectRoot   string
+	numJobs       int
 }
 
 // New creates a new parallel runner TUI model.

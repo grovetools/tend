@@ -15,8 +15,8 @@ type StreamHandler func(line string, isStderr bool)
 
 // StreamOptions configures output streaming
 type StreamOptions struct {
-	Handler      StreamHandler
-	BufferSize   int
+	Handler       StreamHandler
+	BufferSize    int
 	CombineOutput bool
 }
 

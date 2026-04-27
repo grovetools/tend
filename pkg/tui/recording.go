@@ -80,7 +80,7 @@ func (s *Session) SaveRecording() error {
 	// Generate HTML report
 	htmlContent := s.generateHTMLReport()
 	htmlPath := s.recording.outputPath + ".html"
-	if err := os.WriteFile(htmlPath, []byte(htmlContent), 0644); err != nil {
+	if err := os.WriteFile(htmlPath, []byte(htmlContent), 0o644); err != nil {
 		return fmt.Errorf("failed to save HTML report: %w", err)
 	}
 
@@ -90,7 +90,7 @@ func (s *Session) SaveRecording() error {
 		return fmt.Errorf("failed to marshal recording to JSON: %w", err)
 	}
 	jsonPath := s.recording.outputPath + ".json"
-	if err := os.WriteFile(jsonPath, jsonData, 0644); err != nil {
+	if err := os.WriteFile(jsonPath, jsonData, 0o644); err != nil {
 		return fmt.Errorf("failed to save JSON data: %w", err)
 	}
 
@@ -169,7 +169,7 @@ func (s *Session) TakeScreenshot(filepath string) error {
 	}
 
 	// Save raw ANSI for terminal playback
-	if err := os.WriteFile(filepath, []byte(raw), 0644); err != nil {
+	if err := os.WriteFile(filepath, []byte(raw), 0o644); err != nil {
 		return fmt.Errorf("failed to save screenshot: %w", err)
 	}
 

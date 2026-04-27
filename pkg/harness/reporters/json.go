@@ -12,26 +12,26 @@ import (
 
 // JSONReport represents the overall test report
 type JSONReport struct {
-	Timestamp   time.Time         `json:"timestamp"`
-	Duration    string            `json:"duration"`
-	TotalTests  int               `json:"total_tests"`
-	Passed      int               `json:"passed"`
-	Failed      int               `json:"failed"`
-	SuccessRate float64           `json:"success_rate"`
-	Results     []JSONTestResult  `json:"results"`
-	Environment JSONEnvironment   `json:"environment"`
+	Timestamp   time.Time        `json:"timestamp"`
+	Duration    string           `json:"duration"`
+	TotalTests  int              `json:"total_tests"`
+	Passed      int              `json:"passed"`
+	Failed      int              `json:"failed"`
+	SuccessRate float64          `json:"success_rate"`
+	Results     []JSONTestResult `json:"results"`
+	Environment JSONEnvironment  `json:"environment"`
 }
 
 // JSONTestResult represents a single test result
 type JSONTestResult struct {
-	Name       string           `json:"name"`
-	Success    bool             `json:"success"`
-	Duration   string           `json:"duration"`
-	StartTime  time.Time        `json:"start_time"`
-	EndTime    time.Time        `json:"end_time"`
-	FailedStep string           `json:"failed_step,omitempty"`
-	Error      string           `json:"error,omitempty"`
-	Steps      []JSONTestStep   `json:"steps,omitempty"`
+	Name       string         `json:"name"`
+	Success    bool           `json:"success"`
+	Duration   string         `json:"duration"`
+	StartTime  time.Time      `json:"start_time"`
+	EndTime    time.Time      `json:"end_time"`
+	FailedStep string         `json:"failed_step,omitempty"`
+	Error      string         `json:"error,omitempty"`
+	Steps      []JSONTestStep `json:"steps,omitempty"`
 }
 
 // JSONTestStep represents a test step
@@ -47,23 +47,23 @@ type JSONTestStep struct {
 
 // JSONEnvironment represents test environment info
 type JSONEnvironment struct {
-	GoVersion    string            `json:"go_version"`
-	OS           string            `json:"os"`
-	Arch         string            `json:"arch"`
-	GroveBinary  string            `json:"grove_binary"`
-	Variables    map[string]string `json:"variables,omitempty"`
+	GoVersion   string            `json:"go_version"`
+	OS          string            `json:"os"`
+	Arch        string            `json:"arch"`
+	GroveBinary string            `json:"grove_binary"`
+	Variables   map[string]string `json:"variables,omitempty"`
 }
 
 // JSONReporter generates JSON reports
 type JSONReporter struct {
-	pretty      bool
+	pretty       bool
 	includeSteps bool
 }
 
 // NewJSONReporter creates a new JSON reporter
 func NewJSONReporter(pretty, includeSteps bool) *JSONReporter {
 	return &JSONReporter{
-		pretty:      pretty,
+		pretty:       pretty,
 		includeSteps: includeSteps,
 	}
 }
@@ -79,10 +79,10 @@ func (r *JSONReporter) WriteReport(w io.Writer, results []*harness.Result) error
 			Arch:        runtime.GOARCH,
 			GroveBinary: os.Getenv("GROVE_BINARY"),
 			Variables: map[string]string{
-				"CI":               os.Getenv("CI"),
-				"GITHUB_ACTIONS":   os.Getenv("GITHUB_ACTIONS"),
-				"GITHUB_RUN_ID":    os.Getenv("GITHUB_RUN_ID"),
-				"GITHUB_SHA":       os.Getenv("GITHUB_SHA"),
+				"CI":             os.Getenv("CI"),
+				"GITHUB_ACTIONS": os.Getenv("GITHUB_ACTIONS"),
+				"GITHUB_RUN_ID":  os.Getenv("GITHUB_RUN_ID"),
+				"GITHUB_SHA":     os.Getenv("GITHUB_SHA"),
 			},
 		},
 	}

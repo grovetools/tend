@@ -21,14 +21,14 @@ func (i item) FilterValue() string { return i.title }
 
 // Model represents the state of the sessions TUI.
 type Model struct {
-	list          list.Model
-	viewport      viewport.Model
-	sessions      []string
-	width         int
-	height        int
-	ready         bool
-	err           error
-	keyMap KeyMap
+	list     list.Model
+	viewport viewport.Model
+	sessions []string
+	width    int
+	height   int
+	ready    bool
+	err      error
+	keyMap   KeyMap
 }
 
 // NewModel creates a new sessions TUI model.

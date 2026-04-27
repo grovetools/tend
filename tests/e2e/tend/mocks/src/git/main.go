@@ -14,7 +14,7 @@ func main() {
 	}
 
 	command := os.Args[1]
-	
+
 	switch command {
 	case "init":
 		fmt.Println("Initialized empty Git repository in .git/")
@@ -58,7 +58,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "git: '%s' is not a git command (mock)\n", command)
 		os.Exit(1)
 	}
-	
+
 	// Always log that the mock was called
 	fmt.Fprintf(os.Stderr, "[MOCK GIT] Executed: git %s\n", strings.Join(os.Args[1:], " "))
 }

@@ -13,9 +13,9 @@ import (
 // newValidateCmd creates the validate command with the provided scenarios
 func newValidateCmd(allScenarios []*harness.Scenario) *cobra.Command {
 	validateCmd := &cobra.Command{
-	Use:   "validate",
-	Short: "Validate test scenarios",
-	Long: `Validate that all test scenarios are properly defined and can be loaded.
+		Use:   "validate",
+		Short: "Validate test scenarios",
+		Long: `Validate that all test scenarios are properly defined and can be loaded.
 
 This command checks:
   • Scenario files can be parsed
@@ -28,29 +28,28 @@ This is useful for CI/CD pipelines to catch configuration errors early.
 Examples:
   tend validate              # Validate all scenarios
   tend validate --verbose    # Show detailed validation output`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return validateScenarios(cmd, args, allScenarios)
-	},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return validateScenarios(cmd, args, allScenarios)
+		},
 	}
-	
+
 	return validateCmd
 }
 
 func validateScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Scenario) error {
 	// Create UI renderer
 	renderer := ui.NewRenderer(cmd.OutOrStdout(), verbose, 80)
-	
-	
+
 	if len(allScenarios) == 0 {
 		renderer.RenderInfo("No scenarios found to validate")
 		return nil
 	}
-	
+
 	renderer.RenderInfo(fmt.Sprintf("Validating %d scenario(s)...", len(allScenarios)))
-	
+
 	var validationErrors []string
 	validCount := 0
-	
+
 	for _, scenario := range allScenarios {
 		errors := validateScenario(scenario)
 		if len(errors) == 0 {
@@ -64,7 +63,7 @@ func validateScenarios(cmd *cobra.Command, args []string, allScenarios []*harnes
 			}
 		}
 	}
-	
+
 	// Display results
 	if len(validationErrors) == 0 {
 		renderer.RenderSuccess(fmt.Sprintf("All %d scenario(s) are valid!", validCount))
@@ -75,33 +74,33 @@ func validateScenarios(cmd *cobra.Command, args []string, allScenarios []*harnes
 		}
 		return fmt.Errorf("validation failed")
 	}
-	
+
 	return nil
 }
 
 func validateScenario(scenario *harness.Scenario) []string {
 	var errors []string
-	
+
 	// Check required fields
 	if scenario.Name == "" {
 		errors = append(errors, "scenario name is required")
 	}
-	
+
 	if len(scenario.Steps) == 0 {
 		errors = append(errors, "scenario must have at least one step")
 	}
-	
+
 	// Validate steps
 	for i, step := range scenario.Steps {
 		if step.Name == "" {
 			errors = append(errors, fmt.Sprintf("step %d is missing a name", i+1))
 		}
-		
+
 		if step.Func == nil {
 			errors = append(errors, fmt.Sprintf("step %d (%s) is missing a function", i+1, step.Name))
 		}
 	}
-	
+
 	// Check for duplicate step names
 	stepNames := make(map[string]int)
 	for i, step := range scenario.Steps {
@@ -110,6 +109,6 @@ func validateScenario(scenario *harness.Scenario) []string {
 		}
 		stepNames[step.Name] = i
 	}
-	
+
 	return errors
 }

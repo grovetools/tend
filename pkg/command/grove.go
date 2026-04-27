@@ -48,7 +48,7 @@ func (g *Grove) Output(args ...string) (string, error) {
 func (g *Grove) AgentUp(detached bool) error {
 	args := []string{"agent", "up"}
 	// Note: detached parameter ignored as grove agent up doesn't support -d flag
-	
+
 	// For now, we need to work around the fact that 'grove agent up' might
 	// run in foreground. We'll use a short timeout and ignore timeout errors.
 	cmd := New(g.binary, args...)
@@ -57,9 +57,9 @@ func (g *Grove) AgentUp(detached bool) error {
 	}
 	// Use a short timeout - if agent starts successfully, command should return quickly
 	cmd.Timeout(5 * time.Second)
-	
+
 	result := cmd.Run()
-	
+
 	// If we got a timeout, that might be OK - the agent could be running in foreground
 	if result.Error != nil && strings.Contains(result.Error.Error(), "timeout") {
 		// Check if agent is actually running
@@ -73,10 +73,10 @@ func (g *Grove) AgentUp(detached bool) error {
 			}
 		}
 		// Include status info in error for debugging
-		return fmt.Errorf("agent up timed out and status check failed (exit %d): %s", 
+		return fmt.Errorf("agent up timed out and status check failed (exit %d): %s",
 			statusResult.ExitCode, statusResult.Stdout)
 	}
-	
+
 	if result.Error != nil {
 		return fmt.Errorf("agent up failed: %w\nStderr: %s",
 			result.Error, result.Stderr)

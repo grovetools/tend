@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/grovetools/tend/pkg/harness"
 	"github.com/grovetools/tend/pkg/fs"
 	"github.com/grovetools/tend/pkg/git"
+	"github.com/grovetools/tend/pkg/harness"
 )
 
 func TestCoreAbstractions(t *testing.T) {
@@ -94,9 +94,9 @@ func TestGitHelpers(t *testing.T) {
 
 	// Create test repository
 	files := map[string]string{
-		"README.md":   "# Test Repo",
-		"main.go":     "package main\n",
-		".gitignore":  "*.tmp\n",
+		"README.md":  "# Test Repo",
+		"main.go":    "package main\n",
+		".gitignore": "*.tmp\n",
 	}
 
 	repo, err := git.CreateTestRepo(repoDir, files)

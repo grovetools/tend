@@ -31,9 +31,9 @@ type DisplayNode struct {
 	IsScenario  bool
 
 	// Use Project for all node types to know the project context
-	Project   *workspace.WorkspaceNode
-	FilePath  string            // For File and Scenario nodes
-	Scenario  *harness.Scenario // For Scenario nodes
+	Project         *workspace.WorkspaceNode
+	FilePath        string              // For File and Scenario nodes
+	Scenario        *harness.Scenario   // For Scenario nodes
 	ScenariosInFile []*harness.Scenario // For File nodes
 
 	// Pre-calculated for rendering

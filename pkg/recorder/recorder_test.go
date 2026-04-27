@@ -15,7 +15,6 @@ func TestRecorderWithSimpleCommand(t *testing.T) {
 
 	// Record a simple echo command
 	frames, err := rec.Run([]string{"sh", "-c", "echo hello && sleep 0.5 && echo world"})
-
 	if err != nil {
 		t.Fatalf("Recording failed: %v", err)
 	}

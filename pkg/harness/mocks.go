@@ -37,7 +37,7 @@ export PATH=%s:$PATH
 exec /bin/bash "$@"
 `, mockBinDir)
 
-		if err := os.WriteFile(wrapperPath, []byte(wrapperContent), 0755); err != nil {
+		if err := os.WriteFile(wrapperPath, []byte(wrapperContent), 0o755); err != nil {
 			return fmt.Errorf("failed to create shell wrapper: %w", err)
 		}
 
@@ -57,7 +57,7 @@ func SetupMocks(mocks ...Mock) Step {
 	return NewStep("Setup Mocks", func(ctx *Context) error {
 		// Create a dedicated bin directory for the test run.
 		mockBinDir := filepath.Join(ctx.RootDir, "test_bin")
-		if err := os.MkdirAll(mockBinDir, 0755); err != nil {
+		if err := os.MkdirAll(mockBinDir, 0o755); err != nil {
 			return fmt.Errorf("failed to create mock bin directory: %w", err)
 		}
 
@@ -97,20 +97,20 @@ func SetupMocks(mocks ...Mock) Step {
 				// 1. tests/e2e/tend/mocks/bin/mock-{name} (new E2E test location)
 				// 2. tests/mocks/bin/mock-{name} (general test location)
 				// 3. bin/mock-{name} (older convention)
-				
+
 				possiblePaths := []string{
 					filepath.Join(ctx.ProjectRoot, "tests", "e2e", "tend", "mocks", "bin", "mock-"+mock.CommandName),
 					filepath.Join(ctx.ProjectRoot, "tests", "mocks", "bin", "mock-"+mock.CommandName),
 					filepath.Join(ctx.ProjectRoot, "bin", "mock-"+mock.CommandName),
 				}
-				
+
 				for _, path := range possiblePaths {
 					if _, err := os.Stat(path); err == nil {
 						sourcePath = path
 						break
 					}
 				}
-				
+
 				// If still not found, use the first path for the error message
 				if sourcePath == "" {
 					sourcePath = possiblePaths[0]
@@ -124,7 +124,7 @@ func SetupMocks(mocks ...Mock) Step {
 			if err := os.Symlink(sourcePath, targetPath); err != nil {
 				return fmt.Errorf("failed to symlink mock for %s: %w", mock.CommandName, err)
 			}
-			
+
 			// Store the mock override path in the context
 			ctx.mockOverrides[mock.CommandName] = targetPath
 		}

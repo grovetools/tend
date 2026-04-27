@@ -32,7 +32,7 @@ func DefaultOptions() Options {
 func For(condition Condition, opts Options) error {
 	ctx, cancel := context.WithTimeout(context.Background(), opts.Timeout)
 	defer cancel()
-	
+
 	return ForContext(ctx, condition, opts)
 }
 
@@ -45,15 +45,15 @@ func ForContext(ctx context.Context, condition Condition, opts Options) error {
 			return nil
 		}
 	}
-	
+
 	ticker := time.NewTicker(opts.PollInterval)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ctx.Done():
 			return fmt.Errorf("timeout waiting for condition: %w", ctx.Err())
-			
+
 		case <-ticker.C:
 			ok, err := condition()
 			if err != nil {
@@ -70,18 +70,18 @@ func ForContext(ctx context.Context, condition Condition, opts Options) error {
 func ForWithMessage(condition ConditionWithMessage, opts Options) error {
 	ctx, cancel := context.WithTimeout(context.Background(), opts.Timeout)
 	defer cancel()
-	
+
 	return ForContextWithMessage(ctx, condition, opts)
 }
 
 // ForContextWithMessage waits with context and message updates
 func ForContextWithMessage(ctx context.Context, condition ConditionWithMessage, opts Options) error {
 	var lastMessage string
-	
+
 	checkCondition := func() error {
 		ok, msg, err := condition()
 		lastMessage = msg
-		
+
 		if err != nil {
 			return fmt.Errorf("condition check failed: %w", err)
 		}
@@ -90,22 +90,22 @@ func ForContextWithMessage(ctx context.Context, condition ConditionWithMessage, 
 		}
 		return fmt.Errorf("condition not met")
 	}
-	
+
 	if opts.Immediate {
 		if err := checkCondition(); err == nil {
 			return nil
 		}
 	}
-	
+
 	ticker := time.NewTicker(opts.PollInterval)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("timeout waiting for condition: %s (last status: %s)", 
+			return fmt.Errorf("timeout waiting for condition: %s (last status: %s)",
 				ctx.Err(), lastMessage)
-			
+
 		case <-ticker.C:
 			if err := checkCondition(); err == nil {
 				return nil

@@ -17,12 +17,12 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/grovetools/tend/internal/tui/prunner"
 	"github.com/grovetools/tend/pkg/fs"
 	"github.com/grovetools/tend/pkg/harness"
 	"github.com/grovetools/tend/pkg/harness/reporters"
 	"github.com/grovetools/tend/pkg/ui"
-	"github.com/grovetools/tend/internal/tui/prunner"
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 var ulogRun = grovelogging.NewUnifiedLogger("grove-tend.cmd.run")
@@ -54,9 +54,9 @@ var (
 // newRunCmd creates the run command with the provided scenarios
 func newRunCmd(allScenarios []*harness.Scenario) *cobra.Command {
 	runCmd := &cobra.Command{
-	Use:   "run [scenario...]",
-	Short: "Run test scenarios",
-	Long: `Run one or more test scenarios.
+		Use:   "run [scenario...]",
+		Short: "Run test scenarios",
+		Long: `Run one or more test scenarios.
 
 If no scenarios are specified, all scenarios in the scenarios directory will be run.
 Scenarios can be filtered by tags using the --tags flag.
@@ -67,9 +67,9 @@ Examples:
   tend run --tags=smoke              # Run scenarios tagged with 'smoke'
   tend run --interactive agent-*     # Run agent scenarios interactively
   tend run --parallel --timeout=5m   # Run with 5 minute timeout in parallel`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return runScenarios(cmd, args, allScenarios)
-	},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runScenarios(cmd, args, allScenarios)
+		},
 	}
 
 	runCmd.Flags().BoolVarP(&parallel, "parallel", "p", false, "Run scenarios in parallel")
@@ -135,11 +135,10 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 	if nvim && !tmuxSplit {
 		return fmt.Errorf("--nvim can only be used with --tmux-split")
 	}
-	
+
 	// Create UI renderer
 	renderer := ui.NewRenderer(os.Stdout, verbose, 80)
-	
-	
+
 	// Filter scenarios based on --explicit flag
 	var selectedScenarios []*harness.Scenario
 	if explicitOnly {
@@ -157,7 +156,7 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 	} else {
 		// Normal filtering
 		selectedScenarios = filterScenarios(allScenarios, args, tags)
-		
+
 		// Filter ExplicitOnly scenarios when running all (and not using --explicit)
 		if len(args) == 0 && len(selectedScenarios) > 0 {
 			var filtered []*harness.Scenario
@@ -175,7 +174,7 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 			selectedScenarios = filtered
 		}
 	}
-	
+
 	// Filter LocalOnly scenarios in CI
 	if harness.IsCI() && !includeLocal && len(selectedScenarios) > 0 {
 		var filtered []*harness.Scenario
@@ -192,7 +191,7 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 		}
 		selectedScenarios = filtered
 	}
-	
+
 	if len(selectedScenarios) == 0 {
 		renderer.RenderInfo("No scenarios match the specified criteria")
 		return nil
@@ -224,7 +223,7 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 		dataDir := filepath.Join(homeDir, ".local", "share")
 		cacheDir := filepath.Join(homeDir, ".cache")
 		for _, dir := range []string{homeDir, configDir, dataDir, cacheDir} {
-			if err := os.MkdirAll(dir, 0755); err != nil {
+			if err := os.MkdirAll(dir, 0o755); err != nil {
 				return fmt.Errorf("failed to create sandbox dir %s: %w", dir, err)
 			}
 		}
@@ -492,16 +491,16 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 		RunSteps:         runSteps,
 		RecordTUIDir:     recordTUIDir,
 	}
-	
+
 	// Configure for CI if needed
 	harness.ConfigureForCI(&opts)
-	
+
 	// Setup CI environment
 	harness.SetupCIEnvironment()
-	
+
 	// Create harness
 	h := harness.New(opts)
-	
+
 	// Determine if we can use the interactive TUI for parallel mode.
 	// Fall back to sequential runner when stdout is not a terminal (e.g., piped
 	// to a file, captured by a subprocess, or running inside a non-interactive agent).
@@ -622,17 +621,17 @@ func printParallelFailureDetails(states []*prunner.ScenarioState) {
 
 func runScenariosSequential(ctx context.Context, h *harness.Harness, scenarios []*harness.Scenario, renderer *ui.Renderer) ([]*harness.Result, error) {
 	var results []*harness.Result
-	
+
 	for i, scenario := range scenarios {
 		renderer.RenderProgress(i, len(scenarios))
-		
+
 		result, _ := runSingleScenario(ctx, h, scenario, renderer)
 		// Ignore the error - we want to continue running all scenarios
 		// The result object contains the success/failure information
-		
+
 		results = append(results, result)
 	}
-	
+
 	return results, nil
 }
 
@@ -695,17 +694,17 @@ func runScenariosParallelHeadless(ctx context.Context, scenarios []*harness.Scen
 
 func runSingleScenario(ctx context.Context, h *harness.Harness, scenario *harness.Scenario, renderer *ui.Renderer) (*harness.Result, error) {
 	renderer.RenderScenarioStart(scenario)
-	
+
 	result, err := h.Run(ctx, scenario)
-	
+
 	renderer.RenderScenarioEnd(result)
-	
+
 	return result, err
 }
 
 func filterScenarios(scenarios []*harness.Scenario, names []string, tags []string) []*harness.Scenario {
 	var filtered []*harness.Scenario
-	
+
 	for _, scenario := range scenarios {
 		// Filter by name patterns if specified
 		if len(names) > 0 {
@@ -720,7 +719,7 @@ func filterScenarios(scenarios []*harness.Scenario, names []string, tags []strin
 				continue
 			}
 		}
-		
+
 		// Filter by tags if specified
 		if len(tags) > 0 {
 			tagMatch := false
@@ -739,10 +738,10 @@ func filterScenarios(scenarios []*harness.Scenario, names []string, tags []strin
 				continue
 			}
 		}
-		
+
 		filtered = append(filtered, scenario)
 	}
-	
+
 	return filtered
 }
 
@@ -763,11 +762,11 @@ func renderFinalSummary(renderer *ui.Renderer, results []*harness.Result, succes
 		Pretty("").
 		PrettyOnly().
 		Emit()
-	
+
 	// Build table data
 	headers := []string{"STATUS", "SCENARIO", "DURATION", "DETAILS"}
 	var rows [][]string
-	
+
 	for _, result := range results {
 		status := theme.IconSuccess + " PASS"
 		statusStyle := theme.DefaultTheme.Success
@@ -780,7 +779,7 @@ func renderFinalSummary(renderer *ui.Renderer, results []*harness.Result, succes
 		if !result.Success && result.FailedStep != "" {
 			details = result.FailedStep
 		}
-		
+
 		row := []string{
 			statusStyle.Render(status),
 			result.ScenarioName,
@@ -789,21 +788,21 @@ func renderFinalSummary(renderer *ui.Renderer, results []*harness.Result, succes
 		}
 		rows = append(rows, row)
 	}
-	
+
 	// Create table renderer
 	re := lipgloss.NewRenderer(os.Stdout)
-	
+
 	// Define styles
 	baseStyle := re.NewStyle().Padding(0, 1)
 	headerStyle := baseStyle.Bold(true).Foreground(lipgloss.Color("#5FAFFF"))
-	
+
 	// Create the table
 	t := table.New().
 		Border(lipgloss.NormalBorder()).
 		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("#6C7086"))).
 		Headers(headers...).
 		Rows(rows...)
-	
+
 	// Apply styling
 	t.StyleFunc(func(row, col int) lipgloss.Style {
 		if row == 0 {
@@ -830,13 +829,13 @@ func writeReports(results []*harness.Result) error {
 			return fmt.Errorf("creating junit file: %w", err)
 		}
 		defer file.Close()
-		
+
 		reporter := reporters.NewJUnitReporter("Grove Tend Tests")
 		if err := reporter.WriteReport(file, results); err != nil {
 			return fmt.Errorf("writing junit report: %w", err)
 		}
 	}
-	
+
 	// JSON output
 	if jsonOutput != "" {
 		file, err := os.Create(jsonOutput)
@@ -844,13 +843,13 @@ func writeReports(results []*harness.Result) error {
 			return fmt.Errorf("creating json file: %w", err)
 		}
 		defer file.Close()
-		
+
 		reporter := reporters.NewJSONReporter(true, true)
 		if err := reporter.WriteReport(file, results); err != nil {
 			return fmt.Errorf("writing json report: %w", err)
 		}
 	}
-	
+
 	// GitHub Actions annotations
 	if harness.DetectCIProvider() == harness.CIProviderGitHubActions {
 		reporter := reporters.NewGitHubReporter()

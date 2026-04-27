@@ -16,11 +16,11 @@ func NewDocker() *Docker {
 
 // ContainerInfo represents basic container information
 type ContainerInfo struct {
-	ID      string
-	Name    string
-	Image   string
-	Status  string
-	Ports   []string
+	ID     string
+	Name   string
+	Image  string
+	Status string
+	Ports  []string
 }
 
 // ListContainers lists running containers

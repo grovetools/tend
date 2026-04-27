@@ -334,7 +334,7 @@ func FullLifecycleScenario() *harness.Scenario {
 	).WithSetup(
 		harness.NewStep("Create workspace", func(ctx *harness.Context) error {
 			workspace := ctx.NewDir("lifecycle-workspace")
-			if err := os.MkdirAll(workspace, 0755); err != nil {
+			if err := os.MkdirAll(workspace, 0o755); err != nil {
 				return fmt.Errorf("failed to create workspace: %w", err)
 			}
 			ctx.Set("workspace", workspace)
@@ -377,7 +377,7 @@ func SetupPhaseAssertionsScenario() *harness.Scenario {
 	).WithSetup(
 		harness.NewStep("Setup with assertions", func(ctx *harness.Context) error {
 			testDir := ctx.NewDir("assertions-test")
-			if err := os.MkdirAll(testDir, 0755); err != nil {
+			if err := os.MkdirAll(testDir, 0o755); err != nil {
 				return fmt.Errorf("failed to create dir: %w", err)
 			}
 
@@ -465,7 +465,7 @@ func ReusableSetupStepsScenario() *harness.Scenario {
 	// Define a reusable setup step
 	commonSetup := harness.NewStep("Common setup step", func(ctx *harness.Context) error {
 		commonDir := ctx.NewDir("common-workspace")
-		if err := os.MkdirAll(commonDir, 0755); err != nil {
+		if err := os.MkdirAll(commonDir, 0o755); err != nil {
 			return fmt.Errorf("failed to create common dir: %w", err)
 		}
 

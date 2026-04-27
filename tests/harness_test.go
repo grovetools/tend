@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/grovetools/tend/pkg/harness"
 	"github.com/grovetools/tend/pkg/command"
 	"github.com/grovetools/tend/pkg/fs"
+	"github.com/grovetools/tend/pkg/harness"
 )
 
 func TestHarnessExecution(t *testing.T) {
@@ -37,7 +37,7 @@ func TestHarnessExecution(t *testing.T) {
 					if testDir == "" {
 						return fmt.Errorf("test directory not found")
 					}
-					
+
 					testFile := filepath.Join(testDir, "test.txt")
 					return fs.WriteString(testFile, "Hello from harness test!")
 				},
@@ -47,7 +47,7 @@ func TestHarnessExecution(t *testing.T) {
 				Func: func(ctx *harness.Context) error {
 					testDir := ctx.Dir("test")
 					testFile := filepath.Join(testDir, "test.txt")
-					
+
 					if !fs.Exists(testFile) {
 						return fmt.Errorf("test file does not exist")
 					}
@@ -65,7 +65,6 @@ func TestHarnessExecution(t *testing.T) {
 
 	ctx := context.Background()
 	result, err := h.Run(ctx, scenario)
-
 	if err != nil {
 		t.Fatalf("Scenario failed: %v", err)
 	}
@@ -178,7 +177,7 @@ func TestStepBuilders(t *testing.T) {
 
 	t.Run("DelayStep", func(t *testing.T) {
 		step := harness.DelayStep("delay", 10*time.Millisecond)
-		
+
 		start := time.Now()
 		err := step.Func(ctx)
 		duration := time.Since(start)
@@ -194,7 +193,7 @@ func TestStepBuilders(t *testing.T) {
 
 	t.Run("ConditionalStep", func(t *testing.T) {
 		// Test condition that returns true
-		step := harness.ConditionalStep("conditional", 
+		step := harness.ConditionalStep("conditional",
 			func(*harness.Context) bool { return true },
 			func(*harness.Context) error { return nil })
 
@@ -223,15 +222,15 @@ func TestCommandIntegration(t *testing.T) {
 				Func: func(ctx *harness.Context) error {
 					cmd := command.New("echo", "hello", "world")
 					result := cmd.Run()
-					
+
 					if result.Error != nil {
 						return result.Error
 					}
-					
+
 					if result.ExitCode != 0 {
 						return fmt.Errorf("expected exit code 0, got %d", result.ExitCode)
 					}
-					
+
 					ctx.Set("echo_output", result.Stdout)
 					return nil
 				},
@@ -243,12 +242,12 @@ func TestCommandIntegration(t *testing.T) {
 					if output == "" {
 						return fmt.Errorf("echo output not found")
 					}
-					
+
 					expected := "hello world\n"
 					if output != expected {
 						return fmt.Errorf("expected %q, got %q", expected, output)
 					}
-					
+
 					return nil
 				},
 			},
@@ -257,7 +256,6 @@ func TestCommandIntegration(t *testing.T) {
 
 	h := harness.New(harness.Options{Verbose: false})
 	result, err := h.Run(context.Background(), scenario)
-
 	if err != nil {
 		t.Fatalf("Command scenario failed: %v", err)
 	}

@@ -46,7 +46,7 @@ func main() {
 
 			harness.NewStep("Initialize git repository", func(ctx *harness.Context) error {
 				workspaceDir := ctx.GetString("workspace")
-				
+
 				repo, err := git.SetupTestRepo(workspaceDir)
 				if err != nil {
 					return err
@@ -157,7 +157,6 @@ func newFeature() {
 					v.True("a failing boolean check", false)
 					v.Contains("another failing contains check", "foo bar", "baz")
 				})
-
 				if err != nil {
 					ulog.Info("Collected assertion failures").
 						Err(err).

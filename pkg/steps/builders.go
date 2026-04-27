@@ -3,7 +3,7 @@ package steps
 import (
 	"fmt"
 	"time"
-	
+
 	"github.com/grovetools/tend/pkg/harness"
 	"github.com/grovetools/tend/pkg/retry"
 	"github.com/grovetools/tend/pkg/verify"
@@ -28,7 +28,7 @@ func WaitForService(serviceName string) harness.Step {
 			if workDir == "" {
 				workDir = ctx.RootDir
 			}
-			
+
 			return verify.ServiceRunning(ctx.GroveBinary, workDir, serviceName)
 		},
 	)
@@ -39,7 +39,7 @@ func RetryOnFailure(name string, fn harness.StepFunc, attempts int) harness.Step
 	return harness.NewStep(name, func(ctx *harness.Context) error {
 		opts := retry.DefaultOptions()
 		opts.MaxAttempts = attempts
-		
+
 		return retry.Do(func() error {
 			return fn(ctx)
 		}, opts)

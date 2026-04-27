@@ -36,7 +36,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if !m.saved {
 				// Save a file
 				content := fmt.Sprintf("saved at %s", time.Now().Format(time.RFC3339))
-				if err := os.WriteFile("output.txt", []byte(content), 0644); err != nil {
+				if err := os.WriteFile("output.txt", []byte(content), 0o644); err != nil {
 					m.message = fmt.Sprintf("Error saving file: %v", err)
 				} else {
 					m.saved = true

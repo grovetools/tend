@@ -44,7 +44,7 @@ func WriteBasicGroveConfig(dir string) error {
 // This is useful for testing workspace discovery scenarios.
 func WriteGlobalGroveConfig(homeDir string, searchPaths map[string]config.SearchPathConfig) error {
 	configDir := filepath.Join(homeDir, ".config", "grove")
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
 		return fmt.Errorf("creating global config dir: %w", err)
 	}
 

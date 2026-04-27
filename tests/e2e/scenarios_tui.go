@@ -25,7 +25,7 @@ func AutoPathMocksScenario() *harness.Scenario {
 		[]harness.Step{
 			harness.NewStep("Create mock binaries", func(ctx *harness.Context) error {
 				mockDir := ctx.NewDir("mocks")
-				if err := os.MkdirAll(mockDir, 0755); err != nil {
+				if err := os.MkdirAll(mockDir, 0o755); err != nil {
 					return fmt.Errorf("failed to create mocks directory: %w", err)
 				}
 				ctx.Set("test_bin_dir", mockDir)
@@ -35,11 +35,11 @@ func AutoPathMocksScenario() *harness.Scenario {
 echo "MOCK GIT: This is a mock git binary!"`); err != nil {
 					return err
 				}
-				return os.Chmod(mockGitPath, 0755)
+				return os.Chmod(mockGitPath, 0o755)
 			}),
 			harness.NewStep("Create test script", func(ctx *harness.Context) error {
 				scriptDir := ctx.NewDir("test-scripts")
-				if err := os.MkdirAll(scriptDir, 0755); err != nil {
+				if err := os.MkdirAll(scriptDir, 0o755); err != nil {
 					return fmt.Errorf("failed to create test-scripts directory: %w", err)
 				}
 				scriptPath := filepath.Join(scriptDir, "test-mocks.sh")
@@ -51,7 +51,7 @@ echo "Mock test complete"`); err != nil {
 					return err
 				}
 				ctx.Set("test_script", scriptPath)
-				return os.Chmod(scriptPath, 0755)
+				return os.Chmod(scriptPath, 0o755)
 			}),
 			harness.NewStep("Launch TUI with automatic PATH handling", func(ctx *harness.Context) error {
 				scriptPath := ctx.GetString("test_script")
@@ -86,7 +86,7 @@ func EnvPassingTestScenario() *harness.Scenario {
 		[]harness.Step{
 			harness.NewStep("Create test script that prints env vars", func(ctx *harness.Context) error {
 				scriptDir := ctx.NewDir("env-test")
-				if err := os.MkdirAll(scriptDir, 0755); err != nil {
+				if err := os.MkdirAll(scriptDir, 0o755); err != nil {
 					return fmt.Errorf("failed to create env-test directory: %w", err)
 				}
 				scriptPath := filepath.Join(scriptDir, "env-test.sh")
@@ -95,7 +95,7 @@ echo "CUSTOM_VAR is: $CUSTOM_VAR"`); err != nil {
 					return err
 				}
 				ctx.Set("env_script", scriptPath)
-				return os.Chmod(scriptPath, 0755)
+				return os.Chmod(scriptPath, 0o755)
 			}),
 			harness.NewStep("Launch TUI with environment variables", func(ctx *harness.Context) error {
 				scriptPath := ctx.GetString("env_script")

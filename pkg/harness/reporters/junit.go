@@ -23,26 +23,26 @@ type JUnitTestSuites struct {
 
 // JUnitTestSuite represents a test suite
 type JUnitTestSuite struct {
-	Name       string           `xml:"name,attr"`
-	Tests      int              `xml:"tests,attr"`
-	Failures   int              `xml:"failures,attr"`
-	Errors     int              `xml:"errors,attr"`
-	Time       float64          `xml:"time,attr"`
-	Timestamp  string           `xml:"timestamp,attr"`
-	Properties []JUnitProperty  `xml:"properties>property,omitempty"`
-	TestCases  []JUnitTestCase  `xml:"testcase"`
+	Name       string          `xml:"name,attr"`
+	Tests      int             `xml:"tests,attr"`
+	Failures   int             `xml:"failures,attr"`
+	Errors     int             `xml:"errors,attr"`
+	Time       float64         `xml:"time,attr"`
+	Timestamp  string          `xml:"timestamp,attr"`
+	Properties []JUnitProperty `xml:"properties>property,omitempty"`
+	TestCases  []JUnitTestCase `xml:"testcase"`
 }
 
 // JUnitTestCase represents a test case
 type JUnitTestCase struct {
-	Name      string         `xml:"name,attr"`
-	ClassName string         `xml:"classname,attr"`
-	Time      float64        `xml:"time,attr"`
-	Failure   *JUnitFailure  `xml:"failure,omitempty"`
-	Error     *JUnitError    `xml:"error,omitempty"`
-	Skipped   *JUnitSkipped  `xml:"skipped,omitempty"`
-	SystemOut string         `xml:"system-out,omitempty"`
-	SystemErr string         `xml:"system-err,omitempty"`
+	Name      string        `xml:"name,attr"`
+	ClassName string        `xml:"classname,attr"`
+	Time      float64       `xml:"time,attr"`
+	Failure   *JUnitFailure `xml:"failure,omitempty"`
+	Error     *JUnitError   `xml:"error,omitempty"`
+	Skipped   *JUnitSkipped `xml:"skipped,omitempty"`
+	SystemOut string        `xml:"system-out,omitempty"`
+	SystemErr string        `xml:"system-err,omitempty"`
 }
 
 // JUnitProperty represents a property

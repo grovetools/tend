@@ -1,16 +1,16 @@
 package reporters
 
 import (
-	grovelogging "github.com/grovetools/core/logging"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 
+	grovelogging "github.com/grovetools/core/logging"
+
 	"github.com/grovetools/core/tui/theme"
 	"github.com/grovetools/tend/pkg/harness"
 )
-
 
 var ulog = grovelogging.NewUnifiedLogger("grove-tend.reporters/github")
 
@@ -61,7 +61,7 @@ func (r *GitHubReporter) WriteReport(w io.Writer, results []*harness.Result) err
 
 // writeSummary writes a markdown summary for GitHub Actions
 func (r *GitHubReporter) writeSummary(results []*harness.Result, passed, failed int) error {
-	file, err := os.OpenFile(r.summaryFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	file, err := os.OpenFile(r.summaryFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		return fmt.Errorf("opening summary file: %w", err)
 	}
@@ -133,5 +133,5 @@ func EmitGroupStart(name string) {
 
 // EmitGroupEnd emits a group end marker
 func EmitGroupEnd() {
- ulog.Info("::endgroup::").Pretty("::endgroup::").PrettyOnly().Emit()
+	ulog.Info("::endgroup::").Pretty("::endgroup::").PrettyOnly().Emit()
 }

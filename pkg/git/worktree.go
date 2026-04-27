@@ -11,7 +11,7 @@ import (
 func (g *Git) CreateWorktree(path, branch string) error {
 	// Ensure the parent directory exists
 	parentDir := filepath.Dir(path)
-	if err := os.MkdirAll(parentDir, 0755); err != nil {
+	if err := os.MkdirAll(parentDir, 0o755); err != nil {
 		return fmt.Errorf("creating parent directory: %w", err)
 	}
 

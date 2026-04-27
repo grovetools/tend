@@ -1317,7 +1317,8 @@ func (g *homelabGenerator) createPlanWithJobs(repoDir, planName string, jobs []j
 
 	// Step 2: Add jobs via CLI
 	for i, job := range jobs {
-		args := []string{"plan", "add", planDir,
+		args := []string{
+			"plan", "add", planDir,
 			"-t", job.jobType,
 			"--title", job.title,
 			"-p", job.prompt,
@@ -1399,7 +1400,7 @@ func (g *homelabGenerator) updateJobStatusFile(filePath, status string) error {
 	statusRe := regexp.MustCompile(`(?m)^status:\s*.*$`)
 	newContent := statusRe.ReplaceAllString(string(content), "status: "+status)
 
-	return os.WriteFile(filePath, []byte(newContent), 0644)
+	return os.WriteFile(filePath, []byte(newContent), 0o644)
 }
 
 // Register the homelab spec with the registry on package initialization.

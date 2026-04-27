@@ -124,7 +124,7 @@ func buildMocksByConvention(sourceDir string) error {
 		// No mocks directory found, nothing to build
 		return nil
 	}
-	if err := os.MkdirAll(mockBinDir, 0755); err != nil {
+	if err := os.MkdirAll(mockBinDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create mock bin directory: %w", err)
 	}
 
@@ -209,7 +209,7 @@ func BuildProjectTendBinary(startDir string) (string, error) {
 
 	// 4. Compile the test runner with version info.
 	binDir := filepath.Join(projectRoot, "bin")
-	if err := os.MkdirAll(binDir, 0755); err != nil {
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
 		return "", fmt.Errorf("failed to create bin directory at %s: %w", binDir, err)
 	}
 
@@ -260,7 +260,7 @@ func FindTendBinary(startDir string) (string, error) {
 		for _, exactName := range exactMatches {
 			fullPath := filepath.Join(binDir, exactName)
 			info, err := os.Stat(fullPath)
-			if err == nil && !info.IsDir() && info.Mode()&0111 != 0 {
+			if err == nil && !info.IsDir() && info.Mode()&0o111 != 0 {
 				return filepath.Abs(fullPath)
 			}
 		}
@@ -293,7 +293,7 @@ func FindTendBinary(startDir string) (string, error) {
 
 				// Check if it's executable
 				info, err := os.Stat(fullPath)
-				if err == nil && info.Mode()&0111 != 0 {
+				if err == nil && info.Mode()&0o111 != 0 {
 					return filepath.Abs(fullPath)
 				}
 			}

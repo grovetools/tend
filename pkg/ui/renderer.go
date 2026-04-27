@@ -46,11 +46,11 @@ func (r *Renderer) RenderScenarioStart(scenario *harness.Scenario) {
 func (r *Renderer) RenderScenarioEnd(result *harness.Result) {
 	output := "\n" + strings.Repeat("─", r.width) + "\n"
 	output += Summary(result.ScenarioName, result.Success, result.Duration, len(result.StepResults))
-	
+
 	if !result.Success && result.Error != nil {
 		output += "\n" + ErrorBox(result.Error)
 	}
-	
+
 	r.write(output + "\n")
 }
 
@@ -70,13 +70,13 @@ func (r *Renderer) RenderStepEnd(stepNumber int, step harness.Step, result harne
 	} else {
 		status = StatusError
 	}
-	
+
 	output := StepStatus(stepNumber, step.Name, status, result.Duration)
-	
+
 	if !result.Success && result.Error != nil && r.verbose {
 		output += "\n" + ErrorBox(result.Error)
 	}
-	
+
 	r.write(output + "\n")
 }
 

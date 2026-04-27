@@ -14,11 +14,11 @@ func main() {
 	if callCount == "" {
 		callCount = "0"
 	}
-	
+
 	// Parse command line
 	var prompt string
 	var jsonOutput bool
-	
+
 	for i, arg := range os.Args[1:] {
 		if arg == "--json" {
 			jsonOutput = true
@@ -32,13 +32,13 @@ func main() {
 			break
 		}
 	}
-	
+
 	if prompt == "" {
 		fmt.Fprintf(os.Stderr, "Error: No prompt provided\n")
 		fmt.Fprintf(os.Stderr, "Usage: llm [--json] [-p|--prompt] <prompt>\n")
 		os.Exit(1)
 	}
-	
+
 	// Generate mock response based on prompt
 	var response string
 	if strings.Contains(strings.ToLower(prompt), "test") {
@@ -50,7 +50,7 @@ func main() {
 	} else {
 		response = fmt.Sprintf("Mock LLM response to: '%s'. This is call number %s to the mock.", prompt, callCount)
 	}
-	
+
 	// Output response
 	if jsonOutput {
 		output := map[string]interface{}{
@@ -64,7 +64,7 @@ func main() {
 	} else {
 		fmt.Println(response)
 	}
-	
+
 	// Log for debugging
 	fmt.Fprintf(os.Stderr, "[MOCK LLM] Prompt: %s\n", prompt)
 }

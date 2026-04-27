@@ -14,7 +14,7 @@ import (
 var setupTestWorkspace = harness.NewStep("Setup mock filesystem with test files", func(ctx *harness.Context) error {
 	// Create a test directory structure
 	testDir := ctx.NewDir("test-workspace")
-	if err := os.MkdirAll(testDir, 0755); err != nil {
+	if err := os.MkdirAll(testDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create test workspace: %w", err)
 	}
 

@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	grovelogging "github.com/grovetools/core/logging"
 	"fmt"
 	"os"
 	"os/exec"
@@ -11,12 +10,13 @@ import (
 	"syscall"
 	"time"
 
+	grovelogging "github.com/grovetools/core/logging"
+
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/grovetools/core/pkg/tmux"
 	"github.com/grovetools/tend/internal/tui/sessions"
 	"github.com/spf13/cobra"
-	tea "github.com/charmbracelet/bubbletea"
 )
-
 
 var ulogSessions = grovelogging.NewUnifiedLogger("grove-tend.sessions")
 
@@ -70,7 +70,7 @@ func newSessionsListCmd() *cobra.Command {
 				return err
 			}
 			if len(sessionNames) == 0 {
-    ulogSessions.Info("No active tend sessions found.").Pretty("No active tend sessions found.").PrettyOnly().Emit()
+				ulogSessions.Info("No active tend sessions found.").Pretty("No active tend sessions found.").PrettyOnly().Emit()
 				return nil
 			}
 			for _, name := range sessionNames {
@@ -100,7 +100,7 @@ func newSessionsKillCmd() *cobra.Command {
 					return err
 				}
 				if len(sessionsToKill) == 0 {
-     ulogSessions.Info("No active tend sessions to kill.").Pretty("No active tend sessions to kill.").PrettyOnly().Emit()
+					ulogSessions.Info("No active tend sessions to kill.").Pretty("No active tend sessions to kill.").PrettyOnly().Emit()
 					return nil
 				}
 			} else {

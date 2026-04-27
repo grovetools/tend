@@ -33,19 +33,19 @@ func Do(fn func() error, opts Options) error {
 func DoContext(ctx context.Context, fn func() error, opts Options) error {
 	var lastErr error
 	delay := opts.Delay
-	
+
 	for attempt := 1; attempt <= opts.MaxAttempts; attempt++ {
 		select {
 		case <-ctx.Done():
 			return fmt.Errorf("retry cancelled: %w", ctx.Err())
 		default:
 		}
-		
+
 		if err := fn(); err == nil {
 			return nil
 		} else {
 			lastErr = err
-			
+
 			if attempt < opts.MaxAttempts {
 				// Calculate next delay
 				if opts.Multiplier > 1 {
@@ -54,7 +54,7 @@ func DoContext(ctx context.Context, fn func() error, opts Options) error {
 						delay = opts.MaxDelay
 					}
 				}
-				
+
 				select {
 				case <-ctx.Done():
 					return fmt.Errorf("retry cancelled during delay: %w", ctx.Err())
@@ -63,7 +63,7 @@ func DoContext(ctx context.Context, fn func() error, opts Options) error {
 			}
 		}
 	}
-	
+
 	return fmt.Errorf("failed after %d attempts: %w", opts.MaxAttempts, lastErr)
 }
 
@@ -71,20 +71,20 @@ func DoContext(ctx context.Context, fn func() error, opts Options) error {
 func WithTimeout(fn func() error, timeout time.Duration, interval time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	
+
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
-	
+
 	// Try immediately
 	if err := fn(); err == nil {
 		return nil
 	}
-	
+
 	for {
 		select {
 		case <-ctx.Done():
 			return fmt.Errorf("timeout after %v", timeout)
-			
+
 		case <-ticker.C:
 			if err := fn(); err == nil {
 				return nil
@@ -97,12 +97,12 @@ func WithTimeout(fn func() error, timeout time.Duration, interval time.Duration)
 func UntilSuccess(ctx context.Context, fn func() error, interval time.Duration) error {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-			
+
 		case <-ticker.C:
 			if err := fn(); err == nil {
 				return nil

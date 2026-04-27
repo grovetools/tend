@@ -138,7 +138,7 @@ func NotNil(value interface{}, message ...string) error {
 // Empty asserts that a string, slice, or map is empty
 func Empty(value interface{}, message ...string) error {
 	v := reflect.ValueOf(value)
-	
+
 	switch v.Kind() {
 	case reflect.String, reflect.Slice, reflect.Map:
 		if v.Len() != 0 {
@@ -154,6 +154,6 @@ func Empty(value interface{}, message ...string) error {
 	default:
 		return fmt.Errorf("Empty() only supports string, slice, and map types")
 	}
-	
+
 	return nil
 }

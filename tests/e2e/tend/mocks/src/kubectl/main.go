@@ -10,7 +10,7 @@ func main() {
 		fmt.Println("Mock kubectl - usage: kubectl <command>")
 		os.Exit(1)
 	}
-	
+
 	switch os.Args[1] {
 	case "version":
 		fmt.Println("Mock kubectl version: v1.0.0-mock")

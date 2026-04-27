@@ -19,11 +19,11 @@ var ulogList = grovelogging.NewUnifiedLogger("grove-tend.cmd.list")
 // newListCmd creates the list command with the provided scenarios
 func newListCmd(allScenarios []*harness.Scenario) *cobra.Command {
 	var keyword string
-	
+
 	listCmd := &cobra.Command{
-	Use:   "list",
-	Short: "List available test scenarios",
-	Long: `List all available test scenarios with their descriptions and tags.
+		Use:   "list",
+		Short: "List available test scenarios",
+		Long: `List all available test scenarios with their descriptions and tags.
 
 This command helps you discover what scenarios are available and understand
 their purpose before running them.
@@ -33,57 +33,56 @@ Examples:
   tend list --tags=smoke            # List scenarios tagged with 'smoke'
   tend list --keyword=git           # List scenarios containing 'git' in name, description, or tags
   tend list --verbose               # List with detailed information`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return listScenarios(cmd, args, allScenarios, keyword)
-	},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return listScenarios(cmd, args, allScenarios, keyword)
+		},
 	}
-	
+
 	listCmd.Flags().StringVarP(&keyword, "keyword", "k", "", "Filter scenarios by keyword (searches name, description, and tags)")
-	
+
 	return listCmd
 }
 
 func listScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Scenario, keyword string) error {
 	// Create UI renderer
 	renderer := ui.NewRenderer(cmd.OutOrStdout(), verbose, 80)
-	
-	
+
 	// Filter scenarios by tags and keyword if specified
 	filteredScenarios := filterScenarios(allScenarios, []string{}, tags)
-	
+
 	// Apply keyword filtering if specified
 	if keyword != "" {
 		filteredScenarios = filterByKeyword(filteredScenarios, keyword)
 	}
-	
+
 	if len(filteredScenarios) == 0 {
 		renderer.RenderInfo("No scenarios found matching the specified criteria")
 		return nil
 	}
-	
+
 	// Display header
 	ulogList.Info("Listing scenarios").
 		Field("count", len(filteredScenarios)).
 		Pretty(fmt.Sprintf("Available scenarios (%d):\n", len(filteredScenarios))).
 		Emit()
-	
+
 	// Build table data
 	headers := []string{"NAME", "DESCRIPTION", "LOCAL", "EXPLICIT", "TAGS", "STEPS"}
 	var rows [][]string
-	
+
 	for _, scenario := range filteredScenarios {
 		// Format tags
 		tagStr := "-"
 		if len(scenario.Tags) > 0 {
 			tagStr = strings.Join(scenario.Tags, ", ")
 		}
-		
+
 		// Format description - truncate if too long
 		description := scenario.Description
 		if len(description) > 50 && !verbose {
 			description = description[:47] + "..."
 		}
-		
+
 		// Format local and explicit indicators
 		localIndicator := ""
 		if scenario.LocalOnly {
@@ -94,7 +93,7 @@ func listScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sc
 		if scenario.ExplicitOnly {
 			explicitIndicator = theme.IconSuccess
 		}
-		
+
 		row := []string{
 			scenario.Name,
 			description,
@@ -105,7 +104,7 @@ func listScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sc
 		}
 		rows = append(rows, row)
 	}
-	
+
 	// Create table renderer
 	t := table.NewStyledTable().
 		Headers(headers...).
@@ -131,7 +130,7 @@ func listScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sc
 			return lipgloss.NewStyle().Padding(0, 1)
 		}
 	})
-	
+
 	ulogList.Info("Scenario list table").
 		Pretty(t.String()).
 		PrettyOnly().
@@ -147,12 +146,11 @@ func listScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sc
 			displayScenarioDetails(renderer, scenario)
 		}
 	}
-	
+
 	return nil
 }
 
 func displayScenarioDetails(renderer *ui.Renderer, scenario *harness.Scenario) {
-
 	// Scenario name and description
 	prettyMsg := fmt.Sprintf("\n%s %s",
 		theme.DefaultTheme.Header.Render("●"),
@@ -219,20 +217,20 @@ func displayScenarioDetails(renderer *ui.Renderer, scenario *harness.Scenario) {
 func filterByKeyword(scenarios []*harness.Scenario, keyword string) []*harness.Scenario {
 	var filtered []*harness.Scenario
 	lowercaseKeyword := strings.ToLower(keyword)
-	
+
 	for _, scenario := range scenarios {
 		// Check if keyword appears in scenario name
 		if strings.Contains(strings.ToLower(scenario.Name), lowercaseKeyword) {
 			filtered = append(filtered, scenario)
 			continue
 		}
-		
+
 		// Check if keyword appears in description
 		if strings.Contains(strings.ToLower(scenario.Description), lowercaseKeyword) {
 			filtered = append(filtered, scenario)
 			continue
 		}
-		
+
 		// Check if keyword appears in any tag
 		for _, tag := range scenario.Tags {
 			if strings.Contains(strings.ToLower(tag), lowercaseKeyword) {
@@ -241,6 +239,6 @@ func filterByKeyword(scenarios []*harness.Scenario, keyword string) []*harness.S
 			}
 		}
 	}
-	
+
 	return filtered
 }

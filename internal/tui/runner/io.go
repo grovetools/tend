@@ -61,14 +61,18 @@ func runTestInPaneCmd(node *DisplayNode) tea.Cmd {
 	case node.IsProject:
 		args = []string{"run"}
 	case node.IsEcosystem:
-		return func() tea.Msg { return testOutputMsg{nodeID: nodeID, output: "Cannot run ecosystem tests.", done: true} }
+		return func() tea.Msg {
+			return testOutputMsg{nodeID: nodeID, output: "Cannot run ecosystem tests.", done: true}
+		}
 	default:
 		return func() tea.Msg { return testOutputMsg{nodeID: nodeID, output: "Not supported.", done: true} }
 	}
 
 	executable, err := os.Executable()
 	if err != nil {
-		return func() tea.Msg { return testOutputMsg{nodeID: nodeID, output: fmt.Sprintf("Error: %v", err), done: true, err: err} }
+		return func() tea.Msg {
+			return testOutputMsg{nodeID: nodeID, output: fmt.Sprintf("Error: %v", err), done: true, err: err}
+		}
 	}
 
 	return func() tea.Msg {
@@ -120,7 +124,7 @@ func loadDataCmd(initialFocusPath string) tea.Cmd {
 		logger := logrus.New()
 		logPath := filepath.Join(os.TempDir(), "tend-tui.log")
 		// Silently ignore errors, but fallback to discarding logs to prevent UI corruption.
-		if logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+		if logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o666); err == nil {
 			logger.SetOutput(logFile)
 		} else {
 			logger.SetOutput(io.Discard)

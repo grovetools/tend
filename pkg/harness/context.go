@@ -191,9 +191,9 @@ func (c *Context) Command(program string, args ...string) *command.Command {
 			finalProgramPath = mockPath
 		}
 	}
-	
+
 	cmd := command.New(finalProgramPath, args...)
-	
+
 	// Construct and set the PATH environment variable
 	if binDir != "" {
 		currentPath := os.Getenv("PATH")
@@ -205,7 +205,7 @@ func (c *Context) Command(program string, args ...string) *command.Command {
 			c.ui.CommandOutput(fmt.Sprintf("PATH for '%s'", program), constructedPath, "")
 		}
 	}
-	
+
 	// Inject mock override environment variables
 	for commandName, mockPath := range c.mockOverrides {
 		envVarName := getOverrideEnvVarName(commandName)
@@ -256,7 +256,8 @@ func (c *Context) Command(program string, args ...string) *command.Command {
 // the binary path from grove.yml (stored in c.GroveBinary).
 //
 // Example:
-//   cmd := ctx.Bin("plan", "init", "my-plan")  // instead of ctx.Command(flowBinary, "plan", "init", "my-plan")
+//
+//	cmd := ctx.Bin("plan", "init", "my-plan")  // instead of ctx.Command(flowBinary, "plan", "init", "my-plan")
 func (c *Context) Bin(args ...string) *command.Command {
 	// If GroveBinary is not a path (just "grove" or similar), try to resolve it
 	if c.GroveBinary == "" || !filepath.IsAbs(c.GroveBinary) {
@@ -420,7 +421,7 @@ func (c *Context) StartTUI(binaryPath string, args []string, opts ...tui.StartOp
 	// Start recording if configured
 	if c.recordTUIDir != "" {
 		// Ensure the recording directory exists
-		if err := os.MkdirAll(c.recordTUIDir, 0755); err != nil {
+		if err := os.MkdirAll(c.recordTUIDir, 0o755); err != nil {
 			return nil, fmt.Errorf("failed to create TUI recording directory: %w", err)
 		}
 

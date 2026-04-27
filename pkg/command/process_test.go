@@ -80,7 +80,7 @@ func TestProcessKill(t *testing.T) {
 func TestProcessMultipleBackgroundCommands(t *testing.T) {
 	// Test running multiple commands in the background
 	processes := make([]*Process, 3)
-	
+
 	for i := 0; i < 3; i++ {
 		cmd := New("echo", fmt.Sprintf("process %d", i))
 		process, err := cmd.Start()

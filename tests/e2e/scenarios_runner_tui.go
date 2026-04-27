@@ -43,13 +43,13 @@ func setupMockFilesystem(ctx *harness.Context) error {
 
 	// Create the grove config directory structure
 	groveConfigDir := filepath.Join(ctx.ConfigDir(), "grove")
-	if err := os.MkdirAll(groveConfigDir, 0755); err != nil {
+	if err := os.MkdirAll(groveConfigDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create grove config dir: %w", err)
 	}
 
 	// Create a "code" directory in the sandboxed root to hold our test projects
 	codeDir := filepath.Join(ctx.RootDir, "code")
-	if err := os.MkdirAll(codeDir, 0755); err != nil {
+	if err := os.MkdirAll(codeDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create code dir: %w", err)
 	}
 
@@ -67,7 +67,7 @@ func setupMockFilesystem(ctx *harness.Context) error {
 	// --- Project A (Standalone) ---
 	projectADir := filepath.Join(codeDir, "project-a")
 	projectAE2EDir := filepath.Join(projectADir, "tests", "e2e")
-	if err := os.MkdirAll(projectAE2EDir, 0755); err != nil {
+	if err := os.MkdirAll(projectAE2EDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create project-a e2e dir: %w", err)
 	}
 	if err := fs.WriteString(filepath.Join(projectADir, "grove.yml"), "name: project-a\ntype: go\n"); err != nil {
@@ -103,7 +103,7 @@ func ScenarioForA() *harness.Scenario {
 	projectBDir := filepath.Join(codeDir, "project-b")
 	subProjectCDir := filepath.Join(projectBDir, "sub-project-c")
 	subProjectCE2EDir := filepath.Join(subProjectCDir, "tests", "e2e")
-	if err := os.MkdirAll(subProjectCE2EDir, 0755); err != nil {
+	if err := os.MkdirAll(subProjectCE2EDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create sub-project-c e2e dir: %w", err)
 	}
 

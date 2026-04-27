@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
-	
+
 	"github.com/grovetools/tend/pkg/command"
 	"github.com/grovetools/tend/pkg/wait"
 )
@@ -12,28 +12,27 @@ import (
 // ServiceRunning verifies a Grove service is running
 func ServiceRunning(groveBinary, workDir, serviceName string) error {
 	grove := command.NewGrove(groveBinary).InDir(workDir)
-	
+
 	// First wait for the service to appear in status
 	err := wait.ForWithMessage(func() (bool, string, error) {
 		output, err := grove.Output("status")
 		if err != nil {
 			return false, "grove status failed", err
 		}
-		
+
 		if strings.Contains(output, serviceName) {
 			return true, fmt.Sprintf("service %s found in status", serviceName), nil
 		}
-		
+
 		return false, fmt.Sprintf("service %s not in status output", serviceName), nil
 	}, wait.Options{
 		Timeout:      30 * time.Second,
 		PollInterval: 1 * time.Second,
 	})
-	
 	if err != nil {
 		return fmt.Errorf("service %s not running: %w", serviceName, err)
 	}
-	
+
 	return nil
 }
 
@@ -44,13 +43,13 @@ func ContainersRunning(containerNames ...string) error {
 		if err := wait.ForContainer(name, 30*time.Second); err != nil {
 			return fmt.Errorf("container %s not found: %w", name, err)
 		}
-		
+
 		// Wait for it to be running
 		if err := wait.ForContainerStatus(name, "running", 30*time.Second); err != nil {
 			return fmt.Errorf("container %s not running: %w", name, err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -77,12 +76,12 @@ func HTTPEndpoints(endpoints map[string]int) error {
 // NoErrors verifies no errors in logs
 func NoErrors(containerName string, errorPatterns []string) error {
 	docker := command.NewDocker()
-	
+
 	logs, err := docker.Logs(containerName, 100)
 	if err != nil {
 		return fmt.Errorf("getting logs: %w", err)
 	}
-	
+
 	for _, pattern := range errorPatterns {
 		if strings.Contains(logs, pattern) {
 			// Extract context around the error
@@ -97,13 +96,13 @@ func NoErrors(containerName string, errorPatterns []string) error {
 					if end > len(lines) {
 						end = len(lines)
 					}
-					
+
 					context := strings.Join(lines[start:end], "\n")
 					return fmt.Errorf("found error pattern '%s' in logs:\n%s", pattern, context)
 				}
 			}
 		}
 	}
-	
+
 	return nil
 }

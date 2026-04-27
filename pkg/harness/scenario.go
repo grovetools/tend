@@ -10,16 +10,17 @@ import "runtime"
 // location (assuming steps use harness.NewStep).
 //
 // Example:
-//   scenario := harness.NewScenario(
-//       "my-test",
-//       "Tests something important",
-//       []string{"integration"},
-//       []harness.Step{
-//           harness.NewStep("First step", func(ctx *harness.Context) error {
-//               // ...
-//           }),
-//       },
-//   )
+//
+//	scenario := harness.NewScenario(
+//	    "my-test",
+//	    "Tests something important",
+//	    []string{"integration"},
+//	    []harness.Step{
+//	        harness.NewStep("First step", func(ctx *harness.Context) error {
+//	            // ...
+//	        }),
+//	    },
+//	)
 //
 // Source location capture is automatic via runtime.Caller and is used by:
 // - Debug mode editor navigation (--debug flag)
