@@ -14,6 +14,7 @@ import (
 	grovelogging "github.com/grovetools/core/logging"
 	"github.com/grovetools/core/pkg/tmux"
 	"github.com/grovetools/core/tui/theme"
+
 	"github.com/grovetools/tend/pkg/command"
 	"github.com/grovetools/tend/pkg/fs"
 	"github.com/grovetools/tend/pkg/project"
@@ -792,7 +793,7 @@ func setupTmuxPane(client *tmux.Client, ui *UI, paneType string, splitHorizontal
 			return "", fmt.Errorf("failed to split tmux window for %s pane: %w", paneType, err)
 		}
 		paneID = newPaneID
-		_ = os.WriteFile(paneIDFile, []byte(paneID), 0o644)
+		_ = os.WriteFile(paneIDFile, []byte(paneID), 0o644) //nolint:gosec // pane ID cache file
 	}
 
 	// Send the command to the pane
@@ -806,7 +807,7 @@ func setupTmuxPane(client *tmux.Client, ui *UI, paneType string, splitHorizontal
 				return "", fmt.Errorf("failed to split tmux window for %s pane: %w", paneType, createErr)
 			}
 			paneID = newPaneID
-			_ = os.WriteFile(paneIDFile, []byte(paneID), 0o644)
+			_ = os.WriteFile(paneIDFile, []byte(paneID), 0o644) //nolint:gosec // pane ID cache file
 
 			// Retry sending keys to the new pane
 			if retryErr := client.SendKeys(context.Background(), paneID, commandStr, "C-m"); retryErr != nil {

@@ -9,6 +9,7 @@ import (
 	grovelogging "github.com/grovetools/core/logging"
 
 	"github.com/grovetools/core/tui/theme"
+
 	"github.com/grovetools/tend/pkg/harness"
 )
 

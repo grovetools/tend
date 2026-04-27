@@ -4,9 +4,10 @@ import (
 	"context"
 
 	"github.com/grovetools/core/cli"
+	"github.com/spf13/cobra"
+
 	"github.com/grovetools/tend/internal/cmd"
 	"github.com/grovetools/tend/pkg/harness"
-	"github.com/spf13/cobra"
 )
 
 // New creates the root cobra command for a tend application, configured with the provided scenarios.

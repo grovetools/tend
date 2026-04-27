@@ -14,8 +14,9 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/grovetools/core/pkg/tmux"
-	"github.com/grovetools/tend/internal/tui/sessions"
 	"github.com/spf13/cobra"
+
+	"github.com/grovetools/tend/internal/tui/sessions"
 )
 
 var ulogSessions = grovelogging.NewUnifiedLogger("grove-tend.sessions")

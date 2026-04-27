@@ -9,9 +9,10 @@ import (
 	"strings"
 
 	"github.com/grovetools/core/util/delegation"
+	"gopkg.in/yaml.v3"
+
 	"github.com/grovetools/tend/pkg/fs"
 	"github.com/grovetools/tend/pkg/git"
-	"gopkg.in/yaml.v3"
 )
 
 // HomelabSpec implements the DemoSpec interface for the homelab demo.
@@ -1400,7 +1401,7 @@ func (g *homelabGenerator) updateJobStatusFile(filePath, status string) error {
 	statusRe := regexp.MustCompile(`(?m)^status:\s*.*$`)
 	newContent := statusRe.ReplaceAllString(string(content), "status: "+status)
 
-	return os.WriteFile(filePath, []byte(newContent), 0o644)
+	return os.WriteFile(filePath, []byte(newContent), 0o644) //nolint:gosec // spec output file
 }
 
 // Register the homelab spec with the registry on package initialization.

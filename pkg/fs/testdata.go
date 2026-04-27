@@ -46,7 +46,7 @@ func main() {
 }
 
 // CreateServiceFiles creates files for a test service
-func CreateServiceFiles(root string, serviceName string) error {
+func CreateServiceFiles(root, serviceName string) error {
 	serviceDir := filepath.Join(root, "services", serviceName)
 	if err := CreateDir(serviceDir); err != nil {
 		return err

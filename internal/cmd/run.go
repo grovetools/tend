@@ -18,6 +18,7 @@ import (
 	"golang.org/x/term"
 
 	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/grovetools/tend/internal/tui/prunner"
 	"github.com/grovetools/tend/pkg/fs"
 	"github.com/grovetools/tend/pkg/harness"
@@ -702,7 +703,7 @@ func runSingleScenario(ctx context.Context, h *harness.Harness, scenario *harnes
 	return result, err
 }
 
-func filterScenarios(scenarios []*harness.Scenario, names []string, tags []string) []*harness.Scenario {
+func filterScenarios(scenarios []*harness.Scenario, names, tags []string) []*harness.Scenario {
 	var filtered []*harness.Scenario
 
 	for _, scenario := range scenarios {

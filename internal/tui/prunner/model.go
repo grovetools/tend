@@ -6,6 +6,7 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/grovetools/tend/pkg/harness"
 )
 

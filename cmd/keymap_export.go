@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/grovetools/core/tui/keymap"
+
 	"github.com/grovetools/tend/internal/tui/runner"
 	"github.com/grovetools/tend/internal/tui/sessions"
 )

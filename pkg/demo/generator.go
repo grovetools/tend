@@ -9,8 +9,9 @@ import (
 
 	grovelogging "github.com/grovetools/core/logging"
 	"github.com/grovetools/core/pkg/paths"
-	"github.com/grovetools/tend/pkg/fs"
 	"gopkg.in/yaml.v3"
+
+	"github.com/grovetools/tend/pkg/fs"
 )
 
 var ulog = grovelogging.NewUnifiedLogger("grove-tend.demo")
@@ -264,7 +265,7 @@ func (g *Generator) copyUserOverride() error {
 	}
 
 	destPath := filepath.Join(g.rootDir, "config", "grove", "grove.override.yml")
-	return os.WriteFile(destPath, filteredData, 0o644)
+	return os.WriteFile(destPath, filteredData, 0o644) //nolint:gosec // config output file
 }
 
 // Helper methods for directory paths

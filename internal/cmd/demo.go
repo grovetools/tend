@@ -10,8 +10,9 @@ import (
 
 	grovelogging "github.com/grovetools/core/logging"
 	"github.com/grovetools/core/pkg/tmux"
-	"github.com/grovetools/tend/pkg/demo"
 	"github.com/spf13/cobra"
+
+	"github.com/grovetools/tend/pkg/demo"
 )
 
 var ulogDemo = grovelogging.NewUnifiedLogger("grove-tend.demo")

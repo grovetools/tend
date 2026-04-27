@@ -91,7 +91,7 @@ func (c *Command) RunContext(ctx context.Context) *Result {
 	start := time.Now()
 
 	// Create a new command with context
-	cmdCtx := exec.CommandContext(ctx, c.cmd.Path, c.cmd.Args[1:]...)
+	cmdCtx := exec.CommandContext(ctx, c.cmd.Path, c.cmd.Args[1:]...) //nolint:gosec // args from internal command builder
 	cmdCtx.Dir = c.cmd.Dir
 
 	// Setup environment

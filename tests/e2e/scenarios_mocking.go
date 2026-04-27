@@ -25,7 +25,7 @@ var GitWorkflowScenario = harness.NewScenario(
 				return fmt.Errorf("failed to create directory: %w", err)
 			}
 			testFile := filepath.Join(testDir, "test.txt")
-			return os.WriteFile(testFile, []byte("Hello from mock test!\n"), 0o644)
+			return os.WriteFile(testFile, []byte("Hello from mock test!\n"), 0o644) //nolint:gosec // test fixture
 		}),
 		harness.NewStep("Initialize git repository", func(ctx *harness.Context) error {
 			repoDir := ctx.GetString("repo_dir")
@@ -135,7 +135,7 @@ docker version | head -1
 echo "3. Checking Kubernetes..."
 kubectl version --client=true 2>/dev/null || echo "kubectl mock: ready"
 `
-			if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
+			if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil { //nolint:gosec // executable test script
 				return err
 			}
 			ctx.Set("script_path", scriptPath)

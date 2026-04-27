@@ -9,10 +9,11 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/grovetools/core/pkg/workspace"
-	"github.com/grovetools/tend/internal/tui/runner"
-	"github.com/grovetools/tend/pkg/recorder"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+
+	"github.com/grovetools/tend/internal/tui/runner"
+	"github.com/grovetools/tend/pkg/recorder"
 )
 
 // newTuiCmd creates the `tui` subcommand.

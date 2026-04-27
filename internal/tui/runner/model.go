@@ -10,6 +10,7 @@ import (
 	"github.com/grovetools/core/pkg/workspace"
 	"github.com/grovetools/core/tui/components/help"
 	"github.com/grovetools/core/tui/keymap"
+
 	"github.com/grovetools/tend/pkg/harness"
 )
 

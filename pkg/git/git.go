@@ -117,7 +117,7 @@ func Add(dir string, patterns ...string) error {
 }
 
 // Commit creates a commit with the given message
-func Commit(dir string, message string) error {
+func Commit(dir, message string) error {
 	g := New(dir)
 	return g.Commit(message)
 }
@@ -129,19 +129,19 @@ func CurrentBranch(dir string) (string, error) {
 }
 
 // CreateBranch creates a new branch
-func CreateBranch(dir string, name string) error {
+func CreateBranch(dir, name string) error {
 	g := New(dir)
 	return g.CreateBranch(name)
 }
 
 // Checkout switches to the specified branch
-func Checkout(dir string, ref string) error {
+func Checkout(dir, ref string) error {
 	g := New(dir)
 	return g.Checkout(ref)
 }
 
 // CreateWorktree creates a new git worktree
-func CreateWorktree(repoDir string, branch string, worktreeDir string) error {
+func CreateWorktree(repoDir, branch, worktreeDir string) error {
 	g := New(repoDir)
 	return g.CreateWorktree(worktreeDir, branch)
 }

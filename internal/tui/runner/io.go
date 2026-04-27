@@ -12,9 +12,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/grovetools/core/pkg/workspace"
 	"github.com/grovetools/core/tui/theme"
+	"github.com/sirupsen/logrus"
+
 	"github.com/grovetools/tend/internal/tui/scanner"
 	"github.com/grovetools/tend/pkg/harness"
-	"github.com/sirupsen/logrus"
 )
 
 type dataLoadedMsg struct {

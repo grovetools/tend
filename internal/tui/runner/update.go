@@ -16,8 +16,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/grovetools/core/pkg/workspace"
 	"github.com/grovetools/core/tui/keymap"
-	"github.com/grovetools/tend/pkg/harness/reporters"
 	"github.com/sirupsen/logrus"
+
+	"github.com/grovetools/tend/pkg/harness/reporters"
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {

@@ -68,7 +68,7 @@ func DoContext(ctx context.Context, fn func() error, opts Options) error {
 }
 
 // WithTimeout retries until timeout
-func WithTimeout(fn func() error, timeout time.Duration, interval time.Duration) error {
+func WithTimeout(fn func() error, timeout, interval time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 

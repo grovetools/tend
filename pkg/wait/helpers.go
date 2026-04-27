@@ -26,7 +26,7 @@ func ForFile(path string, timeout time.Duration) error {
 }
 
 // ForFileContent waits for a file to contain specific content
-func ForFileContent(path string, content string, timeout time.Duration) error {
+func ForFileContent(path, content string, timeout time.Duration) error {
 	opts := DefaultOptions()
 	opts.Timeout = timeout
 
@@ -108,7 +108,7 @@ func ForContainer(containerName string, timeout time.Duration) error {
 }
 
 // ForContainerStatus waits for a container to reach a specific status
-func ForContainerStatus(containerName string, expectedStatus string, timeout time.Duration) error {
+func ForContainerStatus(containerName, expectedStatus string, timeout time.Duration) error {
 	opts := DefaultOptions()
 	opts.Timeout = timeout
 

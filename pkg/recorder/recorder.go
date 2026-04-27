@@ -23,7 +23,7 @@ func New() *Recorder {
 
 // Run executes the command in a PTY and records the session.
 func (r *Recorder) Run(command []string) ([]Frame, error) {
-	cmd := exec.Command(command[0], command[1:]...)
+	cmd := exec.Command(command[0], command[1:]...) //nolint:gosec // command from caller
 
 	ptmx, err := pty.Start(cmd)
 	if err != nil {

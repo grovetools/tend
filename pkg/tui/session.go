@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/grovetools/core/pkg/tmux"
+
 	"github.com/grovetools/tend/pkg/assert"
 	"github.com/grovetools/tend/pkg/fs"
 	"github.com/grovetools/tend/pkg/wait"
@@ -73,7 +74,7 @@ func (s *Session) Type(keys ...string) error {
 			if err := s.WaitStable(); err != nil {
 				return err
 			}
-			if err := s.SendKeys(keys[1]); err != nil {
+			if err := s.SendKeys(keys[1]); err != nil { //nolint:gosec // len(keys)==2 checked above
 				return err
 			}
 			return s.WaitStable()
@@ -191,7 +192,7 @@ func (s *Session) WaitForText(text string, timeout time.Duration) error {
 // - stableDuration: How long the screen must be unchanged to be considered stable (e.g., 200*time.Millisecond)
 //
 // For most use cases, use WaitStable() instead, which provides sensible defaults.
-func (s *Session) WaitForUIStable(timeout time.Duration, pollInterval time.Duration, stableDuration time.Duration) error {
+func (s *Session) WaitForUIStable(timeout, pollInterval, stableDuration time.Duration) error {
 	var lastContent string
 	var stableSince time.Time
 	var initialized bool
@@ -540,7 +541,7 @@ func (s *Session) AssertFileExists(relPath string) error {
 }
 
 // AssertFileContains asserts that a file within the scenario's temporary directory contains specific content.
-func (s *Session) AssertFileContains(relPath string, content string) error {
+func (s *Session) AssertFileContains(relPath, content string) error {
 	if s.rootDir == "" {
 		return fmt.Errorf("session is not aware of test root directory")
 	}
@@ -770,7 +771,7 @@ func (s *Session) ClearEvents() error {
 // loop for the given panel. This simulates a CSI-u key event from the host
 // terminal. keycode is a Unicode codepoint, mods is the kitty modifier
 // bitmask (shift=1, alt=2, ctrl=4, super=8).
-func (s *Session) SendKittyKey(panelID string, keycode int, mods int) error {
+func (s *Session) SendKittyKey(panelID string, keycode, mods int) error {
 	return s.postDebug("/debug/kitty-keys", map[string]interface{}{
 		"panel_id": panelID,
 		"keycode":  keycode,

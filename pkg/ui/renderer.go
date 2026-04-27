@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/grovetools/core/tui/theme"
+
 	"github.com/grovetools/tend/pkg/harness"
 )
 

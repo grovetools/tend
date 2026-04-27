@@ -68,7 +68,7 @@ func Run(ctx context.Context, projects []*ProjectState, numWorkers int) <-chan E
 
 				// Execute `make <target>` for the project
 				makeArgs := fmt.Sprintf("ARGS=--json %s", jsonPath)
-				cmd := exec.CommandContext(ctx, "make", job.project.makeTarget)
+				cmd := exec.CommandContext(ctx, "make", job.project.makeTarget) //nolint:gosec // target from internal config
 				cmd.Dir = job.project.projectPath
 				cmd.Env = append(os.Environ(), makeArgs)
 

@@ -37,7 +37,7 @@ export PATH=%s:$PATH
 exec /bin/bash "$@"
 `, mockBinDir)
 
-		if err := os.WriteFile(wrapperPath, []byte(wrapperContent), 0o755); err != nil {
+		if err := os.WriteFile(wrapperPath, []byte(wrapperContent), 0o755); err != nil { //nolint:gosec // executable wrapper script
 			return fmt.Errorf("failed to create shell wrapper: %w", err)
 		}
 

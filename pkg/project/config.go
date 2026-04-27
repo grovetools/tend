@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/grovetools/core/config"
+
 	"github.com/grovetools/tend/pkg/command"
 )
 

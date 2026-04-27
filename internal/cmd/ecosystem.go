@@ -15,11 +15,12 @@ import (
 	grovelogging "github.com/grovetools/core/logging"
 	"github.com/grovetools/core/tui/components/table"
 	"github.com/grovetools/core/tui/theme"
+	"github.com/spf13/cobra"
+
 	"github.com/grovetools/tend/internal/tui/e_runner"
 	"github.com/grovetools/tend/pkg/command"
 	"github.com/grovetools/tend/pkg/harness/reporters"
 	"github.com/grovetools/tend/pkg/ui"
-	"github.com/spf13/cobra"
 )
 
 var ulog = grovelogging.NewUnifiedLogger("grove-tend.cmd.ecosystem")

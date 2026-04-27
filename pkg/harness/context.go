@@ -12,6 +12,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	corecommand "github.com/grovetools/core/command"
 	"github.com/grovetools/core/pkg/tmux"
+
 	"github.com/grovetools/tend/pkg/command"
 	"github.com/grovetools/tend/pkg/project"
 	"github.com/grovetools/tend/pkg/teatest"

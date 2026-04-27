@@ -19,11 +19,11 @@ func WriteFile(path string, content []byte) error {
 		return fmt.Errorf("creating parent directory: %w", err)
 	}
 
-	return os.WriteFile(path, content, 0o644)
+	return os.WriteFile(path, content, 0o644) //nolint:gosec // test fixture files need 0644
 }
 
 // WriteString writes a string to a file
-func WriteString(path string, content string) error {
+func WriteString(path, content string) error {
 	return WriteFile(path, []byte(content))
 }
 

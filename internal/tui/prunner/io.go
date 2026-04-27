@@ -5,6 +5,7 @@ import (
 	"runtime"
 
 	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/grovetools/tend/pkg/harness"
 )
 

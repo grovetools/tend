@@ -5,9 +5,10 @@ import (
 	"os"
 
 	"github.com/grovetools/core/cli"
+	"github.com/spf13/cobra"
+
 	"github.com/grovetools/tend/pkg/docs"
 	"github.com/grovetools/tend/pkg/harness"
-	"github.com/spf13/cobra"
 )
 
 var (

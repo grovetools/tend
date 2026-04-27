@@ -52,7 +52,7 @@ func Box(title, content string) string {
 }
 
 // ProgressBar renders a progress bar
-func ProgressBar(current, total int, width int) string {
+func ProgressBar(current, total, width int) string {
 	if width <= 0 {
 		width = 40
 	}
