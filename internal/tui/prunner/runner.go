@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"runtime"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/grovetools/tend/pkg/harness"
@@ -59,8 +60,13 @@ func Run(ctx context.Context, scenarios []*harness.Scenario, projectRoot string,
 					continue
 				}
 
-				// Execute tend run for a single scenario
+				// Execute tend run for a single scenario.
+				// Send SIGTERM (not SIGKILL) on cancel so the child can run cleanup.
 				cmd := exec.CommandContext(ctx, executable, "run", job.scenario.Name, "--json", jsonPath)
+				cmd.Cancel = func() error {
+					return cmd.Process.Signal(syscall.SIGTERM)
+				}
+				cmd.WaitDelay = 5 * time.Second
 				cmd.Dir = projectRoot
 				cmd.Env = append(os.Environ(), "TEND_IS_CHILD_PROCESS=true")
 
