@@ -170,6 +170,25 @@ func (c *Context) RuntimeDir() string {
 	return c.runtimeDir
 }
 
+// SandboxEnv returns the sandbox XDG environment variables as a slice suitable
+// for passing to command.New(...).Env(ctx.SandboxEnv()...). Use this when
+// ctx.Command() isn't available (e.g. helper functions without Context access)
+// or when you need to use command.New() directly with sandbox isolation.
+//
+// Without these vars, commands inherit the host's XDG paths and can spawn
+// groved daemons that write PID/socket files to the host's state directory,
+// escaping the test sandbox.
+func (c *Context) SandboxEnv() []string {
+	return []string{
+		fmt.Sprintf("HOME=%s", c.homeDir),
+		fmt.Sprintf("XDG_CONFIG_HOME=%s", c.configDir),
+		fmt.Sprintf("XDG_DATA_HOME=%s", c.dataDir),
+		fmt.Sprintf("XDG_STATE_HOME=%s", c.stateDir),
+		fmt.Sprintf("XDG_CACHE_HOME=%s", c.cacheDir),
+		fmt.Sprintf("XDG_RUNTIME_DIR=%s", c.runtimeDir),
+	}
+}
+
 // CommandExecutor creates a new TestExecutor configured with the current context.
 // This is the preferred way to get a command executor within a test step, as it
 // encapsulates all necessary test environment setup.
