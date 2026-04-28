@@ -60,7 +60,7 @@ func Run(ctx context.Context, scenarios []*harness.Scenario, projectRoot string,
 				}
 
 				// Execute tend run for a single scenario
-				cmd := exec.CommandContext(ctx, executable, "run", job.scenario.Name, "--json", jsonPath, "--no-cleanup")
+				cmd := exec.CommandContext(ctx, executable, "run", job.scenario.Name, "--json", jsonPath)
 				cmd.Dir = projectRoot
 				cmd.Env = append(os.Environ(), "TEND_IS_CHILD_PROCESS=true")
 

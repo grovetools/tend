@@ -526,11 +526,18 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 	var totalSuccess int
 	var err error
 
+	// Clean up orphaned tmux servers from previous (possibly interrupted) runs
+	// before starting new parallel tests to avoid PTY exhaustion
+	if parallel {
+		if cleanupErr := cleanupOrphanedTmuxServers(ctx); cleanupErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to cleanup orphaned tmux servers: %v\n", cleanupErr)
+		}
+	}
+
 	if useTUI {
 		results, scenarioStates, err = runScenariosParallel(ctx, h, selectedScenarios, renderer, rootDir)
 
-		// Clean up orphaned tmux servers from parallel test runs
-		// Parallel tests use --no-cleanup to avoid interference, so we clean up here
+		// Safety net: clean up any orphaned tmux servers from interrupted or panicked runs
 		if err := cleanupOrphanedTmuxServers(ctx); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to cleanup orphaned tmux servers: %v\n", err)
 		}
@@ -948,7 +955,7 @@ func reportTestResultsToDaemon(ctx context.Context, results []*harness.Result) {
 }
 
 // cleanupOrphanedTmuxServers kills all tend-test tmux servers and removes their socket files.
-// This is called after parallel test runs to clean up servers left by --no-cleanup.
+// Child runs now self-cleanup; this is a safety net for interrupted suites or panics.
 func cleanupOrphanedTmuxServers(ctx context.Context) error {
 	// Get the tmux socket directory. Respect TMUX_TMPDIR/TMPDIR — the tmux client
 	// uses the same precedence and on macOS the system TMPDIR is not /tmp.
