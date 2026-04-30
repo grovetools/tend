@@ -21,21 +21,29 @@ func TuimuxPlaywrightTestScenario() *harness.Scenario {
 		[]string{"tuimux", "playwright", "debug", "slow"},
 		[]harness.Step{
 			harness.NewStep("Start tuimux daemon + detached session", func(ctx *harness.Context) error {
-				tuimuxBin, err := exec.LookPath("tuimux")
-				if err != nil {
-					return fmt.Errorf("tuimux binary not found in PATH: %w", err)
+				tuimuxBin := os.Getenv("TUIMUX_BIN")
+				if tuimuxBin == "" {
+					home, _ := os.UserHomeDir()
+					candidate := filepath.Join(home, "Code/grovetools/.grove-worktrees/mux-engine-extraction/tuimux/bin/tuimux")
+					if _, serr := os.Stat(candidate); serr == nil {
+						tuimuxBin = candidate
+					}
+				}
+				if tuimuxBin == "" {
+					var err error
+					tuimuxBin, err = exec.LookPath("tuimux")
+					if err != nil {
+						return fmt.Errorf("tuimux not found (set TUIMUX_BIN): %w", err)
+					}
 				}
 
-				socketDir := ctx.NewDir("tuimux-socket")
-				if err := os.MkdirAll(socketDir, 0o755); err != nil {
-					return err
-				}
-				socketPath := filepath.Join(socketDir, "test.sock")
-				ctx.Set("socket_path", socketPath)
 				ctx.Set("tuimux_bin", tuimuxBin)
 
-				// Start detached session (starts daemon + creates session + runs headless)
-				cmd := exec.Command(tuimuxBin, "new", "-s", "test", "--socket", socketPath, "-d", "--wait")
+				// Kill any existing test session
+				_ = exec.Command(tuimuxBin, "kill-session", "-t", "tend-pw-test").Run()
+
+				// Start detached session using default socket (daemon auto-starts)
+				cmd := exec.Command(tuimuxBin, "new", "-s", "tend-pw-test", "-d")
 				cmd.Stdout = os.Stderr
 				cmd.Stderr = os.Stderr
 				if err := cmd.Start(); err != nil {
@@ -43,26 +51,15 @@ func TuimuxPlaywrightTestScenario() *harness.Scenario {
 				}
 				ctx.Set("tuimux_pid", cmd.Process.Pid)
 
-				// Wait for the command to complete (--wait blocks until shell is idle)
-				errCh := make(chan error, 1)
-				go func() { errCh <- cmd.Wait() }()
-
-				select {
-				case err := <-errCh:
-					if err != nil {
-						return fmt.Errorf("tuimux new failed: %w", err)
-					}
-				case <-time.After(30 * time.Second):
-					_ = cmd.Process.Kill()
-					return fmt.Errorf("tuimux new timed out")
-				}
-
+				// Wait for the session to be ready (hub connection + shell spawn)
+				time.Sleep(3 * time.Second)
 				return nil
 			}),
 
 			harness.NewStep("Connect tend session and assert initial state", func(ctx *harness.Context) error {
-				socketPath := ctx.GetString("socket_path")
-				session := tui.NewTuimuxSession(socketPath, "test")
+				home, _ := os.UserHomeDir()
+				socketPath := filepath.Join(home, ".local", "state", "tuimux", "daemon.sock")
+				session := tui.NewTuimuxSession(socketPath, "tend-pw-test")
 				ctx.Set("session", session)
 
 				if err := session.WaitForTuimuxReady(10 * time.Second); err != nil {
@@ -117,19 +114,8 @@ func TuimuxPlaywrightTestScenario() *harness.Scenario {
 			harness.NewStep("Send keys to panel and wait for text", func(ctx *harness.Context) error {
 				session := ctx.Get("session").(*tui.Session)
 
-				// Find a panel to send keys to
-				snap, err := session.GetDebugState()
-				if err != nil {
-					return err
-				}
-
-				var targetID string
-				for id := range snap.Panels {
-					targetID = id
-					break
-				}
-
-				panel := session.Panel(targetID)
+				// Target shell-0 which has a running shell (pane-1 may still be spawning)
+				panel := session.Panel("shell-0")
 				if err := panel.SendKeys("echo PLAYWRIGHT_TEST_OK\n"); err != nil {
 					return fmt.Errorf("send keys: %w", err)
 				}
@@ -185,8 +171,8 @@ func TuimuxPlaywrightTestScenario() *harness.Scenario {
 			}),
 
 			harness.NewStep("Cleanup", func(ctx *harness.Context) error {
-				socketPath := ctx.GetString("socket_path")
-				_ = os.Remove(socketPath)
+				tuimuxBin := ctx.GetString("tuimux_bin")
+				_ = exec.Command(tuimuxBin, "kill-session", "-t", "tend-pw-test").Run()
 				return nil
 			}),
 		},
