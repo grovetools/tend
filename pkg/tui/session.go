@@ -39,6 +39,49 @@ func NewSession(sessionName string, client *tmux.Client, rootDir string) *Sessio
 	}
 }
 
+// NewTuimuxSession creates a Session that talks to a tuimux daemon's debug
+// endpoints over its Unix socket. The socketPath is the tuimux daemon socket
+// and sessionName identifies the tuimux session to target.
+//
+// The returned Session's PanelLocator/RailLocator APIs work unchanged because
+// a custom HTTP transport rewrites /debug/* paths to /api/debug/*?session=name.
+func NewTuimuxSession(socketPath, sessionName string) *Session {
+	s := &Session{
+		sessionName:     sessionName,
+		debugSocketPath: socketPath,
+	}
+	s.debugClient = newTuimuxDebugClient(socketPath, sessionName)
+	return s
+}
+
+// WaitForTuimuxReady polls the debug endpoint until it returns a valid state.
+func (s *Session) WaitForTuimuxReady(timeout time.Duration) error {
+	return waitForDebugServer(s.debugClient, timeout)
+}
+
+// ExecuteTuimuxCommand sends a command to the tuimux daemon via the execute
+// endpoint. This allows tests to run commands like split-window, run-command,
+// etc. that are not covered by the PanelLocator API.
+func (s *Session) ExecuteTuimuxCommand(args []string) error {
+	if s.debugClient == nil {
+		return fmt.Errorf("debug client not configured")
+	}
+	body := map[string][]string{"args": args}
+	data, _ := json.Marshal(body)
+
+	url := fmt.Sprintf("http://unix/api/sessions/%s/execute", s.sessionName)
+	resp, err := s.debugClient.Post(url, "application/json", bytes.NewReader(data))
+	if err != nil {
+		return fmt.Errorf("execute command: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("execute command returned %d", resp.StatusCode)
+	}
+	return nil
+}
+
 // Type sends keys to the TUI and waits for the screen to stabilize.
 // This is the recommended method for most interactions, as it combines
 // SendKeys + WaitStable which is the pattern used in 90% of tests.

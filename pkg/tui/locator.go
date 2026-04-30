@@ -18,6 +18,16 @@ type DebugSnapshot struct {
 	HUD           string                    `json:"hud"`
 	Rail          []DebugRailItem           `json:"rail"`
 	Panels        map[string]DebugPanelInfo `json:"panels"`
+	Overlays      DebugOverlayState         `json:"overlays"`
+}
+
+// DebugOverlayState describes transient UI overlays (tree picker, help, prompt).
+type DebugOverlayState struct {
+	TreeActive   bool   `json:"tree_active"`
+	HelpActive   bool   `json:"help_active"`
+	PromptActive bool   `json:"prompt_active"`
+	PromptType   string `json:"prompt_type,omitempty"`
+	PromptBuffer string `json:"prompt_buffer,omitempty"`
 }
 
 // DebugRailItem mirrors the terminal's DebugRailItem.

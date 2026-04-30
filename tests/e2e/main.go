@@ -88,6 +88,9 @@ func main() {
 		SlowScenario3(),
 		SlowScenario4(),
 
+		// Tuimux Playwright Tests
+		TuimuxPlaywrightTestScenario(),
+
 		// Parallel Runner E2E Tests
 		ParallelRunAllPassingScenario(),
 		ParallelRunWithFailuresScenario(),
