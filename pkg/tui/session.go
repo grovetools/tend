@@ -827,6 +827,111 @@ func (s *Session) Panel(id string) *PanelLocator {
 	return &PanelLocator{session: s, panelID: id}
 }
 
+// PanelByType returns a PanelLocator for the first panel matching the given type.
+func (s *Session) PanelByType(panelType string) (*PanelLocator, error) {
+	snap, err := s.GetDebugState()
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range snap.Panels {
+		if p.Type == panelType {
+			return &PanelLocator{session: s, panelID: p.ID}, nil
+		}
+	}
+	return nil, fmt.Errorf("no panel with type %q found", panelType)
+}
+
+// PanelBySelector returns a PanelLocator for the first panel matching the selector.
+// Uses the tuimux query command for selector evaluation.
+func (s *Session) PanelBySelector(selector string) (*PanelLocator, error) {
+	snap, err := s.GetDebugState()
+	if err != nil {
+		return nil, err
+	}
+	matches := matchPanels(snap, selector)
+	if len(matches) == 0 {
+		return nil, fmt.Errorf("no panel matches selector %q", selector)
+	}
+	return &PanelLocator{session: s, panelID: matches[0].ID}, nil
+}
+
+// matchPanels evaluates a selector against a debug snapshot.
+func matchPanels(snap *DebugSnapshot, selector string) []DebugPanelInfo {
+	if !strings.Contains(selector, "[") {
+		if p, ok := snap.Panels[selector]; ok {
+			return []DebugPanelInfo{p}
+		}
+		return nil
+	}
+	conditions := parseSelector(selector)
+	var matches []DebugPanelInfo
+	for _, p := range snap.Panels {
+		if matchesAll(p, conditions) {
+			matches = append(matches, p)
+		}
+	}
+	return matches
+}
+
+type selectorCondition struct {
+	key   string
+	value string
+	bare  bool
+}
+
+func parseSelector(selector string) []selectorCondition {
+	var conditions []selectorCondition
+	s := selector
+	for {
+		start := strings.Index(s, "[")
+		if start < 0 {
+			break
+		}
+		end := strings.Index(s[start:], "]")
+		if end < 0 {
+			break
+		}
+		inner := s[start+1 : start+end]
+		s = s[start+end+1:]
+		if eq := strings.Index(inner, "="); eq >= 0 {
+			conditions = append(conditions, selectorCondition{key: inner[:eq], value: inner[eq+1:]})
+		} else {
+			conditions = append(conditions, selectorCondition{key: inner, bare: true})
+		}
+	}
+	return conditions
+}
+
+func matchesAll(p DebugPanelInfo, conditions []selectorCondition) bool {
+	for _, c := range conditions {
+		if !matchesOne(p, c) {
+			return false
+		}
+	}
+	return true
+}
+
+func matchesOne(p DebugPanelInfo, c selectorCondition) bool {
+	switch {
+	case c.key == "focused" && c.bare:
+		return p.IsFocused
+	case c.key == "type":
+		return p.Type == c.value
+	case strings.HasPrefix(c.key, "state."):
+		stateKey := c.key[len("state."):]
+		if p.State == nil {
+			return false
+		}
+		val, ok := p.State[stateKey]
+		if !ok {
+			return false
+		}
+		return fmt.Sprintf("%v", val) == c.value
+	default:
+		return false
+	}
+}
+
 // RailItem returns a RailLocator for the given rail item label.
 func (s *Session) RailItem(label string) *RailLocator {
 	return &RailLocator{session: s, label: label}

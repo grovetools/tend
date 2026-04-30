@@ -305,6 +305,18 @@ func (l *PanelLocator) ClearPTYWrites() error {
 	return nil
 }
 
+// Click sends a click event to the center of this panel's bounds.
+func (l *PanelLocator) Click() error {
+	x, y, w, h, err := l.Bounds()
+	if err != nil {
+		return fmt.Errorf("click: %w", err)
+	}
+	return l.session.postDebug("/debug/click", map[string]int{
+		"x": x + w/2,
+		"y": y + h/2,
+	})
+}
+
 // InjectOutputHex injects hex-encoded bytes into the panel's PTY output
 // parser (OSC scanners + terminal emulator). Used to simulate PTY output
 // like OSC 777 sequences without a real child process.
