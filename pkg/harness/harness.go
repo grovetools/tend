@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strconv"
@@ -51,6 +52,9 @@ type Context struct {
 	currentEditorFile string                 // The file currently open in the editor pane
 	recordTUIDir      string                 // Directory to save TUI session recordings
 	tmuxSocket        string                 // Socket name for isolated tmux server for test TUI sessions
+	tuimuxSocket      string                 // Socket path for isolated tuimux daemon
+	tuimuxDaemonProc  *os.Process            // Process handle for the isolated tuimux daemon
+	activeMuxType     mux.MuxType            // Which mux backend is active for this test run
 
 	// UI for displaying command output
 	ui *UI
@@ -222,10 +226,16 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 	// Create cleanup function that can be called from multiple places
 	cleanupFunc := func() {
 		ui.Cleanup()
-		// Clean up all TUI sessions if testCtx was initialized
 		if testCtx != nil {
-			// If using an isolated tmux server, kill the entire server
-			// This cleans up all sessions and the server in one operation
+			// Kill isolated tuimux daemon if running
+			if testCtx.tuimuxDaemonProc != nil {
+				ulogHarness.Debug("Killing tuimux daemon").Emit()
+				_ = testCtx.tuimuxDaemonProc.Signal(syscall.SIGTERM)
+				_, _ = testCtx.tuimuxDaemonProc.Wait()
+				testCtx.tuimuxDaemonProc = nil
+			}
+
+			// Clean up tmux server if using an isolated socket
 			if testCtx.tmuxSocket != "" {
 				ulogHarness.Debug("Attempting to kill tmux server").
 					Field("socket", testCtx.tmuxSocket).
@@ -320,6 +330,13 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 	if h.opts.Verbose || h.opts.VeryVerbose {
 		ui.Info("Grove binary", groveBinary)
 	}
+
+	// Detect which mux backend to use for test isolation
+	activeMuxType := mux.ActiveMux()
+	if envMux := os.Getenv(mux.EnvGroveMux); envMux == "tuimux" {
+		activeMuxType = mux.MuxTuimux
+	}
+
 	// Unix socket paths are limited to 104 chars on macOS (sun_path). tmux places
 	// sockets in $TMPDIR/tmux-<uid>/ which can already be ~50 chars on macOS, so
 	// the socket name itself must stay short. Use a short prefix of testID for log
@@ -329,6 +346,26 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 		shortPrefix = shortPrefix[:8]
 	}
 	socketName := fmt.Sprintf("tt-%s-%x", shortPrefix, time.Now().UnixNano()%0x100000000)
+
+	// Tuimux isolation: spawn an isolated daemon with a custom socket
+	var tuimuxSocketPath string
+	var tuimuxProc *os.Process
+	if activeMuxType == mux.MuxTuimux {
+		tuimuxSocketPath = filepath.Join(sandboxedRuntime, "tuimux-test.sock")
+		proc, err := spawnTuimuxDaemon(tuimuxSocketPath)
+		if err != nil {
+			result.Success = false
+			result.Error = fmt.Errorf("spawning tuimux daemon: %w", err)
+			result.EndTime = time.Now()
+			result.Duration = result.EndTime.Sub(result.StartTime)
+			return result, result.Error
+		}
+		tuimuxProc = proc
+		ulogHarness.Info("Tuimux daemon started").
+			Field("socket", tuimuxSocketPath).
+			Field("pid", proc.Pid).
+			Emit()
+	}
 
 	// Populate the map for real dependencies
 	realDepsMap := make(map[string]bool)
@@ -344,23 +381,26 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 	}
 
 	testCtx = &Context{
-		RootDir:       tempMgr.BaseDir(),
-		ProjectRoot:   h.opts.RootDir, // Pass project root from harness options
-		GroveBinary:   groveBinary,
-		TestID:        testID,
-		homeDir:       sandboxedHome,
-		configDir:     sandboxedConfig,
-		dataDir:       sandboxedData,
-		stateDir:      sandboxedState,
-		cacheDir:      sandboxedCache,
-		runtimeDir:    sandboxedRuntime,
-		dirs:          make(map[string]string),
-		values:        make(map[string]interface{}),
-		UseRealDeps:   realDepsMap,
-		mockOverrides: make(map[string]string),
-		recordTUIDir:  h.opts.RecordTUIDir,
-		tmuxSocket:    socketName,
-		ui:            ui,
+		RootDir:          tempMgr.BaseDir(),
+		ProjectRoot:      h.opts.RootDir, // Pass project root from harness options
+		GroveBinary:      groveBinary,
+		TestID:           testID,
+		homeDir:          sandboxedHome,
+		configDir:        sandboxedConfig,
+		dataDir:          sandboxedData,
+		stateDir:         sandboxedState,
+		cacheDir:         sandboxedCache,
+		runtimeDir:       sandboxedRuntime,
+		dirs:             make(map[string]string),
+		values:           make(map[string]interface{}),
+		UseRealDeps:      realDepsMap,
+		mockOverrides:    make(map[string]string),
+		recordTUIDir:     h.opts.RecordTUIDir,
+		tmuxSocket:       socketName,
+		tuimuxSocket:     tuimuxSocketPath,
+		tuimuxDaemonProc: tuimuxProc,
+		activeMuxType:    activeMuxType,
+		ui:               ui,
 	}
 
 	// Set the test ID in the UI for container filtering
@@ -889,6 +929,37 @@ func (h *Harness) setupDebugPanes(ctx *Context, ui *UI, scenario *Scenario) erro
 	}
 
 	return nil
+}
+
+// spawnTuimuxDaemon starts an isolated tuimux daemon on the given socket path
+// and waits up to 5s for it to become ready.
+func spawnTuimuxDaemon(socketPath string) (*os.Process, error) {
+	tuimuxBin, err := exec.LookPath("tuimux")
+	if err != nil {
+		return nil, fmt.Errorf("tuimux binary not found: %w", err)
+	}
+
+	cmd := exec.Command(tuimuxBin, "daemon", "--socket", socketPath)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("start tuimux daemon: %w", err)
+	}
+
+	// Poll the socket for readiness
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		time.Sleep(200 * time.Millisecond)
+		if mux.PingTuimuxSocket(socketPath) == nil {
+			return cmd.Process, nil
+		}
+	}
+
+	// Timed out — kill the process and fail
+	_ = cmd.Process.Signal(syscall.SIGTERM)
+	_, _ = cmd.Process.Wait()
+	return nil, fmt.Errorf("tuimux daemon did not become ready within 5s at %s", socketPath)
 }
 
 // killDaemonsInTree finds groved PID files anywhere under root and kills

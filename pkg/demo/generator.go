@@ -86,10 +86,10 @@ func (g *Generator) Generate() error {
 		return fmt.Errorf("creating global config: %w", err)
 	}
 
-	// Setup tmux if needed
+	// Setup mux session if needed
 	if content.TmuxNeeded {
-		if err := g.setupTmux(content); err != nil {
-			return fmt.Errorf("setting up tmux: %w", err)
+		if err := g.setupMux(content); err != nil {
+			return fmt.Errorf("setting up mux: %w", err)
 		}
 	}
 
@@ -288,12 +288,18 @@ func BuildEnvironment(demoDir, tmuxSocket string) map[string]string {
 	// Capture the real bin directory BEFORE GROVE_HOME would affect it
 	realBinDir := paths.BinDir()
 
-	return map[string]string{
+	env := map[string]string{
 		"GROVE_HOME":        demoDir,    // Isolates config/data/state/cache
 		"GROVE_BIN":         realBinDir, // Preserves binary delegation
 		"GROVE_DEMO":        "1",
 		"GROVE_TMUX_SOCKET": tmuxSocket,
 	}
+	// Include tuimux socket if a demo daemon is running
+	tuimuxSocket := filepath.Join(demoDir, "state", "tuimux-demo.sock")
+	if _, err := os.Stat(tuimuxSocket); err == nil {
+		env["GROVE_TUIMUX_SOCKET"] = tuimuxSocket
+	}
+	return env
 }
 
 // Helper functions for file operations

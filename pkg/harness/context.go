@@ -179,7 +179,7 @@ func (c *Context) RuntimeDir() string {
 // groved daemons that write PID/socket files to the host's state directory,
 // escaping the test sandbox.
 func (c *Context) SandboxEnv() []string {
-	return []string{
+	env := []string{
 		fmt.Sprintf("HOME=%s", c.homeDir),
 		fmt.Sprintf("XDG_CONFIG_HOME=%s", c.configDir),
 		fmt.Sprintf("XDG_DATA_HOME=%s", c.dataDir),
@@ -187,6 +187,13 @@ func (c *Context) SandboxEnv() []string {
 		fmt.Sprintf("XDG_CACHE_HOME=%s", c.cacheDir),
 		fmt.Sprintf("XDG_RUNTIME_DIR=%s", c.runtimeDir),
 	}
+	if c.tmuxSocket != "" {
+		env = append(env, fmt.Sprintf("GROVE_TMUX_SOCKET=%s", c.tmuxSocket))
+	}
+	if c.tuimuxSocket != "" {
+		env = append(env, fmt.Sprintf("GROVE_TUIMUX_SOCKET=%s", c.tuimuxSocket))
+	}
+	return env
 }
 
 // CommandExecutor creates a new TestExecutor configured with the current context.
@@ -232,15 +239,8 @@ func (c *Context) Command(program string, args ...string) *command.Command {
 		cmd.Env(fmt.Sprintf("%s=%s", envVarName, mockPath))
 	}
 
-	// Inject sandboxed home environment
-	cmd.Env(
-		fmt.Sprintf("HOME=%s", c.homeDir),
-		fmt.Sprintf("XDG_CONFIG_HOME=%s", c.configDir),
-		fmt.Sprintf("XDG_DATA_HOME=%s", c.dataDir),
-		fmt.Sprintf("XDG_STATE_HOME=%s", c.stateDir),
-		fmt.Sprintf("XDG_CACHE_HOME=%s", c.cacheDir),
-		fmt.Sprintf("XDG_RUNTIME_DIR=%s", c.runtimeDir),
-	)
+	// Inject sandboxed home and mux isolation environment
+	cmd.Env(c.SandboxEnv()...)
 
 	// Preserve or detect DOCKER_HOST to ensure Docker client can connect
 	// even when HOME is sandboxed (which would make socket paths too long)
@@ -338,25 +338,10 @@ func (c *Context) StartTUI(binaryPath string, args []string, opts ...tui.StartOp
 		}
 	}
 
-	// Inject sandboxed home environment variables (HOME, XDG_CONFIG_HOME, etc.)
-	// This ensures TUI processes use the test's isolated directories, similar to ctx.Command()
-	config.Env = append(config.Env,
-		fmt.Sprintf("HOME=%s", c.homeDir),
-		fmt.Sprintf("XDG_CONFIG_HOME=%s", c.configDir),
-		fmt.Sprintf("XDG_DATA_HOME=%s", c.dataDir),
-		fmt.Sprintf("XDG_STATE_HOME=%s", c.stateDir),
-		fmt.Sprintf("XDG_CACHE_HOME=%s", c.cacheDir),
-		fmt.Sprintf("XDG_RUNTIME_DIR=%s", c.runtimeDir),
-	)
-
-	// If using isolated tmux socket, pass it to spawned processes
-	// This ensures any tmux operations inside the TUI use the same isolated server
-	if c.tmuxSocket != "" {
-		config.Env = append(config.Env, fmt.Sprintf("GROVE_TMUX_SOCKET=%s", c.tmuxSocket))
-	}
+	// Inject sandboxed environment (HOME, XDG dirs, mux sockets)
+	config.Env = append(config.Env, c.SandboxEnv()...)
 
 	// Set default color env vars so TUIs render colors in test sessions
-	// These work with grove-core's tui.InitializeTUI() to enable colors
 	colorEnvSet := false
 	for _, env := range config.Env {
 		if strings.HasPrefix(env, "CLICOLOR_FORCE=") {
@@ -372,25 +357,10 @@ func (c *Context) StartTUI(binaryPath string, args []string, opts ...tui.StartOp
 		)
 	}
 
-	// Create tmux client - use isolated socket if configured, otherwise default
-	var tmuxClient *tmux.Client
-	var err error
-
-	if c.tmuxSocket != "" {
-		tmuxClient, err = tmux.NewClientWithSocket(c.tmuxSocket)
-	} else {
-		tmuxClient, err = tmux.NewClient()
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to create tmux client for TUI session: %w", err)
-	}
-
 	// Generate a unique session name for test isolation
 	sessionName := fmt.Sprintf("tend-tui-%s-%d", filepath.Base(binaryPath), time.Now().UnixNano())
 
 	// Parse env vars from the config into a map
-	// This separates environment variable setup from command execution,
-	// avoiding long command strings that can get truncated with fish shell
 	envMap := make(map[string]string)
 	for _, envVar := range config.Env {
 		parts := strings.SplitN(envVar, "=", 2)
@@ -399,7 +369,7 @@ func (c *Context) StartTUI(binaryPath string, args []string, opts ...tui.StartOp
 		}
 	}
 
-	// Build the command string *without* environment variables
+	// Build the command string
 	var cmdBuilder strings.Builder
 	cmdBuilder.WriteString(binaryPath)
 	if len(args) > 0 {
@@ -412,10 +382,23 @@ func (c *Context) StartTUI(binaryPath string, args []string, opts ...tui.StartOp
 		workingDir = config.Cwd
 	}
 
+	// Launch via tmux (tuimux sessions are handled through env vars — child
+	// processes detect the isolated daemon via GROVE_TUIMUX_SOCKET)
+	var tmuxClient *tmux.Client
+	var err error
+	if c.tmuxSocket != "" {
+		tmuxClient, err = tmux.NewClientWithSocket(c.tmuxSocket)
+	} else {
+		tmuxClient, err = tmux.NewClient()
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to create tmux client for TUI session: %w", err)
+	}
+
 	launchOpts := tmux.LaunchOptions{
 		SessionName:      sessionName,
 		WorkingDirectory: workingDir,
-		WindowIndex:      -1, // Don't reorder window position
+		WindowIndex:      -1,
 		Panes: []tmux.PaneOptions{
 			{
 				Command: cmdBuilder.String(),
@@ -424,31 +407,25 @@ func (c *Context) StartTUI(binaryPath string, args []string, opts ...tui.StartOp
 		},
 	}
 
-	// Launch the session in the background
 	if err := tmuxClient.Launch(context.Background(), launchOpts); err != nil {
 		return nil, fmt.Errorf("failed to launch TUI in tmux session '%s': %w", sessionName, err)
 	}
 
-	// Register for cleanup - track all sessions created
-	c.Set("active_tui_session_name", sessionName) // Keep for backward compat
+	// Register for cleanup
+	c.Set("active_tui_session_name", sessionName)
 	sessions := c.GetStringSlice("tui_sessions")
 	sessions = append(sessions, sessionName)
 	c.Set("tui_sessions", sessions)
 
-	// Create the session handle
 	session := tui.NewSession(sessionName, tmuxClient, c.RootDir)
 
 	// Start recording if configured
 	if c.recordTUIDir != "" {
-		// Ensure the recording directory exists
 		if err := os.MkdirAll(c.recordTUIDir, 0o755); err != nil {
 			return nil, fmt.Errorf("failed to create TUI recording directory: %w", err)
 		}
-
-		// Generate a unique recording path
 		recordingPath := filepath.Join(c.recordTUIDir, fmt.Sprintf("%s-%d", sessionName, time.Now().Unix()))
 		if err := session.StartRecording(recordingPath); err != nil {
-			// Non-fatal: log but continue
 			if c.ui != nil {
 				c.ui.Error("Failed to start TUI recording", err)
 			}

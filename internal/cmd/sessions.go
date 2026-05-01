@@ -90,9 +90,10 @@ func newSessionsKillCmd() *cobra.Command {
 		Short: "Kill one or more tend sessions",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			all, _ := cmd.Flags().GetBool("all")
-			client, err := tmux.NewClient()
+
+			engine, err := mux.DetectMuxEngine(cmd.Context())
 			if err != nil {
-				return err
+				return fmt.Errorf("detecting mux engine: %w", err)
 			}
 
 			var sessionsToKill []string
@@ -113,7 +114,7 @@ func newSessionsKillCmd() *cobra.Command {
 			}
 
 			for _, sessionName := range sessionsToKill {
-				if err := client.KillSession(cmd.Context(), sessionName); err != nil {
+				if err := engine.KillSession(cmd.Context(), sessionName); err != nil {
 					fmt.Fprintf(os.Stderr, "Failed to kill session %s: %v\n", sessionName, err)
 				} else {
 					fmt.Printf("Killed session: %s\n", sessionName)
@@ -145,16 +146,16 @@ func newSessionsCaptureCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			target := args[0]
-			client, err := tmux.NewClient()
+			engine, err := mux.DetectMuxEngine(cmd.Context())
 			if err != nil {
-				return err
+				return fmt.Errorf("detecting mux engine: %w", err)
 			}
 
 			// If --wait-for is specified, poll until text appears or timeout
 			if waitFor != "" {
 				deadline := time.Now().Add(timeout)
 				for time.Now().Before(deadline) {
-					content, err := client.CapturePane(cmd.Context(), target)
+					content, err := engine.CapturePane(cmd.Context(), target)
 					if err != nil {
 						return err
 					}
@@ -165,7 +166,6 @@ func newSessionsCaptureCmd() *cobra.Command {
 					}
 
 					if strings.Contains(checkContent, waitFor) {
-						// Found it! Print and return
 						if withAnsi {
 							fmt.Print(content)
 						} else {
@@ -180,7 +180,7 @@ func newSessionsCaptureCmd() *cobra.Command {
 			}
 
 			// Normal capture without waiting
-			content, err := client.CapturePane(cmd.Context(), target)
+			content, err := engine.CapturePane(cmd.Context(), target)
 			if err != nil {
 				return err
 			}
@@ -221,11 +221,11 @@ func newSessionsSendKeysCmd() *cobra.Command {
 				return fmt.Errorf("no keys provided to send")
 			}
 
-			client, err := tmux.NewClient()
+			engine, err := mux.DetectMuxEngine(cmd.Context())
 			if err != nil {
-				return err
+				return fmt.Errorf("detecting mux engine: %w", err)
 			}
-			return client.SendKeys(cmd.Context(), target, keys...)
+			return engine.SendKeys(cmd.Context(), target, keys...)
 		},
 	}
 }
@@ -238,25 +238,36 @@ func newSessionsAttachCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			sessionName := args[0]
+			activeMux := mux.ActiveMux()
+
+			if activeMux == mux.MuxTuimux {
+				tuimuxPath, err := exec.LookPath("tuimux")
+				if err != nil {
+					return fmt.Errorf("tuimux executable not found in PATH")
+				}
+				tuimuxArgs := []string{"tuimux", "attach", "-s", sessionName}
+				if err := syscall.Exec(tuimuxPath, tuimuxArgs, os.Environ()); err != nil {
+					return fmt.Errorf("failed to exec tuimux: %w", err)
+				}
+				return nil
+			}
+
 			tmuxPath, err := exec.LookPath("tmux")
 			if err != nil {
 				return fmt.Errorf("tmux executable not found in PATH")
 			}
 
 			var tmuxArgs []string
-			if mux.ActiveMux() != mux.MuxNone {
-				// Inside tmux, switch client
+			if activeMux != mux.MuxNone {
 				tmuxArgs = []string{"tmux", "switch-client", "-t", sessionName}
 			} else {
-				// Outside tmux, attach
 				tmuxArgs = []string{"tmux", "attach-session", "-t", sessionName}
 			}
 
-			// Replace the current process with tmux
 			if err := syscall.Exec(tmuxPath, tmuxArgs, os.Environ()); err != nil {
 				return fmt.Errorf("failed to exec tmux: %w", err)
 			}
-			return nil // This line is never reached
+			return nil
 		},
 	}
 }
