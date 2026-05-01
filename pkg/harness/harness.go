@@ -12,6 +12,7 @@ import (
 	"time"
 
 	grovelogging "github.com/grovetools/core/logging"
+	"github.com/grovetools/core/pkg/mux"
 	"github.com/grovetools/core/pkg/tmux"
 	"github.com/grovetools/core/tui/theme"
 
@@ -831,7 +832,7 @@ func setupTmuxPane(client *tmux.Client, ui *UI, paneType string, splitHorizontal
 
 // setupDebugPanes creates and configures the shell and editor panes for debug mode.
 func (h *Harness) setupDebugPanes(ctx *Context, ui *UI, scenario *Scenario) error {
-	if os.Getenv("TMUX") == "" {
+	if mux.ActiveMux() == mux.MuxNone {
 		return fmt.Errorf("not in a tmux session")
 	}
 

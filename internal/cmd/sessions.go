@@ -13,6 +13,7 @@ import (
 	grovelogging "github.com/grovetools/core/logging"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/grovetools/core/pkg/mux"
 	"github.com/grovetools/core/pkg/tmux"
 	"github.com/spf13/cobra"
 
@@ -243,7 +244,7 @@ func newSessionsAttachCmd() *cobra.Command {
 			}
 
 			var tmuxArgs []string
-			if os.Getenv("TMUX") != "" {
+			if mux.ActiveMux() != mux.MuxNone {
 				// Inside tmux, switch client
 				tmuxArgs = []string{"tmux", "switch-client", "-t", sessionName}
 			} else {

@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	grovelogging "github.com/grovetools/core/logging"
+	"github.com/grovetools/core/pkg/mux"
 	"github.com/grovetools/core/pkg/tmux"
 	"github.com/spf13/cobra"
 
@@ -409,7 +410,7 @@ func attachToDemo(demoDir string) error {
 	// Attach or switch to the session
 	// Use -L for socket name (not -S which is for socket path)
 	var tmuxArgs []string
-	if os.Getenv("TMUX") != "" {
+	if mux.ActiveMux() != mux.MuxNone {
 		// Inside tmux, switch client
 		tmuxArgs = []string{"tmux", "-L", meta.TmuxSocket, "switch-client", "-t", meta.TmuxSessionName}
 	} else {
