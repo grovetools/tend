@@ -42,8 +42,8 @@ func (g *Generator) setupTuimux(content *DemoContent) error {
 
 	ctx := context.Background()
 	workDir := filepath.Join(g.ecosystemsDir(), "homelab")
-	if err := engine.CreateSession(ctx, sessionName, mux.WithWorkDir(workDir)); err != nil {
-		return fmt.Errorf("creating tuimux session: %w", err)
+	if err := engine.StartServer(ctx, sessionName, mux.WithWorkDir(workDir)); err != nil {
+		return fmt.Errorf("starting tuimux server: %w", err)
 	}
 
 	ulog.Info("Tuimux demo session created").
