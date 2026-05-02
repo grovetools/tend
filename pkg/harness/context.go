@@ -11,7 +11,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	corecommand "github.com/grovetools/core/command"
-	"github.com/grovetools/core/pkg/tmux"
+	"github.com/grovetools/core/pkg/mux"
 
 	"github.com/grovetools/tend/pkg/command"
 	"github.com/grovetools/tend/pkg/project"
@@ -382,24 +382,24 @@ func (c *Context) StartTUI(binaryPath string, args []string, opts ...tui.StartOp
 		workingDir = config.Cwd
 	}
 
-	// Launch via tmux (tuimux sessions are handled through env vars — child
+	// Launch via mux engine (tuimux sessions are handled through env vars — child
 	// processes detect the isolated daemon via GROVE_TUIMUX_SOCKET)
-	var tmuxClient *tmux.Client
+	var engine mux.MuxEngine
 	var err error
 	if c.tmuxSocket != "" {
-		tmuxClient, err = tmux.NewClientWithSocket(c.tmuxSocket)
+		engine, err = mux.NewTmuxEngineWithSocket(c.tmuxSocket)
 	} else {
-		tmuxClient, err = tmux.NewClient()
+		engine, err = mux.DetectMuxEngine(context.Background())
 	}
 	if err != nil {
-		return nil, fmt.Errorf("failed to create tmux client for TUI session: %w", err)
+		return nil, fmt.Errorf("failed to create mux engine for TUI session: %w", err)
 	}
 
-	launchOpts := tmux.LaunchOptions{
+	launchOpts := mux.LaunchOptions{
 		SessionName:      sessionName,
 		WorkingDirectory: workingDir,
 		WindowIndex:      -1,
-		Panes: []tmux.PaneOptions{
+		Panes: []mux.PaneOptions{
 			{
 				Command: cmdBuilder.String(),
 				Env:     envMap,
@@ -407,7 +407,7 @@ func (c *Context) StartTUI(binaryPath string, args []string, opts ...tui.StartOp
 		},
 	}
 
-	if err := tmuxClient.Launch(context.Background(), launchOpts); err != nil {
+	if err := engine.Launch(context.Background(), launchOpts); err != nil {
 		return nil, fmt.Errorf("failed to launch TUI in tmux session '%s': %w", sessionName, err)
 	}
 
@@ -417,7 +417,7 @@ func (c *Context) StartTUI(binaryPath string, args []string, opts ...tui.StartOp
 	sessions = append(sessions, sessionName)
 	c.Set("tui_sessions", sessions)
 
-	session := tui.NewSession(sessionName, tmuxClient, c.RootDir)
+	session := tui.NewSession(sessionName, engine, c.RootDir)
 
 	// Start recording if configured
 	if c.recordTUIDir != "" {

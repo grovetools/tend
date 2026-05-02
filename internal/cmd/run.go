@@ -14,7 +14,7 @@ import (
 	grovelogging "github.com/grovetools/core/logging"
 	"github.com/grovetools/core/pkg/daemon"
 	"github.com/grovetools/core/pkg/models"
-	"github.com/grovetools/core/pkg/tmux"
+	"github.com/grovetools/core/pkg/mux"
 	"github.com/grovetools/core/tui/theme"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -280,32 +280,28 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 			serverMode = debugServer
 		}
 
-		// Set up tmux client based on server mode
-		var client *tmux.Client
+		// Set up mux engine based on server mode
+		var engine mux.MuxEngine
 		var sessionName string
 		sanitizedName := regexp.MustCompile(`[^a-zA-Z0-9_-]+`).ReplaceAllString(scenario.Name, "_")
 
 		if serverMode == "main" {
-			// New behavior: use main server with namespaced session name
-			// TODO: Get workspace identifier when available
-			// For now, use simple naming with "tend_" prefix
 			sessionName = fmt.Sprintf("tend_%s", sanitizedName)
-			client, err = tmux.NewClient()
+			engine, err = mux.DetectMuxEngine(ctx)
 			if err != nil {
-				return fmt.Errorf("failed to create tmux client: %w", err)
+				return fmt.Errorf("failed to create mux engine: %w", err)
 			}
 		} else {
-			// Old behavior: use dedicated server with simple session name
 			socketName := "tend-debug"
 			sessionName = sanitizedName
-			client, err = tmux.NewClientWithSocket(socketName)
+			engine, err = mux.NewTmuxEngineWithSocket(socketName)
 			if err != nil {
-				return fmt.Errorf("failed to create tmux client: %w", err)
+				return fmt.Errorf("failed to create mux engine: %w", err)
 			}
 		}
 
 		// Kill any existing session with the same name
-		_ = client.KillSession(ctx, sessionName)
+		_ = engine.KillSession(ctx, sessionName)
 
 		// The project directory is the CWD of the tend process
 		projectRoot := rootDir
@@ -320,16 +316,16 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 		sandboxEnvSlice = append(sandboxEnvSlice, fmt.Sprintf("PATH=%s", sandboxPath))
 
 		// 2. Create Initial Session with 'runner' Window
-		launchOpts := tmux.LaunchOptions{
+		launchOpts := mux.LaunchOptions{
 			SessionName:      sessionName,
 			WorkingDirectory: projectRoot,
 			WindowName:       "runner",
 			WindowIndex:      -1,
-			Panes: []tmux.PaneOptions{
+			Panes: []mux.PaneOptions{
 				{}, // Start with an empty shell
 			},
 		}
-		if err := client.Launch(ctx, launchOpts); err != nil {
+		if err := engine.Launch(ctx, launchOpts); err != nil {
 			return fmt.Errorf("failed to launch debug session: %w", err)
 		}
 
@@ -367,38 +363,32 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 		tendCmd := " " + os.Args[0] + " " + strings.Join(newArgs, " ")
 
 		runnerTarget := sessionName + ":runner"
-		if err := client.SendKeys(ctx, runnerTarget, tendCmd, "C-m"); err != nil {
+		if err := engine.SendKeys(ctx, runnerTarget, tendCmd, "C-m"); err != nil {
 			return fmt.Errorf("failed to send command to runner pane: %w", err)
 		}
 
 		// 4. Create additional windows
 
 		// Window: editor_test_dir - nvim viewing test directory with real user env
-		if err := client.NewWindowWithOptions(ctx, tmux.NewWindowOptions{
-			Target:     sessionName,
-			WindowName: "editor_test_dir",
-			WorkingDir: testRootDir,
-			Env:        realEnvSlice,
-			Command:    "nvim .",
-		}); err != nil {
+		if err := engine.NewWindow(ctx, sessionName, "editor_test_dir", testRootDir, true); err != nil {
 			return fmt.Errorf("failed to create editor_test_dir window: %w", err)
 		}
+		editorTestDirTarget := sessionName + ":editor_test_dir"
+		for _, e := range realEnvSlice {
+			_ = engine.SendKeys(ctx, editorTestDirTarget, fmt.Sprintf("export %s", e), "C-m")
+		}
+		_ = engine.SendKeys(ctx, editorTestDirTarget, "nvim .", "C-m")
 
 		// Window: editor_test_steps - nvim for editing test steps with real user env
-		// Create window with empty shell first
-		if err := client.NewWindowWithOptions(ctx, tmux.NewWindowOptions{
-			Target:     sessionName,
-			WindowName: "editor_test_steps",
-			WorkingDir: projectRoot,
-			Env:        realEnvSlice,
-			Command:    "", // Empty shell, we'll send keys next
-		}); err != nil {
+		if err := engine.NewWindow(ctx, sessionName, "editor_test_steps", projectRoot, true); err != nil {
 			return fmt.Errorf("failed to create editor_test_steps window: %w", err)
+		}
+		editorStepsTarget := sessionName + ":editor_test_steps"
+		for _, e := range realEnvSlice {
+			_ = engine.SendKeys(ctx, editorStepsTarget, fmt.Sprintf("export %s", e), "C-m")
 		}
 
 		// Send nvim command to open the file
-		// Since WorkingDir is projectRoot, relative paths in scenario.File will work
-		editorStepsTarget := sessionName + ":editor_test_steps"
 		if scenario.File != "" {
 			var nvimCmd string
 			if scenario.Line > 0 {
@@ -406,46 +396,42 @@ func runScenarios(cmd *cobra.Command, args []string, allScenarios []*harness.Sce
 			} else {
 				nvimCmd = fmt.Sprintf("nvim %s", scenario.File)
 			}
-			if err := client.SendKeys(ctx, editorStepsTarget, nvimCmd, "C-m"); err != nil {
+			if err := engine.SendKeys(ctx, editorStepsTarget, nvimCmd, "C-m"); err != nil {
 				return fmt.Errorf("failed to send nvim command: %w", err)
 			}
 		} else {
 			// No file, open nvim at tests/e2e directory for easy navigation to scenarios
-			if err := client.SendKeys(ctx, editorStepsTarget, "nvim tests/e2e", "C-m"); err != nil {
+			if err := engine.SendKeys(ctx, editorStepsTarget, "nvim tests/e2e", "C-m"); err != nil {
 				return fmt.Errorf("failed to send nvim command: %w", err)
 			}
 		}
 
 		// Window: term - Interactive shell with sandboxed environment
 		// Build export commands from sandboxEnvSlice and exec the shell
+		if err := engine.NewWindow(ctx, sessionName, "term", testRootDir, true); err != nil {
+			return fmt.Errorf("failed to create term window: %w", err)
+		}
+		termTarget := sessionName + ":term"
 		var exports []string
 		for _, env := range sandboxEnvSlice {
 			exports = append(exports, fmt.Sprintf("export %s", env))
 		}
 		termCmd := fmt.Sprintf("%s && exec $SHELL", strings.Join(exports, " && "))
-		if err := client.NewWindowWithOptions(ctx, tmux.NewWindowOptions{
-			Target:     sessionName,
-			WindowName: "term",
-			WorkingDir: testRootDir,
-			Command:    termCmd,
-		}); err != nil {
-			return fmt.Errorf("failed to create term window: %w", err)
-		}
+		_ = engine.SendKeys(ctx, termTarget, termCmd, "C-m")
 
 		// Window: logs - Log viewer with sandboxed environment
-		if err := client.NewWindowWithOptions(ctx, tmux.NewWindowOptions{
-			Target:     sessionName,
-			WindowName: "logs",
-			WorkingDir: testRootDir,
-			Env:        sandboxEnvSlice,
-			Command:    "sh -c 'core logs --tui || read'", // Keep window open if command fails
-		}); err != nil {
+		if err := engine.NewWindow(ctx, sessionName, "logs", testRootDir, true); err != nil {
 			return fmt.Errorf("failed to create logs window: %w", err)
 		}
+		logsTarget := sessionName + ":logs"
+		for _, e := range sandboxEnvSlice {
+			_ = engine.SendKeys(ctx, logsTarget, fmt.Sprintf("export %s", e), "C-m")
+		}
+		_ = engine.SendKeys(ctx, logsTarget, "sh -c 'core logs --tui || read'", "C-m")
 
 		// 5. Finalize Session State
 		// Select the runner window to be the active one on attach
-		if err := client.SelectWindow(ctx, runnerTarget); err != nil {
+		if err := engine.SelectWindow(ctx, runnerTarget); err != nil {
 			return fmt.Errorf("failed to select runner window: %w", err)
 		}
 
@@ -1000,9 +986,9 @@ func cleanupNewTmuxServers(ctx context.Context, preExisting map[string]bool) err
 			continue // existed before our run, leave it alone
 		}
 
-		client, err := tmux.NewClientWithSocket(name)
+		eng, err := mux.NewTmuxEngineWithSocket(name)
 		if err == nil {
-			_ = client.KillServer(ctx)
+			_ = eng.KillServer(ctx, "")
 		}
 
 		socketPath := filepath.Join(socketDir, name)

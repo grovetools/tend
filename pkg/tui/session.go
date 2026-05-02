@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/grovetools/core/pkg/tmux"
+	"github.com/grovetools/core/pkg/mux"
 
 	"github.com/grovetools/tend/pkg/assert"
 	"github.com/grovetools/tend/pkg/fs"
@@ -23,7 +23,7 @@ import (
 // It provides a high-level API for interaction and assertion.
 type Session struct {
 	sessionName     string
-	client          *tmux.Client
+	engine          mux.MuxEngine
 	recording       *SessionRecording // For recording and debugging
 	rootDir         string
 	debugClient     *http.Client // HTTP client connected via Unix socket to the terminal debug server
@@ -31,10 +31,10 @@ type Session struct {
 }
 
 // NewSession creates a new TUI session handle. It is intended for internal use by the harness.
-func NewSession(sessionName string, client *tmux.Client, rootDir string) *Session {
+func NewSession(sessionName string, engine mux.MuxEngine, rootDir string) *Session {
 	return &Session{
 		sessionName: sessionName,
-		client:      client,
+		engine:      engine,
 		rootDir:     rootDir,
 	}
 }
@@ -138,7 +138,7 @@ func (s *Session) Type(keys ...string) error {
 // waits for the screen to stabilize after sending keys.
 func (s *Session) SendKeys(keys ...string) error {
 	// Tmux's send-keys sends all arguments as a single sequence.
-	err := s.client.SendKeys(context.Background(), s.sessionName, keys...)
+	err := s.engine.SendKeys(context.Background(), s.sessionName, keys...)
 
 	// Record the event if recording is enabled
 	s.recordEvent("key", map[string]interface{}{"keys": keys}, "", err)
@@ -184,7 +184,7 @@ func (s *Session) Capture(opts ...CaptureOption) (string, error) {
 		opt(cfg)
 	}
 
-	content, err := s.client.CapturePane(context.Background(), s.sessionName)
+	content, err := s.engine.CapturePane(context.Background(), s.sessionName)
 	if err != nil {
 		return "", err
 	}
@@ -331,7 +331,7 @@ func (s *Session) AssertLine(predicate func(line string) bool, message string) e
 
 // GetCursorPosition returns the 1-based (row, col) of the cursor.
 func (s *Session) GetCursorPosition() (row, col int, err error) {
-	return s.client.GetCursorPosition(context.Background(), s.sessionName)
+	return s.engine.GetCursorPosition(context.Background(), s.sessionName)
 }
 
 // FindTextLocation searches the screen for the given text and returns its 1-based (row, col) position if found.
@@ -625,7 +625,7 @@ func (s *Session) SendKeysAndWaitForChange(timeout time.Duration, keys ...string
 // Close terminates the tmux session associated with the TUI.
 // This is typically called automatically by the test harness on cleanup.
 func (s *Session) Close() error {
-	return s.client.KillSession(context.Background(), s.sessionName)
+	return s.engine.KillSession(context.Background(), s.sessionName)
 }
 
 // ---------------------------------------------------------------------------

@@ -17,6 +17,7 @@ import (
 	"github.com/grovetools/core/pkg/tmux"
 	"github.com/grovetools/core/tui/theme"
 
+
 	"github.com/grovetools/tend/pkg/command"
 	"github.com/grovetools/tend/pkg/fs"
 	"github.com/grovetools/tend/pkg/project"
@@ -240,14 +241,14 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 				ulogHarness.Debug("Attempting to kill tmux server").
 					Field("socket", testCtx.tmuxSocket).
 					Emit()
-				client, err := tmux.NewClientWithSocket(testCtx.tmuxSocket)
+				eng, err := mux.NewTmuxEngineWithSocket(testCtx.tmuxSocket)
 				if err != nil {
-					ulogHarness.Debug("Tmux client not available for cleanup").
+					ulogHarness.Debug("Tmux engine not available for cleanup").
 						Field("socket", testCtx.tmuxSocket).
 						Field("error", err.Error()).
 						Emit()
 				} else {
-					if err := client.KillServer(context.Background()); err != nil {
+					if err := eng.KillServer(context.Background(), ""); err != nil {
 						ulogHarness.Debug("Tmux server already stopped").
 							Field("socket", testCtx.tmuxSocket).
 							Field("error", err.Error()).
@@ -262,10 +263,10 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 				// Fallback: kill individual sessions on the default tmux server
 				sessions := testCtx.GetStringSlice("tui_sessions")
 				if len(sessions) > 0 {
-					tmuxClient, err := tmux.NewClient()
+					eng, err := mux.DetectMuxEngine(context.Background())
 					if err == nil {
 						for _, sessionName := range sessions {
-							_ = tmuxClient.KillSession(context.Background(), sessionName)
+							_ = eng.KillSession(context.Background(), sessionName)
 						}
 					}
 				}
@@ -517,30 +518,30 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 
 		// Jump to step definition in editor if in debug mode
 		if step.Line > 0 {
-			var tmuxClient *tmux.Client
+			var editorEngine mux.MuxEngine
 			var editorTarget string
 			var err error
 
 			// Check for debug-session mode (dedicated tmux server)
 			if h.opts.TmuxSocket != "" && h.opts.TmuxEditorTarget != "" {
-				tmuxClient, err = tmux.NewClientWithSocket(h.opts.TmuxSocket)
+				editorEngine, err = mux.NewTmuxEngineWithSocket(h.opts.TmuxSocket)
 				editorTarget = h.opts.TmuxEditorTarget
 			} else if h.opts.Nvim && testCtx.editorPaneID != "" {
 				// Pane-based debug mode
-				tmuxClient, err = tmux.NewClient()
+				editorEngine, err = mux.DetectMuxEngine(context.Background())
 				editorTarget = testCtx.editorPaneID
 			}
 
-			if err == nil && tmuxClient != nil && editorTarget != "" {
+			if err == nil && editorEngine != nil && editorTarget != "" {
 				// Check if the step is in a different file and switch if needed
 				if step.File != testCtx.currentEditorFile {
-					_ = tmuxClient.SendKeys(context.Background(), editorTarget, fmt.Sprintf(":e %s", step.File), "C-m")
+					_ = editorEngine.SendKeys(context.Background(), editorTarget, fmt.Sprintf(":e %s", step.File), "C-m")
 					testCtx.currentEditorFile = step.File
 					time.Sleep(100 * time.Millisecond) // Give nvim time to open the file
 				}
 				// Now, jump to the line
 				jumpCmd := fmt.Sprintf(":%d", step.Line)
-				_ = tmuxClient.SendKeys(context.Background(), editorTarget, jumpCmd, "C-m")
+				_ = editorEngine.SendKeys(context.Background(), editorTarget, jumpCmd, "C-m")
 			}
 		}
 
@@ -549,9 +550,9 @@ func (h *Harness) Run(ctx context.Context, scenario *Scenario) (*Result, error) 
 		// Display TUI state if verbose and a session is active
 		if h.opts.Verbose || h.opts.VeryVerbose {
 			if sessionName := testCtx.GetString("active_tui_session_name"); sessionName != "" {
-				tmuxClient, err := tmux.NewClient()
+				eng, err := mux.DetectMuxEngine(context.Background())
 				if err == nil {
-					if content, err := tmuxClient.CapturePane(context.Background(), sessionName); err == nil {
+					if content, err := eng.CapturePane(context.Background(), sessionName); err == nil {
 						ui.RenderTUICapture(content)
 					}
 				}
@@ -802,7 +803,7 @@ func (h *Harness) resolveBinary() string {
 }
 
 // setupTmuxPane manages the creation or reuse of a tmux pane for debugging.
-func setupTmuxPane(client *tmux.Client, ui *UI, paneType string, splitHorizontal bool, commandStr string) (string, error) {
+func setupTmuxPane(engine mux.MuxEngine, ui *UI, paneType string, splitHorizontal bool, commandStr string) (string, error) {
 	paneIDFile := filepath.Join(os.TempDir(), fmt.Sprintf("tend-debug-%s-pane-id", paneType))
 	var paneID string
 	var isReusedPane bool
@@ -810,16 +811,17 @@ func setupTmuxPane(client *tmux.Client, ui *UI, paneType string, splitHorizontal
 	// Check for a cached pane ID
 	if data, err := os.ReadFile(paneIDFile); err == nil {
 		existingPaneID := strings.TrimSpace(string(data))
-		if client.PaneExists(context.Background(), existingPaneID) {
+		exists, _ := engine.PaneExists(context.Background(), existingPaneID)
+		if exists {
 			ui.Info("tmux", fmt.Sprintf("Reusing existing %s pane...", paneType))
 			paneID = existingPaneID
 			isReusedPane = true
 
 			// Kill any running editor to ensure a clean state
-			if currentCmd, err := client.GetPaneCommand(context.Background(), paneID); err == nil {
+			if currentCmd, err := engine.GetPaneCommand(context.Background(), paneID); err == nil {
 				currentCmd = strings.TrimSpace(currentCmd)
 				if currentCmd == "nvim" || currentCmd == "vim" || currentCmd == "vi" {
-					_ = client.SendKeys(context.Background(), paneID, "Escape", ":qa!", "C-m")
+					_ = engine.SendKeys(context.Background(), paneID, "Escape", ":qa!", "C-m")
 					time.Sleep(100 * time.Millisecond)
 				}
 			}
@@ -831,7 +833,7 @@ func setupTmuxPane(client *tmux.Client, ui *UI, paneType string, splitHorizontal
 	// Create a new pane if needed
 	if paneID == "" {
 		ui.Info("tmux", fmt.Sprintf("Creating %s pane...", paneType))
-		newPaneID, err := client.SplitWindow(context.Background(), "", splitHorizontal, 0, "")
+		newPaneID, err := engine.SplitWindow(context.Background(), "", splitHorizontal)
 		if err != nil {
 			return "", fmt.Errorf("failed to split tmux window for %s pane: %w", paneType, err)
 		}
@@ -840,12 +842,12 @@ func setupTmuxPane(client *tmux.Client, ui *UI, paneType string, splitHorizontal
 	}
 
 	// Send the command to the pane
-	if err := client.SendKeys(context.Background(), paneID, commandStr, "C-m"); err != nil {
+	if err := engine.SendKeys(context.Background(), paneID, commandStr, "C-m"); err != nil {
 		// If this was a reused pane, the cache might be stale - try creating a new one
 		if isReusedPane {
 			ui.Info("tmux", fmt.Sprintf("Cached %s pane is stale, creating new one...", paneType))
 			os.Remove(paneIDFile)
-			newPaneID, createErr := client.SplitWindow(context.Background(), "", splitHorizontal, 0, "")
+			newPaneID, createErr := engine.SplitWindow(context.Background(), "", splitHorizontal)
 			if createErr != nil {
 				return "", fmt.Errorf("failed to split tmux window for %s pane: %w", paneType, createErr)
 			}
@@ -853,7 +855,7 @@ func setupTmuxPane(client *tmux.Client, ui *UI, paneType string, splitHorizontal
 			_ = os.WriteFile(paneIDFile, []byte(paneID), 0o644) //nolint:gosec // pane ID cache file
 
 			// Retry sending keys to the new pane
-			if retryErr := client.SendKeys(context.Background(), paneID, commandStr, "C-m"); retryErr != nil {
+			if retryErr := engine.SendKeys(context.Background(), paneID, commandStr, "C-m"); retryErr != nil {
 				command.New("tmux", "kill-pane", "-t", paneID).Run()
 				os.Remove(paneIDFile)
 				return "", fmt.Errorf("failed to send keys to %s pane: %w", paneType, retryErr)
@@ -876,9 +878,9 @@ func (h *Harness) setupDebugPanes(ctx *Context, ui *UI, scenario *Scenario) erro
 		return fmt.Errorf("not in a tmux session")
 	}
 
-	tmuxClient, err := tmux.NewClient()
+	engine, err := mux.DetectMuxEngine(context.Background())
 	if err != nil {
-		return fmt.Errorf("failed to create tmux client: %w", err)
+		return fmt.Errorf("failed to create mux engine: %w", err)
 	}
 
 	// Setup Shell Pane if requested
@@ -886,7 +888,7 @@ func (h *Harness) setupDebugPanes(ctx *Context, ui *UI, scenario *Scenario) erro
 		// Always open nvim in the shell pane for exploring test artifacts
 		shellCommand := fmt.Sprintf("cd '%s' && nvim", ctx.RootDir)
 
-		shellPaneID, err := setupTmuxPane(tmuxClient, ui, "shell", false, shellCommand)
+		shellPaneID, err := setupTmuxPane(engine, ui, "shell", false, shellCommand)
 		if err != nil {
 			return err
 		}
@@ -912,7 +914,7 @@ func (h *Harness) setupDebugPanes(ctx *Context, ui *UI, scenario *Scenario) erro
 		// Only open editor if we have source location info
 		if initialFile != "" {
 			editorCommand := fmt.Sprintf("cd '%s' && nvim '%s'", ctx.ProjectRoot, initialFile)
-			editorPaneID, err := setupTmuxPane(tmuxClient, ui, "editor", true, editorCommand)
+			editorPaneID, err := setupTmuxPane(engine, ui, "editor", true, editorCommand)
 			if err != nil {
 				return err
 			}
@@ -923,7 +925,7 @@ func (h *Harness) setupDebugPanes(ctx *Context, ui *UI, scenario *Scenario) erro
 			if editorPaneID != "" && initialLine > 0 {
 				time.Sleep(100 * time.Millisecond) // Give nvim time to start
 				jumpCmd := fmt.Sprintf(":%d", initialLine)
-				_ = tmuxClient.SendKeys(context.Background(), editorPaneID, jumpCmd, "C-m")
+				_ = engine.SendKeys(context.Background(), editorPaneID, jumpCmd, "C-m")
 			}
 		}
 	}

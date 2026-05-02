@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/grovetools/core/pkg/mux"
-	"github.com/grovetools/core/pkg/tmux"
 )
 
 // setupMux routes demo session setup to the appropriate mux backend.
@@ -85,9 +84,9 @@ func (g *Generator) setupTmux(content *DemoContent) error {
 	socketName := g.tmuxSocket
 	sessionName := fmt.Sprintf("grove-demo-%s", g.demoName)
 
-	client, err := tmux.NewClientWithSocket(socketName)
+	engine, err := mux.NewTmuxEngineWithSocket(socketName)
 	if err != nil {
-		return fmt.Errorf("creating tmux client: %w", err)
+		return fmt.Errorf("creating mux engine: %w", err)
 	}
 
 	ctx := context.Background()
@@ -97,16 +96,16 @@ func (g *Generator) setupTmux(content *DemoContent) error {
 	workDir := filepath.Join(g.ecosystemsDir(), "homelab")
 
 	// Create a simple session with one empty window
-	launchOpts := tmux.LaunchOptions{
+	launchOpts := mux.LaunchOptions{
 		SessionName:      sessionName,
 		WorkingDirectory: workDir,
 		WindowIndex:      -1,
-		Panes: []tmux.PaneOptions{
+		Panes: []mux.PaneOptions{
 			{Env: env},
 		},
 	}
 
-	if err := client.Launch(ctx, launchOpts); err != nil {
+	if err := engine.Launch(ctx, launchOpts); err != nil {
 		return fmt.Errorf("launching session: %w", err)
 	}
 
