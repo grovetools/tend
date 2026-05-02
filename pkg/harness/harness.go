@@ -833,7 +833,7 @@ func setupTmuxPane(engine mux.MuxEngine, ui *UI, paneType string, splitHorizonta
 	// Create a new pane if needed
 	if paneID == "" {
 		ui.Info("tmux", fmt.Sprintf("Creating %s pane...", paneType))
-		newPaneID, err := engine.SplitWindow(context.Background(), "", splitHorizontal)
+		newPaneID, err := engine.SplitWindow(context.Background(), "", splitHorizontal, 0, "")
 		if err != nil {
 			return "", fmt.Errorf("failed to split tmux window for %s pane: %w", paneType, err)
 		}
@@ -847,7 +847,7 @@ func setupTmuxPane(engine mux.MuxEngine, ui *UI, paneType string, splitHorizonta
 		if isReusedPane {
 			ui.Info("tmux", fmt.Sprintf("Cached %s pane is stale, creating new one...", paneType))
 			os.Remove(paneIDFile)
-			newPaneID, createErr := engine.SplitWindow(context.Background(), "", splitHorizontal)
+			newPaneID, createErr := engine.SplitWindow(context.Background(), "", splitHorizontal, 0, "")
 			if createErr != nil {
 				return "", fmt.Errorf("failed to split tmux window for %s pane: %w", paneType, createErr)
 			}
