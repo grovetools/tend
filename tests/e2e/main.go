@@ -31,7 +31,7 @@ func main() {
 		RunSetupFlagE2EScenario(),
 
 		// TUI Scenarios
-		// AutoPathMocksScenario(), // Commented out due to shell-specific tmux issues
+		AutoPathMocksScenario(),
 		EnvPassingTestScenario(),
 		TendTUIScenario(),
 		ExampleAdvancedTuiNavigation(),

@@ -22,16 +22,8 @@ LDFLAGS = -ldflags="\
 -X '$(VERSION_PKG).Branch=$(GIT_BRANCH)' \
 -X '$(VERSION_PKG).BuildDate=$(BUILD_DATE)'"
 
-# --- Mocking ---
-# Example target for building mock binaries for tests.
-# In a real project, you would list your mock source directories here.
-MOCK_SRC_DIR=tests/mocks
-MOCK_BIN_DIR=bin
-MOCKS ?= $(shell find $(MOCK_SRC_DIR) -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
-
-.PHONY: all build test clean fmt fmt-check vet lint run check dev build-all help build-mocks generate-docs \
-        build-custom-example build-tmux-example build-examples test-tmux test-headless \
-        test-tui-verbose test-tui-interactive run-scenarios test-e2e build-e2e-mocks build-e2e-runner
+.PHONY: all build test clean fmt fmt-check vet lint run check dev build-all help generate-docs \
+        test-e2e build-e2e-mocks build-e2e-runner build-e2e-fixtures
 
 all: build
 
@@ -88,52 +80,6 @@ dev:
 	@echo "Building $(BINARY_NAME) version $(VERSION) with race detector..."
 	@go build -race $(LDFLAGS) -o $(BIN_DIR)/$(BINARY_NAME) .
 
-# Run agent-isolation scenario as smoke test
-run-scenarios: build
-	@echo "Running agent-isolation scenario..."
-	@./$(BIN_DIR)/$(BINARY_NAME) run agent-isolation
-
-# Run tmux TUI tests (requires tmux to be installed)
-test-tmux: build-tmux-example
-	@echo "Running tmux TUI tests..."
-	@if command -v tmux > /dev/null; then \
-		$(DIST_DIR)/tmux-tui-test run example-tui-tmux; \
-		$(DIST_DIR)/tmux-tui-test run example-bubbletea-headless; \
-	else \
-		echo "Warning: tmux not installed, skipping tmux tests"; \
-	fi
-
-# Run headless TUI tests only (doesn't require tmux)
-test-headless: build-tmux-example
-	@echo "Running headless TUI tests..."
-	@$(DIST_DIR)/tmux-tui-test run example-bubbletea-headless
-
-# Run all TUI tests in verbose mode
-test-tui-verbose: build-tmux-example
-	@echo "Running TUI tests in verbose mode..."
-	@$(DIST_DIR)/tmux-tui-test run --verbose
-
-# Run TUI tests in interactive debug mode
-test-tui-interactive: build-tmux-example
-	@echo "Running TUI tests in interactive mode (allows attach)..."
-	@$(DIST_DIR)/tmux-tui-test run example-tui-interactive-debug --interactive
-
-# Build custom tend example
-build-custom-example:
-	@echo "Building custom tend example..."
-	@mkdir -p $(DIST_DIR)
-	@go build $(LDFLAGS) -o $(DIST_DIR)/custom-tend ./examples/custom-tend
-
-# Build tmux TUI test example
-build-tmux-example:
-	@echo "Building tmux TUI test example..."
-	@mkdir -p $(DIST_DIR)
-	@go build $(LDFLAGS) -o $(DIST_DIR)/tmux-tui-test ./examples/tmux-tui-test
-
-# Build all examples
-build-examples: build-custom-example build-tmux-example
-	@echo "All examples built successfully"
-
 # Cross-compilation targets
 PLATFORMS ?= darwin/amd64 darwin/arm64 linux/amd64 linux/arm64
 DIST_DIR ?= dist
@@ -148,19 +94,6 @@ build-all:
 		echo "  -> Building $${output_name} version $(VERSION)"; \
 		GOOS=$$os GOARCH=$$arch go build $(LDFLAGS) -o $(DIST_DIR)/$${output_name} .; \
 	done
-
-# Build mock binaries
-build-mocks:
-	@if [ -d "$(MOCK_SRC_DIR)" ]; then \
-		echo "Building mocks: $(MOCKS)"; \
-		mkdir -p $(MOCK_BIN_DIR); \
-		for mock in $(MOCKS); do \
-			echo "  -> Building mock $$mock"; \
-			go build -o $(MOCK_BIN_DIR)/mock-$$mock $(MOCK_SRC_DIR)/$$mock; \
-		done; \
-	else \
-		echo "No mock directory found, skipping mock build."; \
-	fi
 
 # --- E2E Testing for Tend ---
 # For self-testing grove-tend, we need to:
@@ -214,22 +147,9 @@ help:
 	@echo "  make check       - Run all checks"
 	@echo "  make dev         - Build with race detector"
 	@echo ""
-	@echo "Example targets:"
-	@echo "  make build-custom-example  - Build custom tend example"
-	@echo "  make build-tmux-example    - Build tmux TUI test example"
-	@echo "  make build-examples        - Build all examples"
-	@echo ""
-	@echo "TUI testing targets:"
-	@echo "  make test-tmux             - Run tmux TUI tests (requires tmux)"
-	@echo "  make test-headless         - Run headless TUI tests only"
-	@echo "  make test-tui-verbose      - Run all TUI tests in verbose mode"
-	@echo "  make test-tui-interactive  - Run TUI tests in interactive debug mode"
-	@echo ""
 	@echo "E2E testing targets:"
 	@echo "  make test-e2e          - Run E2E test suite (mocks built automatically)"
 	@echo ""
 	@echo "Other targets:"
-	@echo "  make run-scenarios - Run agent-isolation scenario"
 	@echo "  make build-all     - Build for multiple platforms"
-	@echo "  make build-mocks   - Build mock binaries for testing"
 	@echo "  make generate-docs - Generate tend-docs.json and markdown documentation"
