@@ -20,6 +20,14 @@ type Metadata struct {
 	Ecosystems      []EcosystemMeta `yaml:"ecosystems"`
 	ConfigPath      string          `yaml:"config_path"`
 	NotebookDir     string          `yaml:"notebook_dir"`
+	Credentials     *CredentialCopy `yaml:"credentials,omitempty"` // credentials copied into the demo config (names only)
+}
+
+// CredentialCopy records which credential keys were copied into the demo
+// config and from where. Only key names are recorded, never values.
+type CredentialCopy struct {
+	SourcePath string   `yaml:"source_path"` // user config file the keys came from
+	Keys       []string `yaml:"keys"`        // copied key paths, e.g. "gemini.api_key"
 }
 
 // UsesTuimux reports whether this demo was created on the tuimux backend.

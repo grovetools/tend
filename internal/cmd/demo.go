@@ -52,6 +52,7 @@ func newDemoCreateCmd() *cobra.Command {
 	var outputDir string
 	var attach bool
 	var force bool
+	var noCredentials bool
 
 	cmd := &cobra.Command{
 		Use:   "create <name>",
@@ -63,6 +64,11 @@ Available demos:
 
 The environment is created at ~/.local/share/grove/demos/<name> by default (XDG_DATA_HOME),
 or at the path specified with --output-dir. Use --force to overwrite an existing demo environment.
+
+By default your API credentials (api_key/api_key_command from
+~/.config/grove/grove.override.yml) are copied into the demo config so demo
+agents can drive real providers; exactly which keys were copied is disclosed
+at create time (names only, never values). Use --no-credentials to skip this.
 
 After creation, use 'tend demo attach <name>' to connect to the demo tmux session.`,
 		Args: cobra.ExactArgs(1),
@@ -99,7 +105,11 @@ After creation, use 'tend demo attach <name>' to connect to the demo tmux sessio
 			}
 
 			// Create the demo environment
-			gen, err := demo.NewGenerator(outputDir, demoName)
+			var genOpts []demo.Option
+			if noCredentials {
+				genOpts = append(genOpts, demo.WithoutCredentials())
+			}
+			gen, err := demo.NewGenerator(outputDir, demoName, genOpts...)
 			if err != nil {
 				return err
 			}
@@ -128,6 +138,7 @@ After creation, use 'tend demo attach <name>' to connect to the demo tmux sessio
 	cmd.Flags().StringVarP(&outputDir, "output-dir", "o", "", "Output directory (default: XDG_DATA_HOME/grove/demos/<name>)")
 	cmd.Flags().BoolVarP(&attach, "attach", "a", false, "Attach to the demo session immediately after creation")
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "Overwrite existing demo environment")
+	cmd.Flags().BoolVar(&noCredentials, "no-credentials", false, "Do not copy API credentials from ~/.config/grove/grove.override.yml into the demo")
 
 	return cmd
 }
@@ -153,6 +164,12 @@ func printCreateSummary(demoName, outputDir string, customDir bool) {
 			for _, eco := range meta.Ecosystems {
 				fmt.Printf("    - %s (%d repos)\n", eco.Name, eco.RepoCount)
 			}
+		}
+		if meta.Credentials != nil && len(meta.Credentials.Keys) > 0 {
+			fmt.Printf("  Credentials: %d key(s) copied from %s (names listed above; use --no-credentials to skip)\n",
+				len(meta.Credentials.Keys), meta.Credentials.SourcePath)
+		} else {
+			fmt.Printf("  Credentials: none copied; demo agents have no API keys\n")
 		}
 	}
 
