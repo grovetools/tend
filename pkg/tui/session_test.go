@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/grovetools/core/pkg/tmux"
+	"github.com/grovetools/core/pkg/mux"
 )
 
 // Helper to skip tests if tmux is not available
@@ -25,15 +25,18 @@ func TestSession(t *testing.T) {
 
 	ctx := context.Background()
 	sessionName := "tend-tui-test-session"
-	client, _ := tmux.NewClient()
+	client, err := mux.NewTmuxEngine()
+	if err != nil {
+		t.Fatalf("Failed to create mux engine: %v", err)
+	}
 
 	// Cleanup any old session
 	_ = client.KillSession(ctx, sessionName)
 
 	// Launch a simple TUI (a shell command that waits)
-	err := client.Launch(ctx, tmux.LaunchOptions{
+	err = client.Launch(ctx, mux.LaunchOptions{
 		SessionName: sessionName,
-		Panes: []tmux.PaneOptions{
+		Panes: []mux.PaneOptions{
 			{Command: "echo 'Hello TUI'; sleep 5"},
 		},
 	})
@@ -95,7 +98,10 @@ func TestSession_AdvancedFeatures(t *testing.T) {
 
 	ctx := context.Background()
 	sessionName := "tend-tui-advanced-test"
-	client, _ := tmux.NewClient()
+	client, err := mux.NewTmuxEngine()
+	if err != nil {
+		t.Fatalf("Failed to create mux engine: %v", err)
+	}
 
 	_ = client.KillSession(ctx, sessionName)
 
@@ -108,9 +114,9 @@ echo "File 2.md"
 sleep 0.2
 echo "File 3.go"
 printf "> "`
-	err := client.Launch(ctx, tmux.LaunchOptions{
+	err = client.Launch(ctx, mux.LaunchOptions{
 		SessionName: sessionName,
-		Panes:       []tmux.PaneOptions{{Command: script}},
+		Panes:       []mux.PaneOptions{{Command: script}},
 	})
 	if err != nil {
 		t.Fatalf("Failed to launch test session: %v", err)
@@ -180,7 +186,10 @@ func TestSession_ConditionalFlows(t *testing.T) {
 
 	ctx := context.Background()
 	sessionName := "tend-tui-conditional-test"
-	client, _ := tmux.NewClient()
+	client, err := mux.NewTmuxEngine()
+	if err != nil {
+		t.Fatalf("Failed to create mux engine: %v", err)
+	}
 
 	_ = client.KillSession(ctx, sessionName)
 
@@ -196,9 +205,9 @@ elif [ $((RANDOM % 3)) -eq 1 ]; then
 else
     echo "WARNING: Warning"
 fi`
-	err := client.Launch(ctx, tmux.LaunchOptions{
+	err = client.Launch(ctx, mux.LaunchOptions{
 		SessionName: sessionName,
-		Panes:       []tmux.PaneOptions{{Command: script}},
+		Panes:       []mux.PaneOptions{{Command: script}},
 	})
 	if err != nil {
 		t.Fatalf("Failed to launch test session: %v", err)
@@ -226,7 +235,10 @@ func TestSession_PatternMatching(t *testing.T) {
 
 	ctx := context.Background()
 	sessionName := "tend-tui-pattern-test"
-	client, _ := tmux.NewClient()
+	client, err := mux.NewTmuxEngine()
+	if err != nil {
+		t.Fatalf("Failed to create mux engine: %v", err)
+	}
 
 	_ = client.KillSession(ctx, sessionName)
 
@@ -238,9 +250,9 @@ echo "Found 42 files modified"
 echo "Found 7 files added"
 echo "Processing complete"`
 
-	err := client.Launch(ctx, tmux.LaunchOptions{
+	err = client.Launch(ctx, mux.LaunchOptions{
 		SessionName: sessionName,
-		Panes:       []tmux.PaneOptions{{Command: script}},
+		Panes:       []mux.PaneOptions{{Command: script}},
 	})
 	if err != nil {
 		t.Fatalf("Failed to launch test session: %v", err)
@@ -261,6 +273,12 @@ echo "Processing complete"`
 	}
 	t.Logf("Pattern matched: %s", match)
 
+	// Wait for the final line so AssertContainsPattern doesn't race the script output.
+	err = session.WaitForText("Processing complete", 2*time.Second)
+	if err != nil {
+		t.Fatalf("WaitForText for final line failed: %v", err)
+	}
+
 	// Test AssertContainsPattern
 	err = session.AssertContainsPattern(regexp.MustCompile(`Processing complete`))
 	if err != nil {
@@ -273,7 +291,10 @@ func TestSession_SelectItem(t *testing.T) {
 
 	ctx := context.Background()
 	sessionName := "tend-tui-select-test"
-	client, _ := tmux.NewClient()
+	client, err := mux.NewTmuxEngine()
+	if err != nil {
+		t.Fatalf("Failed to create mux engine: %v", err)
+	}
 
 	_ = client.KillSession(ctx, sessionName)
 
@@ -285,9 +306,9 @@ echo "  2. Second option"
 echo "  3. Third option"
 printf "> "`
 
-	err := client.Launch(ctx, tmux.LaunchOptions{
+	err = client.Launch(ctx, mux.LaunchOptions{
 		SessionName: sessionName,
-		Panes:       []tmux.PaneOptions{{Command: script}},
+		Panes:       []mux.PaneOptions{{Command: script}},
 	})
 	if err != nil {
 		t.Fatalf("Failed to launch test session: %v", err)
@@ -330,13 +351,16 @@ func TestSession_Recording(t *testing.T) {
 
 	ctx := context.Background()
 	sessionName := "tend-tui-recording-test"
-	client, _ := tmux.NewClient()
+	client, err := mux.NewTmuxEngine()
+	if err != nil {
+		t.Fatalf("Failed to create mux engine: %v", err)
+	}
 
 	_ = client.KillSession(ctx, sessionName)
 
-	err := client.Launch(ctx, tmux.LaunchOptions{
+	err = client.Launch(ctx, mux.LaunchOptions{
 		SessionName: sessionName,
-		Panes:       []tmux.PaneOptions{{Command: "echo 'Recording Test'"}},
+		Panes:       []mux.PaneOptions{{Command: "echo 'Recording Test'"}},
 	})
 	if err != nil {
 		t.Fatalf("Failed to launch test session: %v", err)
@@ -395,14 +419,17 @@ func TestSession_Type(t *testing.T) {
 
 	ctx := context.Background()
 	sessionName := "tend-tui-type-test"
-	client, _ := tmux.NewClient()
+	client, err := mux.NewTmuxEngine()
+	if err != nil {
+		t.Fatalf("Failed to create mux engine: %v", err)
+	}
 
 	_ = client.KillSession(ctx, sessionName)
 
 	// Launch a simple shell session
-	err := client.Launch(ctx, tmux.LaunchOptions{
+	err = client.Launch(ctx, mux.LaunchOptions{
 		SessionName: sessionName,
-		Panes:       []tmux.PaneOptions{{Command: ""}},
+		Panes:       []mux.PaneOptions{{Command: ""}},
 	})
 	if err != nil {
 		t.Fatalf("Failed to launch test session: %v", err)
@@ -436,14 +463,18 @@ func TestSession_AssertLine(t *testing.T) {
 
 	ctx := context.Background()
 	sessionName := "tend-tui-assertline-test"
-	client, _ := tmux.NewClient()
+	client, err := mux.NewTmuxEngine()
+	if err != nil {
+		t.Fatalf("Failed to create mux engine: %v", err)
+	}
 
 	_ = client.KillSession(ctx, sessionName)
 
-	// Launch a simple shell session
-	err := client.Launch(ctx, tmux.LaunchOptions{
+	// Launch a session that prints a known marker line so the assertion
+	// does not depend on the user's shell or its welcome message.
+	err = client.Launch(ctx, mux.LaunchOptions{
 		SessionName: sessionName,
-		Panes:       []tmux.PaneOptions{{Command: ""}},
+		Panes:       []mux.PaneOptions{{Command: "echo 'assertline-marker'; sleep 5"}},
 	})
 	if err != nil {
 		t.Fatalf("Failed to launch test session: %v", err)
@@ -452,13 +483,15 @@ func TestSession_AssertLine(t *testing.T) {
 
 	session := NewSession(sessionName, client, t.TempDir())
 
-	// Wait for shell to be ready
-	time.Sleep(200 * time.Millisecond)
+	// Wait for the marker to appear
+	if err := session.WaitForText("assertline-marker", 2*time.Second); err != nil {
+		t.Fatalf("WaitForText for marker failed: %v", err)
+	}
 
-	// Test a successful assertion - check for fish shell welcome message
+	// Test a successful assertion
 	err = session.AssertLine(func(line string) bool {
-		return strings.Contains(line, "fish")
-	}, "Expected to find fish shell reference")
+		return strings.Contains(line, "assertline-marker")
+	}, "Expected to find marker line")
 	if err != nil {
 		t.Errorf("AssertLine failed unexpectedly: %v", err)
 	}
