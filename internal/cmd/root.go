@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/grovetools/core/cli"
+	"github.com/grovetools/core/version"
 	"github.com/spf13/cobra"
 
 	"github.com/grovetools/tend/pkg/docs"
@@ -42,6 +43,15 @@ Features:
   • Git worktree support for multi-branch testing
   • Docker container management
   • Grove-specific command helpers`
+
+	vInfo := version.GetInfo()
+	rootCmd.Version = vInfo.Version
+	cli.SetVersionTemplate(rootCmd, cli.VersionInfo{
+		Version:   vInfo.Version,
+		Commit:    vInfo.Commit,
+		BuildDate: vInfo.BuildDate,
+		BuildArch: vInfo.Platform,
+	})
 
 	// Initialize configuration
 	cobra.OnInitialize(func() {
