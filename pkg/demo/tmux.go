@@ -11,46 +11,69 @@ import (
 	"github.com/grovetools/core/pkg/mux"
 )
 
-// setupMux routes demo session setup to the appropriate mux backend.
-func (g *Generator) setupMux(content *DemoContent) error {
+// muxResult records which mux backend a demo was set up with, so the
+// metadata can capture everything destroy/status/attach need later.
+type muxResult struct {
+	backend         mux.MuxType
+	tuimuxSocket    string // socket path (tuimux backend only)
+	tuimuxDaemonPID int    // daemon PID spawned for this demo (tuimux backend only)
+}
+
+// demoBackend decides which mux backend demo setup will use.
+// Shared by Preflight and setupMux so they always agree.
+func demoBackend() mux.MuxType {
 	activeMux := mux.ActiveMux()
 	if envMux := os.Getenv(mux.EnvGroveMux); envMux == "tuimux" {
 		activeMux = mux.MuxTuimux
 	}
 	if activeMux == mux.MuxTuimux {
+		return mux.MuxTuimux
+	}
+	return mux.MuxTmux
+}
+
+// setupMux routes demo session setup to the appropriate mux backend.
+func (g *Generator) setupMux(content *DemoContent) (*muxResult, error) {
+	if demoBackend() == mux.MuxTuimux {
 		return g.setupTuimux(content)
 	}
 	return g.setupTmux(content)
 }
 
 // setupTuimux creates and configures the demo tuimux session.
-func (g *Generator) setupTuimux(content *DemoContent) error {
-	socketPath := filepath.Join(g.rootDir, "state", "tuimux-demo.sock")
+func (g *Generator) setupTuimux(content *DemoContent) (*muxResult, error) {
+	socketPath := TuimuxSocketPath(g.rootDir)
 	sessionName := fmt.Sprintf("grove-demo-%s", g.demoName)
 
 	proc, err := spawnDemoDaemon(socketPath)
 	if err != nil {
-		return fmt.Errorf("spawning tuimux daemon: %w", err)
+		return nil, fmt.Errorf("spawning tuimux daemon: %w", err)
 	}
 
 	engine, err := mux.NewTuimuxEngineWithSocket(socketPath)
 	if err != nil {
 		_ = proc.Signal(os.Kill)
-		return fmt.Errorf("connecting to tuimux daemon: %w", err)
+		return nil, fmt.Errorf("connecting to tuimux daemon: %w", err)
 	}
 
 	ctx := context.Background()
 	workDir := filepath.Join(g.ecosystemsDir(), "homelab")
 	if err := engine.StartServer(ctx, sessionName, mux.WithWorkDir(workDir)); err != nil {
-		return fmt.Errorf("starting tuimux server: %w", err)
+		_ = proc.Signal(os.Kill)
+		return nil, fmt.Errorf("starting tuimux server: %w", err)
 	}
 
 	ulog.Info("Tuimux demo session created").
 		Field("socket", socketPath).
 		Field("session", sessionName).
+		Field("daemon_pid", proc.Pid).
 		Emit()
 
-	return nil
+	return &muxResult{
+		backend:         mux.MuxTuimux,
+		tuimuxSocket:    socketPath,
+		tuimuxDaemonPID: proc.Pid,
+	}, nil
 }
 
 // spawnDemoDaemon starts a tuimux daemon for the demo environment.
@@ -80,13 +103,13 @@ func spawnDemoDaemon(socketPath string) (*os.Process, error) {
 }
 
 // setupTmux creates and configures the demo tmux session.
-func (g *Generator) setupTmux(content *DemoContent) error {
+func (g *Generator) setupTmux(content *DemoContent) (*muxResult, error) {
 	socketName := g.tmuxSocket
 	sessionName := fmt.Sprintf("grove-demo-%s", g.demoName)
 
 	engine, err := mux.NewTmuxEngineWithSocket(socketName)
 	if err != nil {
-		return fmt.Errorf("creating mux engine: %w", err)
+		return nil, fmt.Errorf("creating mux engine: %w", err)
 	}
 
 	ctx := context.Background()
@@ -106,7 +129,7 @@ func (g *Generator) setupTmux(content *DemoContent) error {
 	}
 
 	if err := engine.Launch(ctx, launchOpts); err != nil {
-		return fmt.Errorf("launching session: %w", err)
+		return nil, fmt.Errorf("launching session: %w", err)
 	}
 
 	// Set environment variables at the server (global) level so that
@@ -116,7 +139,7 @@ func (g *Generator) setupTmux(content *DemoContent) error {
 	for key, value := range env {
 		cmd := exec.Command("tmux", "-L", socketName, "set-environment", "-g", key, value)
 		if output, err := cmd.CombinedOutput(); err != nil {
-			return fmt.Errorf("setting tmux global environment %s: %w\nOutput: %s", key, err, string(output))
+			return nil, fmt.Errorf("setting tmux global environment %s: %w\nOutput: %s", key, err, string(output))
 		}
 	}
 
@@ -125,5 +148,5 @@ func (g *Generator) setupTmux(content *DemoContent) error {
 		Field("session", sessionName).
 		Emit()
 
-	return nil
+	return &muxResult{backend: mux.MuxTmux}, nil
 }

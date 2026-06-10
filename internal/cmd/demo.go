@@ -81,6 +81,7 @@ After creation, use 'tend demo attach <name>' to connect to the demo tmux sessio
 			}
 
 			// Set default output directory (uses XDG data directory)
+			customDir := outputDir != ""
 			if outputDir == "" {
 				outputDir = filepath.Join(demo.DemosDir(), demoName)
 			}
@@ -118,10 +119,7 @@ After creation, use 'tend demo attach <name>' to connect to the demo tmux sessio
 				return attachToDemo(outputDir)
 			}
 
-			ulogDemo.Info("Attach with command").
-				Pretty(fmt.Sprintf("\nTo connect to the demo environment:\n  tend demo attach %s", demoName)).
-				PrettyOnly().
-				Emit()
+			printCreateSummary(demoName, outputDir, customDir)
 
 			return nil
 		},
@@ -132,6 +130,36 @@ After creation, use 'tend demo attach <name>' to connect to the demo tmux sessio
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "Overwrite existing demo environment")
 
 	return cmd
+}
+
+// printCreateSummary prints a post-create summary of what was created plus
+// a few commands to try. When the demo lives in a custom directory the
+// follow-up commands need the --output-dir flag, not the demo name.
+func printCreateSummary(demoName, outputDir string, customDir bool) {
+	target := demoName
+	if customDir {
+		target = fmt.Sprintf("--output-dir %s", outputDir)
+	}
+
+	fmt.Printf("\nDemo '%s' is ready.\n\n", demoName)
+	fmt.Printf("  Location: %s\n", outputDir)
+
+	if meta, err := demo.LoadMetadata(outputDir); err == nil {
+		if meta.Backend != "" {
+			fmt.Printf("  Backend:  %s\n", meta.Backend)
+		}
+		if len(meta.Ecosystems) > 0 {
+			fmt.Printf("  Ecosystems:\n")
+			for _, eco := range meta.Ecosystems {
+				fmt.Printf("    - %s (%d repos)\n", eco.Name, eco.RepoCount)
+			}
+		}
+	}
+
+	fmt.Printf("\nTry these:\n")
+	fmt.Printf("  tend demo attach %s            # open the demo session\n", target)
+	fmt.Printf("  tend demo status %s            # inspect the environment\n", target)
+	fmt.Printf("  tend demo destroy %s --force   # tear it all down\n", target)
 }
 
 // newDemoAttachCmd creates the "demo attach" command.
@@ -252,14 +280,12 @@ This kills the demo tmux server and removes all demo files.`,
 				return nil
 			}
 
-			// Kill the tmux server first using metadata
-			meta, err := demo.LoadMetadata(outputDir)
-			if err == nil && meta.TmuxSocket != "" {
-				client, err := tmux.NewClientWithSocket(meta.TmuxSocket)
-				if err == nil {
-					_ = client.KillServer(cmd.Context())
-				}
-			}
+			// Stop everything the demo spawned (tmux server, tuimux daemon,
+			// groved daemons) BEFORE removing the directory, while PID files
+			// and sockets are still readable. meta may be nil if metadata is
+			// missing/corrupt; Teardown still reaps groved PID files then.
+			meta, _ := demo.LoadMetadata(outputDir)
+			demo.Teardown(cmd.Context(), outputDir, meta)
 
 			// Remove the directory
 			// Note: os.RemoveAll is safe with symlinks - it removes the link, not the target.
@@ -330,12 +356,28 @@ func newDemoStatusCmd() *cobra.Command {
 				return fmt.Errorf("loading demo metadata: %w", err)
 			}
 
-			// Check tmux server status
-			tmuxRunning := false
-			client, err := tmux.NewClientWithSocket(meta.TmuxSocket)
-			if err == nil {
-				sessions, _ := client.ListSessions(cmd.Context())
-				tmuxRunning = len(sessions) > 0
+			// Check mux backend status. Demos created on the tuimux backend
+			// have no tmux server; check the tuimux daemon socket instead.
+			backend := meta.Backend
+			muxRunning := false
+			if meta.UsesTuimux() {
+				if backend == "" {
+					backend = "tuimux"
+				}
+				socketPath := meta.TuimuxSocket
+				if socketPath == "" {
+					socketPath = demo.TuimuxSocketPath(outputDir)
+				}
+				muxRunning = mux.PingTuimuxSocket(socketPath) == nil
+			} else {
+				if backend == "" {
+					backend = "tmux"
+				}
+				client, err := tmux.NewClientWithSocket(meta.TmuxSocket)
+				if err == nil {
+					sessions, _ := client.ListSessions(cmd.Context())
+					muxRunning = len(sessions) > 0
+				}
 			}
 
 			// Display status
@@ -344,11 +386,23 @@ func newDemoStatusCmd() *cobra.Command {
 			fmt.Printf("Demo:         %s\n", meta.DemoName)
 			fmt.Printf("Location:     %s\n", outputDir)
 			fmt.Printf("Created:      %s\n", meta.CreatedAt.Format("2006-01-02 15:04:05"))
-			fmt.Printf("Tmux Socket:  %s\n", meta.TmuxSocket)
-			if meta.TmuxSessionName != "" {
-				fmt.Printf("Tmux Session: %s\n", meta.TmuxSessionName)
+			fmt.Printf("Mux Backend:  %s\n", backend)
+			if meta.UsesTuimux() {
+				socketPath := meta.TuimuxSocket
+				if socketPath == "" {
+					socketPath = demo.TuimuxSocketPath(outputDir)
+				}
+				fmt.Printf("Tuimux Socket: %s\n", socketPath)
+				if meta.TuimuxDaemonPID > 0 {
+					fmt.Printf("Tuimux Daemon PID: %d\n", meta.TuimuxDaemonPID)
+				}
+			} else {
+				fmt.Printf("Tmux Socket:  %s\n", meta.TmuxSocket)
 			}
-			fmt.Printf("Tmux Running: %v\n", tmuxRunning)
+			if meta.TmuxSessionName != "" {
+				fmt.Printf("Mux Session:  %s\n", meta.TmuxSessionName)
+			}
+			fmt.Printf("Mux Running:  %v\n", muxRunning)
 			fmt.Printf("\nEcosystems:\n")
 			for _, eco := range meta.Ecosystems {
 				fmt.Printf("  - %s (%d repos", eco.Name, eco.RepoCount)
@@ -367,7 +421,7 @@ func newDemoStatusCmd() *cobra.Command {
 	return cmd
 }
 
-// attachToDemo attaches to the demo tmux session.
+// attachToDemo attaches to the demo mux session (tmux or tuimux backend).
 func attachToDemo(demoDir string) error {
 	// Load metadata
 	meta, err := demo.LoadMetadata(demoDir)
@@ -375,9 +429,9 @@ func attachToDemo(demoDir string) error {
 		return fmt.Errorf("loading demo metadata: %w", err)
 	}
 
-	// Check if this demo has a tmux session
+	// Check if this demo has a mux session
 	if meta.TmuxSessionName == "" {
-		return fmt.Errorf("demo '%s' does not have a tmux session", meta.DemoName)
+		return fmt.Errorf("demo '%s' does not have a mux session", meta.DemoName)
 	}
 
 	// Build environment for the demo
@@ -387,6 +441,12 @@ func attachToDemo(demoDir string) error {
 	fullEnv := os.Environ()
 	for k, v := range env {
 		fullEnv = append(fullEnv, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	// Demos created on the tuimux backend have no tmux server to attach to;
+	// hand off to the tuimux client instead.
+	if meta.UsesTuimux() {
+		return attachToTuimuxDemo(demoDir, meta, fullEnv)
 	}
 
 	// Find tmux binary
@@ -423,5 +483,29 @@ func attachToDemo(demoDir string) error {
 		return fmt.Errorf("failed to exec tmux: %w", err)
 	}
 
+	return nil
+}
+
+// attachToTuimuxDemo attaches to a demo session running on the tuimux backend
+// by exec'ing the tuimux client against the demo's daemon socket.
+func attachToTuimuxDemo(demoDir string, meta *demo.Metadata, fullEnv []string) error {
+	socketPath := meta.TuimuxSocket
+	if socketPath == "" {
+		socketPath = demo.TuimuxSocketPath(demoDir)
+	}
+
+	if err := mux.PingTuimuxSocket(socketPath); err != nil {
+		return fmt.Errorf("demo tuimux daemon not running at %s (run 'tend demo create' first)", socketPath)
+	}
+
+	tuimuxPath, err := exec.LookPath("tuimux")
+	if err != nil {
+		return fmt.Errorf("tuimux not found in PATH")
+	}
+
+	tuimuxArgs := []string{"tuimux", "attach", "--socket", socketPath, "-t", meta.TmuxSessionName}
+	if err := syscall.Exec(tuimuxPath, tuimuxArgs, fullEnv); err != nil {
+		return fmt.Errorf("failed to exec tuimux: %w", err)
+	}
 	return nil
 }

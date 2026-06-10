@@ -12,11 +12,21 @@ import (
 type Metadata struct {
 	DemoName        string          `yaml:"demo_name"`
 	CreatedAt       time.Time       `yaml:"created_at"`
+	Backend         string          `yaml:"backend,omitempty"` // mux backend: "tmux" or "tuimux"
 	TmuxSocket      string          `yaml:"tmux_socket"`
 	TmuxSessionName string          `yaml:"tmux_session_name,omitempty"`
+	TuimuxSocket    string          `yaml:"tuimux_socket,omitempty"`     // tuimux daemon socket path (tuimux backend)
+	TuimuxDaemonPID int             `yaml:"tuimux_daemon_pid,omitempty"` // PID of the tuimux daemon spawned for this demo
 	Ecosystems      []EcosystemMeta `yaml:"ecosystems"`
 	ConfigPath      string          `yaml:"config_path"`
 	NotebookDir     string          `yaml:"notebook_dir"`
+}
+
+// UsesTuimux reports whether this demo was created on the tuimux backend.
+// Falls back to checking the tuimux socket for metadata written before the
+// backend field existed.
+func (m *Metadata) UsesTuimux() bool {
+	return m.Backend == "tuimux" || m.TuimuxSocket != "" || m.TuimuxDaemonPID > 0
 }
 
 // EcosystemMeta contains metadata about a single ecosystem.

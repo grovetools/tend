@@ -32,7 +32,7 @@ func (h *HomelabSpec) Description() string {
 
 // Generate creates the homelab demo content.
 func (h *HomelabSpec) Generate(rootDir string) (*DemoContent, error) {
-	gen := &homelabGenerator{rootDir: rootDir}
+	gen := &homelabGenerator{rootDir: rootDir, tmuxSocket: SocketName(h.Name())}
 
 	// Create all three ecosystems
 	ecosystems, err := gen.createEcosystems()
@@ -59,7 +59,8 @@ func (h *HomelabSpec) Generate(rootDir string) (*DemoContent, error) {
 
 // homelabGenerator is the internal generator for homelab demo content.
 type homelabGenerator struct {
-	rootDir string
+	rootDir    string
+	tmuxSocket string
 }
 
 // Helper methods for directory paths
@@ -460,7 +461,7 @@ func (g *homelabGenerator) runDelegatedCmd(cmd *exec.Cmd, description string) er
 
 // buildCmdEnv returns the environment slice for delegated commands.
 func (g *homelabGenerator) buildCmdEnv() []string {
-	demoEnv := BuildEnvironment(g.rootDir, TmuxSocketName)
+	demoEnv := BuildEnvironment(g.rootDir, g.tmuxSocket)
 	env := os.Environ()
 	for k, v := range demoEnv {
 		env = append(env, fmt.Sprintf("%s=%s", k, v))

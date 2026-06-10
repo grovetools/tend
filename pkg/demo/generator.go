@@ -4,10 +4,13 @@ package demo
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	grovelogging "github.com/grovetools/core/logging"
+	"github.com/grovetools/core/pkg/mux"
 	"github.com/grovetools/core/pkg/paths"
 	"gopkg.in/yaml.v3"
 
@@ -16,10 +19,13 @@ import (
 
 var ulog = grovelogging.NewUnifiedLogger("grove-tend.demo")
 
-// TmuxSocketName is the name of the tmux socket used for demo environments.
+// SocketName returns the tmux socket name for a demo environment.
 // This is used with tmux's -L flag which creates sockets in the tmux temp directory.
-// For multiple demos, this will be parameterized per demo (e.g., "grove-demo-homelab").
-const TmuxSocketName = "grove-demo"
+// Each demo gets its own socket (e.g., "grove-demo-homelab") so multiple demos
+// can coexist without sharing a tmux server.
+func SocketName(demoName string) string {
+	return fmt.Sprintf("grove-demo-%s", demoName)
+}
 
 // DemosDir returns the standard root directory for all demos.
 // Typically ~/.local/share/grove/demos
@@ -46,12 +52,18 @@ func NewGenerator(rootDir, demoName string) (*Generator, error) {
 		rootDir:    rootDir,
 		demoName:   demoName,
 		spec:       spec,
-		tmuxSocket: fmt.Sprintf("grove-demo-%s", demoName),
+		tmuxSocket: SocketName(demoName),
 	}, nil
 }
 
 // Generate creates the complete demo environment.
 func (g *Generator) Generate() error {
+	// Fail fast with a single clear error if required tools are missing,
+	// rather than failing opaquely mid-generation.
+	if err := g.Preflight(); err != nil {
+		return err
+	}
+
 	ulog.Info("Creating demo environment").
 		Field("path", g.rootDir).
 		Field("demo", g.demoName).
@@ -87,8 +99,11 @@ func (g *Generator) Generate() error {
 	}
 
 	// Setup mux session if needed
+	var muxRes *muxResult
 	if content.TmuxNeeded {
-		if err := g.setupMux(content); err != nil {
+		var err error
+		muxRes, err = g.setupMux(content)
+		if err != nil {
 			return fmt.Errorf("setting up mux: %w", err)
 		}
 	}
@@ -103,7 +118,47 @@ func (g *Generator) Generate() error {
 		ConfigPath:      g.configPath(),
 		NotebookDir:     g.notebookDir(),
 	}
+	if muxRes != nil {
+		meta.Backend = string(muxRes.backend)
+		meta.TuimuxSocket = muxRes.tuimuxSocket
+		meta.TuimuxDaemonPID = muxRes.tuimuxDaemonPID
+	}
 	return SaveMetadata(g.rootDir, meta)
+}
+
+// Preflight verifies that all external tools required to generate the demo
+// are available, returning a single error that lists every missing binary.
+//
+// Demo generation delegates to grove, nb, and flow CLIs (see homelab_spec.go)
+// and needs a mux backend (tmux or tuimux) for the demo session. Delegated
+// tools are resolved either from PATH or from the grove bin directory.
+func (g *Generator) Preflight() error {
+	required := []string{"grove", "nb", "flow"}
+	// The mux backend binary depends on which backend setupMux will pick.
+	if demoBackend() == mux.MuxTuimux {
+		required = append(required, "tuimux")
+	} else {
+		required = append(required, "tmux")
+	}
+
+	binDir := paths.BinDir()
+	var missing []string
+	for _, tool := range required {
+		if _, err := exec.LookPath(tool); err == nil {
+			continue
+		}
+		// Delegated commands also resolve binaries from the grove bin dir.
+		if info, err := os.Stat(filepath.Join(binDir, tool)); err == nil && !info.IsDir() && info.Mode()&0o111 != 0 {
+			continue
+		}
+		missing = append(missing, tool)
+	}
+
+	if len(missing) > 0 {
+		return fmt.Errorf("missing required tools for demo creation: %s (install them or make them available in PATH or %s)",
+			strings.Join(missing, ", "), binDir)
+	}
+	return nil
 }
 
 // createEmptyConfig creates a minimal config so CLI commands work during generation.
@@ -281,6 +336,11 @@ func (g *Generator) configPath() string {
 	return filepath.Join(g.rootDir, "config", "grove", "grove.yml")
 }
 
+// TuimuxSocketPath returns the path of the demo's tuimux daemon socket.
+func TuimuxSocketPath(demoDir string) string {
+	return filepath.Join(demoDir, "state", "tuimux-demo.sock")
+}
+
 // BuildEnvironment returns the environment variables for the demo.
 // Uses GROVE_HOME for full XDG isolation (config, data, state, cache all isolated)
 // and GROVE_BIN to preserve access to the real installed binaries for delegation.
@@ -295,7 +355,7 @@ func BuildEnvironment(demoDir, tmuxSocket string) map[string]string {
 		"GROVE_TMUX_SOCKET": tmuxSocket,
 	}
 	// Include tuimux socket if a demo daemon is running
-	tuimuxSocket := filepath.Join(demoDir, "state", "tuimux-demo.sock")
+	tuimuxSocket := TuimuxSocketPath(demoDir)
 	if _, err := os.Stat(tuimuxSocket); err == nil {
 		env["GROVE_TUIMUX_SOCKET"] = tuimuxSocket
 	}
