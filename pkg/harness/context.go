@@ -186,7 +186,18 @@ func (c *Context) SandboxEnv() []string {
 		fmt.Sprintf("XDG_STATE_HOME=%s", c.stateDir),
 		fmt.Sprintf("XDG_CACHE_HOME=%s", c.cacheDir),
 		fmt.Sprintf("XDG_RUNTIME_DIR=%s", c.runtimeDir),
+		// Neutralize any host GROVE_HOME. These vars are appended to
+		// os.Environ() by command.New().Env(), and core's path resolution
+		// prefers a non-empty GROVE_HOME over every XDG var above — a leaked
+		// host value would escape the sandbox. Setting it empty makes core's
+		// `GROVE_HOME != ""` checks fail so the XDG vars take effect.
+		"GROVE_HOME=",
 	}
+	// Point GROVE_BIN at the test bin dir so paths.BinDir() resolves the
+	// sandboxed mock binaries rather than any host GROVE_BIN. Without a mock
+	// bin dir, set it empty so BinDir() falls back to the sandboxed
+	// XDG_DATA_HOME/bin — either way resolution stays inside the sandbox.
+	env = append(env, fmt.Sprintf("GROVE_BIN=%s", c.GetString("test_bin_dir")))
 	if c.tmuxSocket != "" {
 		env = append(env, fmt.Sprintf("GROVE_TMUX_SOCKET=%s", c.tmuxSocket))
 	}

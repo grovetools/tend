@@ -60,7 +60,14 @@ func (e *TestExecutor) applyTestEnvironment(cmd *exec.Cmd) {
 		env = append(env, "PATH="+newPath)
 	}
 
-	// Inject sandboxed home environment
+	// Inject sandboxed home environment.
+	//
+	// Note: we deliberately do NOT set GROVE_HOME. core's path resolution
+	// (paths.getDataHome etc.) prefers GROVE_HOME over XDG_*, so a host
+	// GROVE_HOME would override every XDG var below and make commands write
+	// into the real grove data dir — a sandbox escape. By leaving it unset
+	// (and stripping any inherited value in the preserve loop below) the XDG
+	// vars take effect.
 	env = append(env,
 		fmt.Sprintf("HOME=%s", e.homeDir),
 		fmt.Sprintf("XDG_CONFIG_HOME=%s", e.configDir),
@@ -70,17 +77,30 @@ func (e *TestExecutor) applyTestEnvironment(cmd *exec.Cmd) {
 		fmt.Sprintf("XDG_RUNTIME_DIR=%s", e.runtimeDir),
 	)
 
+	// Point GROVE_BIN at the test bin dir so core's paths.BinDir() (which
+	// prefers GROVE_BIN) resolves the sandboxed mock binaries instead of any
+	// host GROVE_BIN. When no mock bin dir exists, we leave GROVE_BIN unset so
+	// BinDir() falls back to the sandboxed XDG_DATA_HOME/bin — either way
+	// resolution stays inside the sandbox.
+	if e.testBinDir != "" {
+		env = append(env, fmt.Sprintf("GROVE_BIN=%s", e.testBinDir))
+	}
+
 	// Inject mock override environment variables
 	for commandName, mockPath := range e.mockOverrides {
 		envVarName := getOverrideEnvVarName(commandName)
 		env = append(env, fmt.Sprintf("%s=%s", envVarName, mockPath))
 	}
 
-	// Preserve other environment variables
+	// Preserve other environment variables. We strip PATH/HOME/XDG_* (set
+	// above) and GROVE_HOME/GROVE_BIN (handled above) so no host value can
+	// leak in and break sandbox isolation.
 	for _, envVar := range os.Environ() {
 		if !strings.HasPrefix(envVar, "PATH=") &&
 			!strings.HasPrefix(envVar, "HOME=") &&
-			!strings.HasPrefix(envVar, "XDG_") {
+			!strings.HasPrefix(envVar, "XDG_") &&
+			!strings.HasPrefix(envVar, "GROVE_HOME=") &&
+			!strings.HasPrefix(envVar, "GROVE_BIN=") {
 			env = append(env, envVar)
 		}
 	}
