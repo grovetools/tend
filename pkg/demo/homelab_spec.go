@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/grovetools/core/pkg/workspace"
 	"github.com/grovetools/core/util/delegation"
 	"gopkg.in/yaml.v3"
 
@@ -1300,9 +1301,14 @@ func (g *homelabGenerator) createPlanWithJobs(repoDir, planName string, jobs []j
 
 	// Apply git state to worktree if specified
 	if config != nil && config.worktree != "" && config.gitState != "" {
-		// flow plan init --worktree preserves the branch path structure
-		// e.g., feature/gpu-widgets -> .grove-worktrees/feature/gpu-widgets
-		worktreeDir := filepath.Join(repoDir, ".grove-worktrees", config.worktree)
+		// Resolve the worktree path by name via core's registry/layout-aware
+		// resolver, which handles anchored/XDG worktrees that live under the
+		// anchor sub-repo's XDG base rather than the legacy .grove-worktrees join.
+		// Fall back to the legacy hardcoded join only if resolution fails.
+		worktreeDir, ok := workspace.ResolveWorktreePathByName(repoDir, config.worktree, nil)
+		if !ok {
+			worktreeDir = filepath.Join(repoDir, ".grove-worktrees", config.worktree)
+		}
 		if err := g.applyGitState(worktreeDir, config.gitState); err != nil {
 			return fmt.Errorf("applying git state to worktree: %w", err)
 		}
