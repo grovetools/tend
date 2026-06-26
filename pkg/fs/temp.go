@@ -22,10 +22,24 @@ func CreateShortTempDir(prefix string) (string, error) {
 	// Force /tmp on macOS/Linux; let Windows use default
 	if runtime.GOOS != "windows" {
 		dir = "/tmp"
+		// Honor a short TMPDIR when one is set (sandboxed/CI environments that
+		// restrict bare /tmp). Only adopt it when it is short enough to keep the
+		// resulting Unix socket paths under the ~104-char limit; the default
+		// macOS TMPDIR (/var/folders/.../T, ~49 chars) is too long and falls
+		// through to /tmp as before.
+		if td := os.Getenv("TMPDIR"); td != "" {
+			if trimmed := strings.TrimRight(td, "/"); len(trimmed) <= shortTmpdirMaxLen {
+				dir = trimmed
+			}
+		}
 	}
 	// MkdirTemp creates directories with 0700 permissions (required by XDG_RUNTIME_DIR spec)
 	return os.MkdirTemp(dir, prefix)
 }
+
+// shortTmpdirMaxLen bounds how long a TMPDIR may be before CreateShortTempDir
+// falls back to /tmp, preserving the Unix-socket-path budget.
+const shortTmpdirMaxLen = 24
 
 // TempDirManager manages temporary directories for tests
 type TempDirManager struct {
