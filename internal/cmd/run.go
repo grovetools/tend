@@ -802,12 +802,12 @@ func renderFinalSummary(renderer *ui.Renderer, results []*harness.Result, succes
 
 	// Define styles
 	baseStyle := re.NewStyle().Padding(0, 1)
-	headerStyle := baseStyle.Bold(true).Foreground(lipgloss.Color("#5FAFFF"))
+	headerStyle := baseStyle.Bold(true).Foreground(theme.DefaultTheme.Colors.Cyan)
 
 	// Create the table
 	t := table.New().
 		Border(lipgloss.NormalBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("#6C7086"))).
+		BorderStyle(lipgloss.NewStyle().Foreground(theme.DefaultTheme.Colors.Border)).
 		Headers(headers...).
 		Rows(rows...)
 

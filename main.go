@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/charmbracelet/lipgloss"
 	grovelogging "github.com/grovetools/core/logging"
+	"github.com/grovetools/core/tui/theme"
 
 	"github.com/grovetools/tend/pkg/app"
 	"github.com/grovetools/tend/pkg/harness"
@@ -122,17 +122,11 @@ func proxyToProjectBinary() {
 	}
 
 	// Style helpers for messages
-	arrow := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("4")).
-		Render("→")
+	arrow := theme.DefaultTheme.InfoLight.Render("→")
 
-	style := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("2")).
-		Bold(true)
+	style := theme.DefaultTheme.Success
 
-	pathStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("8")).
-		Italic(true)
+	pathStyle := theme.DefaultTheme.Muted.Italic(true)
 
 	// Resolve symlinks for the project binary
 	projectBinary, err = filepath.EvalSymlinks(projectBinary)

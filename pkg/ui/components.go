@@ -165,12 +165,7 @@ func InfoBox(message string) string {
 
 // CodeBlock renders code in a styled block
 func CodeBlock(code string) string {
-	codeStyle := lipgloss.NewStyle().
-		Background(lipgloss.Color("#313244")).
-		Foreground(lipgloss.Color("#F8F8F2")).
-		Padding(0, 1).
-		MarginLeft(2)
-	return codeStyle.Render(code)
+	return theme.DefaultTheme.Code.Render(code)
 }
 
 // List renders a bulleted list

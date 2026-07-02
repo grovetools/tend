@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	grovelogging "github.com/grovetools/core/logging"
 	"github.com/grovetools/core/tui/theme"
 )
@@ -83,9 +82,7 @@ func (ui *UI) ScenarioFailed(name string, err error) {
 
 // PhaseStart displays the start of a test phase (e.g., Setup, Test, Teardown).
 func (ui *UI) PhaseStart(name string) {
-	style := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("6")). // Cyan
+	style := theme.DefaultTheme.Info.
 		MarginTop(1).
 		MarginBottom(1)
 
@@ -411,22 +408,22 @@ func (ui *UI) CommandOutput(command, stdout, stderr string) {
 		return
 	}
 
-	// ANSI color codes
-	cyan := "\033[36m"  // Cyan for box borders
-	green := "\033[32m" // Green for command prompt
-	red := "\033[31m"   // Red for stderr
-	reset := "\033[0m"  // Reset colors
+	// Theme styles for terminal-like output
+	borderStyle := theme.DefaultTheme.InfoLight    // Box borders
+	promptStyle := theme.DefaultTheme.SuccessLight // Command prompt
+	stderrStyle := theme.DefaultTheme.ErrorLight   // Stderr
 
 	// Terminal-like separator with colored borders
-	prettyMsg := fmt.Sprintf("  %s┌─────────────────────────────────────────────%s\n", cyan, reset)
+	prettyMsg := fmt.Sprintf("  %s\n", borderStyle.Render("┌─────────────────────────────────────────────"))
+	border := borderStyle.Render("│")
 
 	// Show command as if typed in terminal (only in very verbose mode)
 	if command != "" && ui.veryVerbose {
 		// Special handling for PATH logging to make it less noisy
 		if strings.HasPrefix(command, "PATH for") {
-			prettyMsg += fmt.Sprintf("  %s│%s %sDebug:%s %s\n", cyan, reset, green, reset, command)
+			prettyMsg += fmt.Sprintf("  %s %s %s\n", border, promptStyle.Render("Debug:"), command)
 		} else {
-			prettyMsg += fmt.Sprintf("  %s│%s %s$%s %s\n", cyan, reset, green, reset, command)
+			prettyMsg += fmt.Sprintf("  %s %s %s\n", border, promptStyle.Render("$"), command)
 		}
 	}
 
@@ -436,9 +433,9 @@ func (ui *UI) CommandOutput(command, stdout, stderr string) {
 		for _, line := range lines {
 			// Special handling for PATH logging to make it less noisy
 			if strings.HasPrefix(command, "PATH for") {
-				prettyMsg += fmt.Sprintf("  %s│%s   %s\n", cyan, reset, line)
+				prettyMsg += fmt.Sprintf("  %s   %s\n", border, line)
 			} else {
-				prettyMsg += fmt.Sprintf("  %s│%s %s\n", cyan, reset, line)
+				prettyMsg += fmt.Sprintf("  %s %s\n", border, line)
 			}
 		}
 	}
@@ -447,11 +444,11 @@ func (ui *UI) CommandOutput(command, stdout, stderr string) {
 	if stderr != "" {
 		lines := strings.Split(strings.TrimSuffix(stderr, "\n"), "\n")
 		for _, line := range lines {
-			prettyMsg += fmt.Sprintf("  %s│%s %s%s%s\n", cyan, reset, red, line, reset)
+			prettyMsg += fmt.Sprintf("  %s %s\n", border, stderrStyle.Render(line))
 		}
 	}
 
-	prettyMsg += fmt.Sprintf("  %s└─────────────────────────────────────────────%s", cyan, reset)
+	prettyMsg += fmt.Sprintf("  %s", borderStyle.Render("└─────────────────────────────────────────────"))
 
 	ulog.Debug("Command output").
 		Field("command", command).

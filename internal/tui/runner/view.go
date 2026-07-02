@@ -173,7 +173,7 @@ func (m Model) View() string {
 
 		outputPane := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("240")).
+			BorderForeground(theme.DefaultTheme.Colors.Border).
 			Width(m.width/2 - 2).
 			Height(m.height - 10).
 			Render(theme.DefaultTheme.Muted.Render(outputTitle) + "\n" + m.outputPane.View())
