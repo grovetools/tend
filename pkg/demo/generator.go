@@ -13,6 +13,7 @@ import (
 	grovelogging "github.com/grovetools/core/logging"
 	"github.com/grovetools/core/pkg/mux"
 	"github.com/grovetools/core/pkg/paths"
+	"github.com/pelletier/go-toml/v2"
 	"gopkg.in/yaml.v3"
 
 	"github.com/grovetools/tend/pkg/fs"
@@ -240,14 +241,13 @@ func (g *Generator) Preflight() error {
 // createEmptyConfig creates a minimal config so CLI commands work during generation.
 func (g *Generator) createEmptyConfig() error {
 	config := map[string]interface{}{
-		"version": "1.0",
-		"groves":  make(map[string]interface{}),
+		"groves": make(map[string]interface{}),
 		"notebooks": map[string]interface{}{
 			"definitions": make(map[string]interface{}),
 		},
 	}
 
-	data, err := yaml.Marshal(config)
+	data, err := toml.Marshal(config)
 	if err != nil {
 		return err
 	}
@@ -275,60 +275,51 @@ func (g *Generator) createDirectoryStructure() error {
 	return nil
 }
 
-// createGlobalConfig creates the grove.yml file in the demo's config directory.
+// createGlobalConfig creates the grove.toml file in the demo's config directory.
 func (g *Generator) createGlobalConfig(content *DemoContent) error {
-	config := map[string]interface{}{
-		"name":    "grove-demo-" + g.demoName,
-		"version": "1.0",
-		"groves":  make(map[string]interface{}),
-		"notebooks": map[string]interface{}{
-			"definitions": make(map[string]interface{}),
-		},
-		// No need to override explicit_projects or context as we are creating a fresh config
+	config := demoGlobalConfig(g.notebookDir(), content.Ecosystems)
+	config["name"] = "grove-demo-" + g.demoName
+	// No need to override explicit_projects or context as we are creating a fresh config
+
+	data, err := toml.Marshal(config)
+	if err != nil {
+		return err
 	}
+	return writeFile(g.configPath(), data)
+}
 
-	groves := config["groves"].(map[string]interface{})
-	notebooks := config["notebooks"].(map[string]interface{})["definitions"].(map[string]interface{})
+// demoGlobalConfig builds the modern grove.toml payload for the demo's global
+// config layer: one [groves.<eco>] source and one [notebooks.definitions.<eco>]
+// per ecosystem. Only root_dir is set on each notebook definition — the demo
+// seeds notes under <root_dir>/workspaces/<eco>/<category>, which is exactly
+// what core's default path templates resolve to (see
+// core/pkg/workspace/notebook_locator.go, defaultNotesPathTemplate et al.), so
+// no explicit path templates are needed. The legacy YAML emission additionally
+// wrote a notebooks.definitions.<eco>.workspaces.<eco>.paths block; that shape
+// has no counterpart in the modern config.Notebook struct and was silently
+// dropped by config parsing.
+func demoGlobalConfig(notebookDir string, ecosystems []EcosystemMeta) map[string]interface{} {
+	groves := make(map[string]interface{})
+	definitions := make(map[string]interface{})
 
-	// Standard workspace categories that nb expects
-	workspaceCategories := []string{
-		"inbox", "issues", "plans", "in_progress", "review",
-		"learn", "concepts", "docgen", "icebox", "llm",
-		"quick", "todos", "completed", "templates", "recipes",
-	}
-
-	for _, eco := range content.Ecosystems {
+	for _, eco := range ecosystems {
 		groves[eco.Name] = map[string]interface{}{
 			"path":        eco.Path,
 			"enabled":     true,
 			"description": eco.Description,
 			"notebook":    eco.Name,
 		}
-
-		// Build explicit workspace paths for the ecosystem
-		notebookRoot := filepath.Join(g.notebookDir(), eco.Name)
-		workspaceRoot := filepath.Join(notebookRoot, "workspaces", eco.Name)
-
-		paths := make(map[string]string)
-		for _, cat := range workspaceCategories {
-			paths[cat] = filepath.Join(workspaceRoot, cat)
-		}
-
-		notebooks[eco.Name] = map[string]interface{}{
-			"root_dir": notebookRoot,
-			"workspaces": map[string]interface{}{
-				eco.Name: map[string]interface{}{
-					"paths": paths,
-				},
-			},
+		definitions[eco.Name] = map[string]interface{}{
+			"root_dir": filepath.Join(notebookDir, eco.Name),
 		}
 	}
 
-	data, err := yaml.Marshal(config)
-	if err != nil {
-		return err
+	return map[string]interface{}{
+		"groves": groves,
+		"notebooks": map[string]interface{}{
+			"definitions": definitions,
+		},
 	}
-	return writeFile(g.configPath(), data)
 }
 
 // overrideProviderSections are the top-level provider sections from which
@@ -455,7 +446,7 @@ func (g *Generator) ecosystemsDir() string {
 }
 
 func (g *Generator) configPath() string {
-	return filepath.Join(g.rootDir, "config", "grove", "grove.yml")
+	return filepath.Join(g.rootDir, "config", "grove", "grove.toml")
 }
 
 // TuimuxSocketPath returns the path of the demo's tuimux daemon socket.

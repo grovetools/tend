@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/grovetools/core/config"
+	"github.com/grovetools/core/pkg/workspace"
 	"gopkg.in/yaml.v3"
 )
 
@@ -259,4 +261,211 @@ func TestWithProgressReportsSteps(t *testing.T) {
 		t.Fatal(err)
 	}
 	plain.reportStep("no-op") // must not panic with no callback
+}
+
+// assertNoVersionKey asserts the emitted file carries no legacy top-level
+// version key. Checked on the raw bytes because the loader's SetDefaults
+// backfills Version="1.0" on the parsed struct either way.
+func assertNoVersionKey(t *testing.T, path string) {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, line := range strings.Split(string(raw), "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "version") {
+			t.Errorf("emitted config still carries legacy version key: %q", line)
+		}
+	}
+}
+
+// demoTestEcosystems returns a representative ecosystem set for config tests.
+func demoTestEcosystems(root string) []EcosystemMeta {
+	return []EcosystemMeta{
+		{Name: "homelab", Path: filepath.Join(root, "ecosystems", "homelab"), RepoCount: 8, Description: "Main homelab ecosystem"},
+		{Name: "contrib", Path: filepath.Join(root, "ecosystems", "contrib"), RepoCount: 3, Description: "Community contributions"},
+		{Name: "infra", Path: filepath.Join(root, "ecosystems", "infra"), RepoCount: 2, Description: "Infrastructure and deployment"},
+	}
+}
+
+// assertDemoGlobalConfig loads the emitted global config through core's real
+// loader (parse + schema validation) and asserts the modern schema: one
+// [groves.<eco>] source and one [notebooks.definitions.<eco>] with root_dir
+// per ecosystem, and NO legacy version/workspaces.paths remnants.
+func assertDemoGlobalConfig(t *testing.T, root, path string) *config.Config {
+	t.Helper()
+
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("core config loader rejected emitted demo config: %v", err)
+	}
+
+	assertNoVersionKey(t, path)
+
+	for _, eco := range demoTestEcosystems(root) {
+		grove, ok := cfg.Groves[eco.Name]
+		if !ok {
+			t.Errorf("groves.%s missing from emitted config", eco.Name)
+			continue
+		}
+		if grove.Path != eco.Path {
+			t.Errorf("groves.%s.path = %q, want %q", eco.Name, grove.Path, eco.Path)
+		}
+		if grove.Notebook != eco.Name {
+			t.Errorf("groves.%s.notebook = %q, want %q", eco.Name, grove.Notebook, eco.Name)
+		}
+		if grove.Enabled == nil || !*grove.Enabled {
+			t.Errorf("groves.%s.enabled should be true", eco.Name)
+		}
+		if grove.Description != eco.Description {
+			t.Errorf("groves.%s.description = %q, want %q", eco.Name, grove.Description, eco.Description)
+		}
+
+		if cfg.Notebooks == nil || cfg.Notebooks.Definitions == nil {
+			t.Fatal("notebooks.definitions missing from emitted config")
+		}
+		nb, ok := cfg.Notebooks.Definitions[eco.Name]
+		if !ok || nb == nil {
+			t.Errorf("notebooks.definitions.%s missing from emitted config", eco.Name)
+			continue
+		}
+		wantRoot := filepath.Join(root, "notebooks", eco.Name)
+		if nb.RootDir != wantRoot {
+			t.Errorf("notebooks.definitions.%s.root_dir = %q, want %q", eco.Name, nb.RootDir, wantRoot)
+		}
+	}
+
+	return cfg
+}
+
+// TestCreateGlobalConfigModernTOML verifies the generator's overlay config is
+// modern grove.toml that core parses fully, and — the bug-fix property — that
+// the default notebook path templates resolve to exactly where the demo seeds
+// its notes (<root_dir>/workspaces/<eco>/<category>). The legacy YAML emission
+// relied on a notebooks...workspaces.<eco>.paths block that modern config
+// parsing silently dropped, leaving the seeded notes invisible to nb.
+func TestCreateGlobalConfigModernTOML(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "config", "grove"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	g := &Generator{rootDir: root, demoName: "homelab"}
+	content := &DemoContent{Ecosystems: demoTestEcosystems(root)}
+	if err := g.createGlobalConfig(content); err != nil {
+		t.Fatalf("createGlobalConfig: %v", err)
+	}
+
+	if base := filepath.Base(g.configPath()); base != "grove.toml" {
+		t.Errorf("config filename = %q, want grove.toml", base)
+	}
+
+	cfg := assertDemoGlobalConfig(t, root, g.configPath())
+	if cfg.Name != "grove-demo-homelab" {
+		t.Errorf("config name = %q, want grove-demo-homelab", cfg.Name)
+	}
+
+	// Bug-fix property: notes seeded at notebooks/<eco>/workspaces/<eco>/<cat>
+	// must be exactly what the locator resolves for the ecosystem node using
+	// only root_dir + default templates.
+	locator := workspace.NewNotebookLocator(cfg)
+	node := &workspace.WorkspaceNode{
+		Name:         "homelab",
+		Path:         filepath.Join(root, "ecosystems", "homelab"),
+		Kind:         workspace.KindEcosystemRoot,
+		NotebookName: "homelab",
+	}
+	for _, category := range []string{"inbox", "concepts", "learn"} {
+		got, err := locator.GetNotesDir(node, category)
+		if err != nil {
+			t.Fatalf("GetNotesDir(%s): %v", category, err)
+		}
+		want := filepath.Join(root, "notebooks", "homelab", "workspaces", "homelab", category)
+		if got != want {
+			t.Errorf("notes dir for %s = %q, want seeded location %q", category, got, want)
+		}
+	}
+	plans, err := locator.GetPlansDir(node)
+	if err != nil {
+		t.Fatalf("GetPlansDir: %v", err)
+	}
+	if want := filepath.Join(root, "notebooks", "homelab", "workspaces", "homelab", "plans"); plans != want {
+		t.Errorf("plans dir = %q, want seeded location %q", plans, want)
+	}
+}
+
+// TestHomelabCreateConfigModernTOML verifies the mid-generation config written
+// before notebook seeding (which delegated nb/flow calls resolve against) has
+// the same modern shape.
+func TestHomelabCreateConfigModernTOML(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "config", "grove"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	g := &homelabGenerator{rootDir: root, tmuxSocket: SocketName("homelab")}
+	if err := g.createConfig(demoTestEcosystems(root)); err != nil {
+		t.Fatalf("createConfig: %v", err)
+	}
+
+	if base := filepath.Base(g.configPath()); base != "grove.toml" {
+		t.Errorf("config filename = %q, want grove.toml", base)
+	}
+	assertDemoGlobalConfig(t, root, g.configPath())
+}
+
+// TestCreateEmptyConfigModernTOML verifies the pre-generation placeholder
+// config is valid modern TOML that core's loader accepts.
+func TestCreateEmptyConfigModernTOML(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "config", "grove"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	g := &Generator{rootDir: root, demoName: "homelab"}
+	if err := g.createEmptyConfig(); err != nil {
+		t.Fatalf("createEmptyConfig: %v", err)
+	}
+
+	cfg, err := config.Load(g.configPath())
+	if err != nil {
+		t.Fatalf("core config loader rejected empty demo config: %v", err)
+	}
+	if len(cfg.Groves) != 0 {
+		t.Errorf("empty config should have no groves, got %v", cfg.Groves)
+	}
+}
+
+// TestWriteEcosystemConfigModernTOML verifies per-ecosystem configs are
+// grove.toml with name + workspaces and no legacy version field.
+func TestWriteEcosystemConfigModernTOML(t *testing.T) {
+	ecoDir := t.TempDir()
+	g := &homelabGenerator{rootDir: t.TempDir(), tmuxSocket: SocketName("homelab")}
+
+	workspaces := []string{"dashboard", "sentinel", "vault"}
+	if err := g.writeEcosystemConfig(ecoDir, "homelab", workspaces); err != nil {
+		t.Fatalf("writeEcosystemConfig: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(ecoDir, "grove.yml")); !os.IsNotExist(err) {
+		t.Error("legacy grove.yml should no longer be written")
+	}
+
+	path := filepath.Join(ecoDir, "grove.toml")
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("core config loader rejected ecosystem config: %v", err)
+	}
+	if cfg.Name != "homelab" {
+		t.Errorf("ecosystem name = %q, want homelab", cfg.Name)
+	}
+	if !reflect.DeepEqual(cfg.Workspaces, workspaces) {
+		t.Errorf("workspaces = %v, want %v", cfg.Workspaces, workspaces)
+	}
+	assertNoVersionKey(t, path)
+
+	// Discovery must recognize the ecosystem via its grove.toml.
+	if found := config.FindEcosystemConfig(ecoDir); found != path {
+		t.Errorf("FindEcosystemConfig(%q) = %q, want %q", ecoDir, found, path)
+	}
 }

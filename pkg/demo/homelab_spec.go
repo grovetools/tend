@@ -10,7 +10,7 @@ import (
 
 	"github.com/grovetools/core/pkg/workspace"
 	"github.com/grovetools/core/util/delegation"
-	"gopkg.in/yaml.v3"
+	"github.com/pelletier/go-toml/v2"
 
 	"github.com/grovetools/tend/pkg/fs"
 	"github.com/grovetools/tend/pkg/git"
@@ -74,7 +74,7 @@ func (g *homelabGenerator) ecosystemsDir() string {
 }
 
 func (g *homelabGenerator) configPath() string {
-	return filepath.Join(g.rootDir, "config", "grove", "grove.yml")
+	return filepath.Join(g.rootDir, "config", "grove", "grove.toml")
 }
 
 // createEcosystems creates all three ecosystems.
@@ -112,7 +112,7 @@ func (g *homelabGenerator) createHomelabEcosystem() (*EcosystemMeta, error) {
 		return nil, err
 	}
 
-	// Write ecosystem grove.yml
+	// Write ecosystem grove.toml
 	if err := g.writeEcosystemConfig(ecoDir, "homelab", []string{
 		"dashboard", "sentinel", "vault", "beacon",
 		"guardian", "relay", "chronicle", "shared",
@@ -152,7 +152,7 @@ func (g *homelabGenerator) createContribEcosystem() (*EcosystemMeta, error) {
 		return nil, err
 	}
 
-	// Write ecosystem grove.yml
+	// Write ecosystem grove.toml
 	if err := g.writeEcosystemConfig(ecoDir, "contrib", []string{
 		"plugin-plex", "plugin-unifi", "theme-catppuccin",
 	}); err != nil {
@@ -186,7 +186,7 @@ func (g *homelabGenerator) createInfraEcosystem() (*EcosystemMeta, error) {
 		return nil, err
 	}
 
-	// Write ecosystem grove.yml
+	// Write ecosystem grove.toml
 	if err := g.writeEcosystemConfig(ecoDir, "infra", []string{
 		"deploy", "charts",
 	}); err != nil {
@@ -345,71 +345,29 @@ func (g *homelabGenerator) getLanguageFiles(spec RepoSpec) map[string]string {
 	return files
 }
 
-// writeEcosystemConfig writes the grove.yml for an ecosystem.
+// writeEcosystemConfig writes the grove.toml for an ecosystem.
 func (g *homelabGenerator) writeEcosystemConfig(ecoDir, name string, workspaces []string) error {
 	config := map[string]interface{}{
 		"name":       name,
-		"version":    "1.0",
 		"workspaces": workspaces,
 	}
 
-	data, err := yaml.Marshal(config)
+	data, err := toml.Marshal(config)
 	if err != nil {
 		return err
 	}
 
-	return fs.WriteFile(filepath.Join(ecoDir, "grove.yml"), data)
+	return fs.WriteFile(filepath.Join(ecoDir, "grove.toml"), data)
 }
 
-// createConfig creates the grove.yml file with ecosystem definitions.
-// This must be called after ecosystems are created but before seeding notebooks.
+// createConfig creates the grove.toml file with ecosystem definitions.
+// This must be called after ecosystems are created but before seeding notebooks
+// (the delegated nb/flow calls resolve their write paths through this config).
+// See demoGlobalConfig for the schema and why root_dir alone is sufficient.
 func (g *homelabGenerator) createConfig(ecosystems []EcosystemMeta) error {
-	config := map[string]interface{}{
-		"version": "1.0",
-		"groves":  make(map[string]interface{}),
-		"notebooks": map[string]interface{}{
-			"definitions": make(map[string]interface{}),
-		},
-	}
+	config := demoGlobalConfig(g.notebookDir(), ecosystems)
 
-	groves := config["groves"].(map[string]interface{})
-	notebooks := config["notebooks"].(map[string]interface{})["definitions"].(map[string]interface{})
-
-	// Standard workspace categories that nb expects
-	workspaceCategories := []string{
-		"inbox", "issues", "plans", "in_progress", "review",
-		"learn", "concepts", "docgen", "icebox", "llm",
-		"quick", "todos", "completed", "templates", "recipes",
-	}
-
-	for _, eco := range ecosystems {
-		groves[eco.Name] = map[string]interface{}{
-			"path":        eco.Path,
-			"enabled":     true,
-			"description": eco.Description,
-			"notebook":    eco.Name,
-		}
-
-		// Build explicit workspace paths for the ecosystem
-		notebookRoot := filepath.Join(g.notebookDir(), eco.Name)
-		workspaceRoot := filepath.Join(notebookRoot, "workspaces", eco.Name)
-
-		paths := make(map[string]string)
-		for _, cat := range workspaceCategories {
-			paths[cat] = filepath.Join(workspaceRoot, cat)
-		}
-
-		notebooks[eco.Name] = map[string]interface{}{
-			"root_dir": notebookRoot,
-			"workspaces": map[string]interface{}{
-				eco.Name: map[string]interface{}{
-					"paths": paths,
-				},
-			},
-		}
-	}
-
-	data, err := yaml.Marshal(config)
+	data, err := toml.Marshal(config)
 	if err != nil {
 		return err
 	}
@@ -1312,13 +1270,30 @@ func (g *homelabGenerator) createPlanWithJobs(repoDir, planName string, jobs []j
 
 	// Apply git state to worktree if specified
 	if config != nil && config.worktree != "" && config.gitState != "" {
-		// Resolve the worktree path by name via core's registry/layout-aware
-		// resolver, which handles anchored/XDG worktrees that live under the
-		// anchor sub-repo's XDG base rather than the legacy .grove-worktrees join.
-		// Fall back to the legacy hardcoded join only if resolution fails.
-		worktreeDir, ok := workspace.ResolveWorktreePathByName(repoDir, config.worktree, nil)
-		if !ok {
-			worktreeDir = filepath.Join(repoDir, ".grove-worktrees", config.worktree)
+		// The delegated flow above ran with GROVE_HOME=<demo root>, so an
+		// XDG-layout worktree lives under the DEMO's data dir — a location
+		// the env-derived registry/layout resolver in THIS process (running
+		// with the host environment) cannot see. Probe the demo's own XDG
+		// base first, then fall back to the env-derived resolver (covers
+		// runs where tend itself executes inside the demo env) and finally
+		// the legacy in-repo join.
+		worktreeDir := filepath.Join(g.rootDir, "data", "grove", "worktrees",
+			workspace.DirIdentifier(repoDir), config.worktree)
+		if _, err := os.Stat(worktreeDir); err != nil {
+			if dir, ok := workspace.ResolveWorktreePathByName(repoDir, config.worktree, nil); ok {
+				worktreeDir = dir
+			} else {
+				worktreeDir = filepath.Join(repoDir, ".grove-worktrees", config.worktree)
+			}
+		}
+		// flow creates an anchored ECOSYSTEM worktree container: the actual
+		// git checkout of the repo lives one level down, in a subdirectory
+		// named after the repo. Git state must be applied to the checkout.
+		if _, err := os.Stat(filepath.Join(worktreeDir, ".git")); err != nil {
+			nested := filepath.Join(worktreeDir, filepath.Base(repoDir))
+			if _, err := os.Stat(filepath.Join(nested, ".git")); err == nil {
+				worktreeDir = nested
+			}
 		}
 		if err := g.applyGitState(worktreeDir, config.gitState); err != nil {
 			return fmt.Errorf("applying git state to worktree: %w", err)
@@ -1343,7 +1318,8 @@ func (g *homelabGenerator) createPlanWithJobs(repoDir, planName string, jobs []j
 			"-p", job.prompt,
 		}
 		if job.dependsOn >= 0 && job.dependsOn < len(jobFilenames) {
-			args = append(args, "-d", jobFilenames[job.dependsOn])
+			// Modern flow has no -d shorthand; the flag is --depends-on.
+			args = append(args, "--depends-on", jobFilenames[job.dependsOn])
 		}
 
 		cmd := g.delegatedCommand("flow", args...)
