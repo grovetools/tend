@@ -41,6 +41,8 @@ type Generator struct {
 	spec            DemoSpec
 	tmuxSocket      string
 	copyCredentials bool
+	withoutMux      bool
+	progress        func(step string)
 }
 
 // Option configures a Generator.
@@ -51,6 +53,23 @@ type Option func(*Generator)
 // will then have no API keys and cannot drive real providers.
 func WithoutCredentials() Option {
 	return func(g *Generator) { g.copyCredentials = false }
+}
+
+// WithoutMux skips the mux setup step entirely: no tmux server or tuimux
+// daemon is spawned for the demo, and Preflight stops requiring a mux
+// binary. For embedding callers (treemux's splash) the host terminal IS
+// the demo's terminal — it execs into the demo env itself, so a demo mux
+// session would only be an orphaned process to tear down later.
+func WithoutMux() Option {
+	return func(g *Generator) { g.withoutMux = true }
+}
+
+// WithProgress registers a callback invoked at the start of each Generate
+// step with a short human-readable label. It is called from Generate's
+// goroutine (whatever goroutine the caller runs Generate on), so UI
+// callers must marshal it onto their event loop themselves.
+func WithProgress(fn func(step string)) Option {
+	return func(g *Generator) { g.progress = fn }
 }
 
 // NewGenerator creates a new demo generator for the specified demo type.
@@ -73,10 +92,18 @@ func NewGenerator(rootDir, demoName string, opts ...Option) (*Generator, error) 
 	return g, nil
 }
 
+// reportStep surfaces a generation step to the WithProgress callback.
+func (g *Generator) reportStep(step string) {
+	if g.progress != nil {
+		g.progress(step)
+	}
+}
+
 // Generate creates the complete demo environment.
 func (g *Generator) Generate() error {
 	// Fail fast with a single clear error if required tools are missing,
 	// rather than failing opaquely mid-generation.
+	g.reportStep("checking required tools")
 	if err := g.Preflight(); err != nil {
 		return err
 	}
@@ -88,12 +115,14 @@ func (g *Generator) Generate() error {
 		Emit()
 
 	// Create directory structure
+	g.reportStep("creating directory structure")
 	if err := g.createDirectoryStructure(); err != nil {
 		return fmt.Errorf("creating directory structure: %w", err)
 	}
 
 	// Create an empty/minimal config first so that CLI commands
 	// (grove, nb, flow) work during spec.Generate(). We'll update it after.
+	g.reportStep("writing initial config")
 	if err := g.createEmptyConfig(); err != nil {
 		return fmt.Errorf("creating initial config: %w", err)
 	}
@@ -102,6 +131,7 @@ func (g *Generator) Generate() error {
 	// agents can talk to real providers, unless disabled. Whatever is
 	// copied is disclosed loudly below (key names only, never values).
 	var credCopy *CredentialCopy
+	g.reportStep("copying credentials")
 	if g.copyCredentials {
 		var err error
 		credCopy, err = g.copyUserOverride()
@@ -124,19 +154,24 @@ func (g *Generator) Generate() error {
 	}
 
 	// Let spec generate content (ecosystems, repos, notes, plans)
+	g.reportStep("generating ecosystems, repos, notes, and plans")
 	content, err := g.spec.Generate(g.rootDir)
 	if err != nil {
 		return fmt.Errorf("generating demo content: %w", err)
 	}
 
 	// Update overlay config with full ecosystem information
+	g.reportStep("writing global config")
 	if err := g.createGlobalConfig(content); err != nil {
 		return fmt.Errorf("creating global config: %w", err)
 	}
 
-	// Setup mux session if needed
+	// Setup mux session if needed (skipped with WithoutMux — the embedding
+	// caller is the demo's terminal, so a mux server would just be an
+	// orphan to tear down later).
 	var muxRes *muxResult
-	if content.TmuxNeeded {
+	if content.TmuxNeeded && !g.withoutMux {
+		g.reportStep("starting mux session")
 		var err error
 		muxRes, err = g.setupMux(content)
 		if err != nil {
@@ -145,6 +180,7 @@ func (g *Generator) Generate() error {
 	}
 
 	// Save metadata
+	g.reportStep("saving metadata")
 	meta := &Metadata{
 		DemoName:        g.demoName,
 		CreatedAt:       time.Now(),
@@ -172,10 +208,13 @@ func (g *Generator) Generate() error {
 func (g *Generator) Preflight() error {
 	required := []string{"grove", "nb", "flow"}
 	// The mux backend binary depends on which backend setupMux will pick.
-	if demoBackend() == mux.MuxTuimux {
-		required = append(required, "tuimux")
-	} else {
-		required = append(required, "tmux")
+	// With WithoutMux there is no mux step, so no mux binary is required.
+	if !g.withoutMux {
+		if demoBackend() == mux.MuxTuimux {
+			required = append(required, "tuimux")
+		} else {
+			required = append(required, "tmux")
+		}
 	}
 
 	binDir := paths.BinDir()

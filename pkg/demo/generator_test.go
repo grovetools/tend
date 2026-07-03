@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"gopkg.in/yaml.v3"
@@ -179,4 +180,83 @@ func TestWithoutCredentialsOption(t *testing.T) {
 	if !g2.copyCredentials {
 		t.Error("credential copying should default to enabled")
 	}
+}
+
+// TestBuildCmdEnvStripsGroveScope verifies delegated generation commands do
+// not inherit the caller's pinned scope: treemux sets GROVE_SCOPE
+// process-wide, and a leaked scope would point the demo's grove/nb/flow
+// calls at the host's scoped daemon instead of the isolated GROVE_HOME.
+func TestBuildCmdEnvStripsGroveScope(t *testing.T) {
+	t.Setenv("GROVE_SCOPE", "/home/user/real-ecosystem")
+	root := t.TempDir()
+	g := &homelabGenerator{rootDir: root, tmuxSocket: SocketName("homelab")}
+
+	env := g.buildCmdEnv()
+	var sawHome bool
+	for _, kv := range env {
+		if strings.HasPrefix(kv, "GROVE_SCOPE=") {
+			t.Errorf("GROVE_SCOPE leaked into delegated command env: %s", kv)
+		}
+		if kv == "GROVE_HOME="+root {
+			sawHome = true
+		}
+	}
+	if !sawHome {
+		t.Error("demo overlay GROVE_HOME missing from delegated command env")
+	}
+}
+
+// TestWithoutMuxSkipsMuxPreflight verifies that WithoutMux drops the mux
+// binary from the preflight requirements (the embedding caller is the
+// terminal) while the delegated CLIs are still required.
+func TestWithoutMuxSkipsMuxPreflight(t *testing.T) {
+	// A PATH/bin dir with grove/nb/flow stubs but no tmux/tuimux.
+	binDir := t.TempDir()
+	for _, tool := range []string{"grove", "nb", "flow"} {
+		if err := os.WriteFile(filepath.Join(binDir, tool), []byte("#!/bin/sh\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", binDir)
+	t.Setenv("GROVE_BIN", binDir)
+
+	withMux, err := NewGenerator(t.TempDir(), "homelab")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := withMux.Preflight(); err == nil {
+		t.Error("Preflight without WithoutMux should require a mux binary")
+	}
+
+	withoutMux, err := NewGenerator(t.TempDir(), "homelab", WithoutMux())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := withoutMux.Preflight(); err != nil {
+		t.Errorf("Preflight with WithoutMux should not require a mux binary: %v", err)
+	}
+	if !withoutMux.withoutMux {
+		t.Error("WithoutMux() did not set the generator flag")
+	}
+}
+
+// TestWithProgressReportsSteps verifies the option wires the callback and
+// reportStep invokes it; a nil callback is a safe no-op.
+func TestWithProgressReportsSteps(t *testing.T) {
+	var steps []string
+	g, err := NewGenerator(t.TempDir(), "homelab", WithProgress(func(s string) { steps = append(steps, s) }))
+	if err != nil {
+		t.Fatal(err)
+	}
+	g.reportStep("one")
+	g.reportStep("two")
+	if len(steps) != 2 || steps[0] != "one" || steps[1] != "two" {
+		t.Errorf("reportStep did not reach the WithProgress callback: %v", steps)
+	}
+
+	plain, err := NewGenerator(t.TempDir(), "homelab")
+	if err != nil {
+		t.Fatal(err)
+	}
+	plain.reportStep("no-op") // must not panic with no callback
 }

@@ -461,9 +461,20 @@ func (g *homelabGenerator) runDelegatedCmd(cmd *exec.Cmd, description string) er
 }
 
 // buildCmdEnv returns the environment slice for delegated commands.
+// GROVE_SCOPE is stripped from the inherited environment: callers like
+// treemux pin their host scope process-wide, and a leaked scope would
+// point the demo's delegated grove/nb/flow calls (and the groved they
+// auto-start) at the host's scoped daemon instead of the isolated
+// GROVE_HOME world the overlay establishes.
 func (g *homelabGenerator) buildCmdEnv() []string {
 	demoEnv := BuildEnvironment(g.rootDir, g.tmuxSocket)
-	env := os.Environ()
+	env := make([]string, 0, len(os.Environ())+len(demoEnv))
+	for _, kv := range os.Environ() {
+		if strings.HasPrefix(kv, "GROVE_SCOPE=") {
+			continue
+		}
+		env = append(env, kv)
+	}
 	for k, v := range demoEnv {
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
