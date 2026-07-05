@@ -36,6 +36,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.Width = msg.Width - listWidth - 4
 		m.viewport.Height = (msg.Height / 2) - 4
 
+		m.help.SetSize(msg.Width, msg.Height)
+
 		return m, nil
 
 	case sessionsListedMsg:
@@ -92,9 +94,25 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, listTendSessionsCmd
 
 	case tea.KeyMsg:
+		// When the full-help overlay is open, quit still quits; every other
+		// key is routed to the help component (scroll, and ?/esc to close).
+		if m.help.ShowAll {
+			if key.Matches(msg, m.keyMap.Quit) {
+				return m, tea.Quit
+			}
+			var cmd tea.Cmd
+			m.help, cmd = m.help.Update(msg)
+			return m, cmd
+		}
+
 		// Handle keybindings using key.Matches for user-configurable keys
 		if key.Matches(msg, m.keyMap.Quit) {
 			return m, tea.Quit
+		}
+
+		if key.Matches(msg, m.keyMap.Help) {
+			m.help.Toggle()
+			return m, nil
 		}
 
 		if key.Matches(msg, m.keyMap.Attach) {

@@ -5,6 +5,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/grovetools/core/config"
+	"github.com/grovetools/core/tui/components/help"
 	"github.com/grovetools/core/tui/theme"
 )
 
@@ -29,6 +30,7 @@ type Model struct {
 	ready    bool
 	err      error
 	keyMap   KeyMap
+	help     help.Model
 }
 
 // NewModel creates a new sessions TUI model.
@@ -69,6 +71,7 @@ func NewModel() (*Model, error) {
 		viewport: vp,
 		sessions: []string{},
 		keyMap:   keyMap,
+		help:     help.New(keyMap),
 	}
 
 	return m, nil

@@ -18,6 +18,11 @@ func (m *Model) View() string {
 		return "\n  Loading sessions...\n"
 	}
 
+	// Full-help overlay takes over the whole view when toggled with '?'.
+	if m.help.ShowAll {
+		return m.help.View()
+	}
+
 	if len(m.sessions) == 0 {
 		return m.renderEmptyState()
 	}
