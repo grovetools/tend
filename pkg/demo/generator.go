@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
@@ -14,7 +13,6 @@ import (
 	"github.com/grovetools/core/pkg/mux"
 	"github.com/grovetools/core/pkg/paths"
 	"github.com/pelletier/go-toml/v2"
-	"gopkg.in/yaml.v3"
 
 	"github.com/grovetools/tend/pkg/fs"
 )
@@ -37,24 +35,16 @@ func DemosDir() string {
 
 // Generator creates demo environments.
 type Generator struct {
-	rootDir         string
-	demoName        string
-	spec            DemoSpec
-	tmuxSocket      string
-	copyCredentials bool
-	withoutMux      bool
-	progress        func(step string)
+	rootDir    string
+	demoName   string
+	spec       DemoSpec
+	tmuxSocket string
+	withoutMux bool
+	progress   func(step string)
 }
 
 // Option configures a Generator.
 type Option func(*Generator)
-
-// WithoutCredentials disables copying the user's API credentials (from
-// ~/.config/grove/grove.override.yml) into the demo config. Demo agents
-// will then have no API keys and cannot drive real providers.
-func WithoutCredentials() Option {
-	return func(g *Generator) { g.copyCredentials = false }
-}
 
 // WithoutMux skips the mux setup step entirely: no tmux server or tuimux
 // daemon is spawned for the demo, and Preflight stops requiring a mux
@@ -81,11 +71,10 @@ func NewGenerator(rootDir, demoName string, opts ...Option) (*Generator, error) 
 	}
 
 	g := &Generator{
-		rootDir:         rootDir,
-		demoName:        demoName,
-		spec:            spec,
-		tmuxSocket:      SocketName(demoName),
-		copyCredentials: true,
+		rootDir:    rootDir,
+		demoName:   demoName,
+		spec:       spec,
+		tmuxSocket: SocketName(demoName),
 	}
 	for _, opt := range opts {
 		opt(g)
@@ -128,30 +117,12 @@ func (g *Generator) Generate() error {
 		return fmt.Errorf("creating initial config: %w", err)
 	}
 
-	// Copy the user's API credentials (from grove.override.yml) so demo
-	// agents can talk to real providers, unless disabled. Whatever is
-	// copied is disclosed loudly below (key names only, never values).
-	var credCopy *CredentialCopy
-	g.reportStep("copying credentials")
-	if g.copyCredentials {
-		var err error
-		credCopy, err = g.copyUserOverride()
-		if err != nil {
-			// Log but don't fail, this is optional
-			ulog.Warn("Failed to copy user credentials").Field("error", err).Emit()
-		}
-		if credCopy != nil {
-			ulog.Info("Copied credentials into the demo config").
-				Field("keys", strings.Join(credCopy.Keys, ", ")).
-				Field("source", credCopy.SourcePath).
-				Pretty(fmt.Sprintf("Copied credentials into the demo config: %s (from %s)\nOnly key names are shown; values are never printed. Use --no-credentials to skip copying.",
-					strings.Join(credCopy.Keys, ", "), credCopy.SourcePath)).
-				Emit()
-		}
-	} else {
-		ulog.Info("Skipping credential copy").
-			Pretty("Skipping credential copy (--no-credentials); demo agents will have no API keys.").
-			Emit()
+	// Sync the user's real [tui] choices (theme, keybindings, focus) into the
+	// demo so it feels native. One-way (real → demo); non-fatal on failure so
+	// a missing theme never blocks generation.
+	g.reportStep("syncing tui config")
+	if err := SyncUserTUIConfig(g.rootDir); err != nil {
+		ulog.Warn("Failed to sync user TUI config into demo").Field("error", err).Emit()
 	}
 
 	// Let spec generate content (ecosystems, repos, notes, plans)
@@ -190,7 +161,6 @@ func (g *Generator) Generate() error {
 		Ecosystems:      content.Ecosystems,
 		ConfigPath:      g.configPath(),
 		NotebookDir:     g.notebookDir(),
-		Credentials:     credCopy,
 	}
 	if muxRes != nil {
 		meta.Backend = string(muxRes.backend)
@@ -320,120 +290,6 @@ func demoGlobalConfig(notebookDir string, ecosystems []EcosystemMeta) map[string
 			"definitions": definitions,
 		},
 	}
-}
-
-// overrideProviderSections are the top-level provider sections from which
-// credential keys are copied into the demo override config.
-var overrideProviderSections = []string{"anthropic", "gemini", "openai"}
-
-// overrideCredentialKeys are the only keys copied from each provider section.
-// Anything else in a provider section stays out of the demo.
-var overrideCredentialKeys = []string{"api_key", "api_key_command"}
-
-// filterOverrideConfig extracts the subset of the user's override config that
-// the demo needs: provider API credentials and agent settings. Everything
-// else (groves, explicit_projects, notebooks, extra provider settings) is
-// excluded so it cannot leak into or break the isolated demo. It returns the
-// filtered config plus the list of copied key paths (names only, never
-// values) so callers can disclose exactly what was copied.
-func filterOverrideConfig(fullConfig map[string]interface{}) (map[string]interface{}, []string) {
-	filtered := make(map[string]interface{})
-	var copied []string
-
-	for _, section := range overrideProviderSections {
-		sectionMap, ok := fullConfig[section].(map[string]interface{})
-		if !ok {
-			continue
-		}
-		narrowed := make(map[string]interface{})
-		for _, key := range overrideCredentialKeys {
-			if v, ok := sectionMap[key]; ok {
-				narrowed[key] = v
-				copied = append(copied, section+"."+key)
-			}
-		}
-		if len(narrowed) > 0 {
-			filtered[section] = narrowed
-		}
-	}
-
-	// Agent settings are not credentials, but demo agents need them to run
-	// the same way the user's agents do.
-	if agent, ok := fullConfig["agent"]; ok {
-		filtered["agent"] = agent
-		if agentMap, isMap := agent.(map[string]interface{}); isMap {
-			keys := make([]string, 0, len(agentMap))
-			for k := range agentMap {
-				keys = append(keys, "agent."+k)
-			}
-			sort.Strings(keys)
-			copied = append(copied, keys...)
-		} else {
-			copied = append(copied, "agent")
-		}
-	}
-
-	return filtered, copied
-}
-
-// copyUserOverride copies filtered settings from the user's override file to
-// the demo: provider API credentials (api_key/api_key_command) and agent
-// config only. It returns a record of what was copied (key names and source
-// path, never values) for disclosure, or nil if nothing was copied.
-func (g *Generator) copyUserOverride() (*CredentialCopy, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil, err
-	}
-
-	// Check standard locations
-	sources := []string{
-		filepath.Join(home, ".config", "grove", "grove.override.yml"),
-		filepath.Join(home, ".config", "grove", "grove.override.yaml"),
-	}
-
-	var sourcePath string
-	for _, p := range sources {
-		if _, err := os.Stat(p); err == nil {
-			sourcePath = p
-			break
-		}
-	}
-
-	if sourcePath == "" {
-		return nil, nil // No override to copy
-	}
-
-	// Read and parse the source file
-	data, err := os.ReadFile(sourcePath)
-	if err != nil {
-		return nil, err
-	}
-
-	var fullConfig map[string]interface{}
-	if err := yaml.Unmarshal(data, &fullConfig); err != nil {
-		return nil, err
-	}
-
-	filteredConfig, copiedKeys := filterOverrideConfig(fullConfig)
-
-	// If nothing to copy, skip creating the file
-	if len(filteredConfig) == 0 {
-		return nil, nil
-	}
-
-	// Write filtered config
-	filteredData, err := yaml.Marshal(filteredConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	destPath := filepath.Join(g.rootDir, "config", "grove", "grove.override.yml")
-	// 0600: this file contains API credentials.
-	if err := os.WriteFile(destPath, filteredData, 0o600); err != nil {
-		return nil, err
-	}
-	return &CredentialCopy{SourcePath: sourcePath, Keys: copiedKeys}, nil
 }
 
 // Helper methods for directory paths

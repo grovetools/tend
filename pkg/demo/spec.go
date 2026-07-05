@@ -3,6 +3,13 @@ package demo
 // DemoSpec defines the interface for demo specifications.
 // Each demo type (homelab, bake-off, etc.) implements this interface
 // to define how it generates its content.
+//
+// Invariant: a DemoSpec must NEVER emit a [tui] section in any config file it
+// generates (the demo's grove.toml or any ecosystem/project grove.toml). The
+// user's real [tui] choices are synced into the demo's grove.override.yml by
+// SyncUserTUIConfig; because that override is consumed as the global override
+// layer while ecosystem/project configs merge on top of it, any [tui] a spec
+// wrote would beat the synced values. Enforced by tests (see generator_test.go).
 type DemoSpec interface {
 	// Name returns the unique identifier for this demo type.
 	Name() string
