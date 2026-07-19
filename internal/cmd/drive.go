@@ -38,6 +38,12 @@ Script schema (a flat, ordered YAML list; one key per step):
   - type: "<keys>"                    Inject keystrokes into the active panel.
   - kittykey: {panel: "<id>", keycode: <int>, mods: <int>}
                                       Inject a synthesized CSI-u key event.
+  - chord: "<keys>"                   Inject a space-separated key sequence
+                                      (e.g. "C-g w" or "C-1") at the app root,
+                                      so global/leader chords and panel
+                                      switching fire. Follow with a wait: step
+                                      before asserting — the snapshot is
+                                      compositor-tick cached.
   - wait: {}                          Wait for the rendered state to stabilize.
   - wait: {timeout: 5s}               ...with a per-step timeout override.
   - assert_contains: "<text>"         Assert the rendered state contains text.

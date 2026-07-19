@@ -9,7 +9,8 @@
 //
 // v1 is attach-only. Because both attach paths (tuimux daemon socket and a
 // treemux debug socket) leave the mux engine unset, the runner talks exclusively
-// over the debug-socket plane (GetDebugState / Panel.SendKeys / SendKittyKey)
+// over the debug-socket plane (GetDebugState / Panel.SendKeys / SendKittyKey /
+// SendRootKeys)
 // rather than the engine-plane Session methods (Type/Capture/WaitStable/…),
 // which require a tmux engine that attach mode does not have.
 package drive
@@ -32,6 +33,9 @@ const (
 	StepType StepKind = "type"
 	// StepKittyKey injects a synthesized CSI-u key event (Session.SendKittyKey).
 	StepKittyKey StepKind = "kittykey"
+	// StepChord injects a whole key sequence at the app root
+	// (Session.SendRootKeys), so global/leader chords and panel switching fire.
+	StepChord StepKind = "chord"
 	// StepWait blocks until the rendered debug state stabilizes.
 	StepWait StepKind = "wait"
 	// StepAssertContains asserts the rendered debug state contains a substring.
@@ -50,8 +54,9 @@ const (
 type Step struct {
 	Kind StepKind
 
-	// Text carries the argument for type / assert_contains / assert_pattern /
-	// snapshot steps (respectively: keys, substring, pattern source, label).
+	// Text carries the argument for type / chord / assert_contains /
+	// assert_pattern / snapshot steps (respectively: keys, key sequence,
+	// substring, pattern source, label).
 	Text string
 
 	// Timeout is the optional per-step override for wait steps. Zero means use
@@ -100,6 +105,7 @@ type StructuralAssert struct {
 var knownStepKeys = map[string]bool{
 	string(StepType):             true,
 	string(StepKittyKey):         true,
+	string(StepChord):            true,
 	string(StepWait):             true,
 	string(StepAssertContains):   true,
 	string(StepAssertPattern):    true,
@@ -163,6 +169,16 @@ func parseStep(node *yaml.Node) (Step, error) {
 			return Step{}, err
 		}
 		return Step{Kind: StepType, Text: s}, nil
+
+	case StepChord:
+		s, err := scalarString(valNode, key)
+		if err != nil {
+			return Step{}, err
+		}
+		if s == "" {
+			return Step{}, fmt.Errorf("chord requires a non-empty key sequence")
+		}
+		return Step{Kind: StepChord, Text: s}, nil
 
 	case StepAssertContains:
 		s, err := scalarString(valNode, key)

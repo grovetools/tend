@@ -43,6 +43,9 @@ type Driver interface {
 	SendKeys(panelID, keys string) error
 	// SendKittyKey injects a synthesized CSI-u key event into the given panel.
 	SendKittyKey(panelID string, keycode, mods int) error
+	// SendChord injects a whole key sequence at the app root, where global
+	// chords, leader sequences, and panel switching are handled.
+	SendChord(keys string) error
 }
 
 // SessionDriver adapts a *tui.Session to the Driver interface. It uses only the
@@ -62,6 +65,11 @@ func (d SessionDriver) SendKeys(panelID, keys string) error {
 // SendKittyKey implements Driver.
 func (d SessionDriver) SendKittyKey(panelID string, keycode, mods int) error {
 	return d.Session.SendKittyKey(panelID, keycode, mods)
+}
+
+// SendChord implements Driver.
+func (d SessionDriver) SendChord(keys string) error {
+	return d.Session.SendRootKeys(keys)
 }
 
 // StepResult is the recorded execution of one step.
@@ -202,6 +210,12 @@ func (r *Runner) runStep(step Step) (Outcome, string, []string) {
 		}
 		if err := r.Driver.SendKittyKey(panel, step.Kitty.Keycode, step.Kitty.Mods); err != nil {
 			return OutcomeError, fmt.Sprintf("send kitty key to %q: %v", panel, err), nil
+		}
+		return OutcomeOK, "", nil
+
+	case StepChord:
+		if err := r.Driver.SendChord(step.Text); err != nil {
+			return OutcomeError, fmt.Sprintf("send chord %q: %v", step.Text, err), nil
 		}
 		return OutcomeOK, "", nil
 
@@ -413,7 +427,7 @@ func (r *Runner) writeSnapshot(label string) ([]string, error) {
 // stepArg renders a step's argument for the manifest and result log.
 func stepArg(step Step) string {
 	switch step.Kind {
-	case StepType, StepAssertContains, StepAssertPattern, StepSnapshot:
+	case StepType, StepChord, StepAssertContains, StepAssertPattern, StepSnapshot:
 		return step.Text
 	case StepWait:
 		if step.Timeout > 0 {

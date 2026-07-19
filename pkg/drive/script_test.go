@@ -9,6 +9,7 @@ func TestParseScript_ValidAllStepTypes(t *testing.T) {
 	script := `
 - type: "hello"
 - kittykey: {panel: "shell-0", keycode: 97, mods: 4}
+- chord: "C-g w"
 - wait: {}
 - wait: {timeout: 5s}
 - assert_contains: "hello"
@@ -26,12 +27,12 @@ func TestParseScript_ValidAllStepTypes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseScript returned error: %v", err)
 	}
-	if len(steps) != 8 {
-		t.Fatalf("expected 8 steps, got %d", len(steps))
+	if len(steps) != 9 {
+		t.Fatalf("expected 9 steps, got %d", len(steps))
 	}
 
 	want := []StepKind{
-		StepType, StepKittyKey, StepWait, StepWait,
+		StepType, StepKittyKey, StepChord, StepWait, StepWait,
 		StepAssertContains, StepAssertPattern, StepSnapshot, StepAssertStructural,
 	}
 	for i, k := range want {
@@ -46,19 +47,22 @@ func TestParseScript_ValidAllStepTypes(t *testing.T) {
 	if steps[1].Kitty != (KittyKey{Panel: "shell-0", Keycode: 97, Mods: 4}) {
 		t.Errorf("kittykey: unexpected value %+v", steps[1].Kitty)
 	}
-	if steps[2].Timeout != 0 {
-		t.Errorf("empty wait: expected zero timeout, got %v", steps[2].Timeout)
+	if steps[2].Text != "C-g w" {
+		t.Errorf("chord: expected keys %q, got %q", "C-g w", steps[2].Text)
 	}
-	if steps[3].Timeout != 5*time.Second {
-		t.Errorf("wait timeout: expected 5s, got %v", steps[3].Timeout)
+	if steps[3].Timeout != 0 {
+		t.Errorf("empty wait: expected zero timeout, got %v", steps[3].Timeout)
 	}
-	if steps[5].pattern == nil || !steps[5].pattern.MatchString("hello") {
+	if steps[4].Timeout != 5*time.Second {
+		t.Errorf("wait timeout: expected 5s, got %v", steps[4].Timeout)
+	}
+	if steps[6].pattern == nil || !steps[6].pattern.MatchString("hello") {
 		t.Errorf("assert_pattern: pattern not compiled/usable")
 	}
-	if steps[6].Text != "after-type" {
-		t.Errorf("snapshot: expected label %q, got %q", "after-type", steps[6].Text)
+	if steps[7].Text != "after-type" {
+		t.Errorf("snapshot: expected label %q, got %q", "after-type", steps[7].Text)
 	}
-	sa := steps[7].Structural
+	sa := steps[8].Structural
 	if sa.ActivePanel != "nav" || sa.RailActive != "sessions" || sa.Focused != "nav" {
 		t.Errorf("assert_structural: unexpected string fields %+v", sa)
 	}
@@ -190,6 +194,23 @@ func TestParseScript_KittyKeyRejectsUnknownField(t *testing.T) {
 	_, err := ParseScript([]byte(`- kittykey: {keycode: 97, bogus: 1}`))
 	if err == nil {
 		t.Fatal("expected error for unknown kittykey field, got nil")
+	}
+}
+
+func TestParseScript_ChordRejectsEmptyKeys(t *testing.T) {
+	_, err := ParseScript([]byte(`- chord: ""`))
+	if err == nil {
+		t.Fatal("expected error for empty chord, got nil")
+	}
+	if !contains(err.Error(), "non-empty key sequence") {
+		t.Errorf("expected 'non-empty key sequence' error, got: %v", err)
+	}
+}
+
+func TestParseScript_ChordRejectsMapping(t *testing.T) {
+	_, err := ParseScript([]byte(`- chord: {keys: "C-g w"}`))
+	if err == nil {
+		t.Fatal("expected error for mapping chord, got nil")
 	}
 }
 

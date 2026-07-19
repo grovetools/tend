@@ -822,6 +822,18 @@ func (s *Session) SendKittyKey(panelID string, keycode, mods int) error {
 	})
 }
 
+// SendRootKeys injects a space-separated key sequence (e.g. "C-g w" or "C-1")
+// at the app root. The keys re-enter the app's root Update switch, so global
+// chords, leader sequences, and panel switching all fire — unlike
+// Panel().SendKeys, which injects directly into one panel's model and bypasses
+// root handling entirely. The whole sequence goes in one request; the server
+// feeds it through the root loop serially.
+func (s *Session) SendRootKeys(keys string) error {
+	return s.postDebug("/debug/root-keys", struct {
+		Keys string `json:"keys"`
+	}{Keys: keys})
+}
+
 // Panel returns a PanelLocator for the given panel ID.
 func (s *Session) Panel(id string) *PanelLocator {
 	return &PanelLocator{session: s, panelID: id}

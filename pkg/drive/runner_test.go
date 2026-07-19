@@ -17,7 +17,9 @@ type fakeDriver struct {
 	stateErr  error
 	sendErr   error
 	kittyErr  error
+	chordErr  error
 	kittyLog  []string
+	chordLog  []string
 	stateHits int
 }
 
@@ -65,6 +67,14 @@ func (d *fakeDriver) SendKittyKey(panelID string, keycode, mods int) error {
 	return nil
 }
 
+func (d *fakeDriver) SendChord(keys string) error {
+	if d.chordErr != nil {
+		return d.chordErr
+	}
+	d.chordLog = append(d.chordLog, keys)
+	return nil
+}
+
 // fastRunner builds a Runner with tiny timings so wait steps resolve instantly.
 func fastRunner(d Driver, steps []Step, outDir string) *Runner {
 	return &Runner{
@@ -106,6 +116,58 @@ func TestRunner_HappyPath(t *testing.T) {
 	}
 	if d.kittyLog != nil {
 		t.Errorf("no kittykey steps ran, but kittyLog is %v", d.kittyLog)
+	}
+}
+
+func TestRunner_Chord_HappyPath(t *testing.T) {
+	steps := mustParse(t, `
+- chord: "C-g w"
+- chord: "C-1"
+`)
+	d := newFakeDriver()
+	result := fastRunner(d, steps, t.TempDir()).Run()
+
+	if code := result.ExitCode(); code != 0 {
+		t.Fatalf("expected exit 0, got %d", code)
+	}
+	for _, s := range result.Steps {
+		if s.Outcome != OutcomeOK {
+			t.Errorf("step %d: expected ok, got %s (%s)", s.Index, s.Outcome, s.Failure)
+		}
+	}
+	if len(d.chordLog) != 2 || d.chordLog[0] != "C-g w" || d.chordLog[1] != "C-1" {
+		t.Errorf("chordLog = %v, want [\"C-g w\" \"C-1\"]", d.chordLog)
+	}
+	// Each chord is one root-keys request; unlike type, it never resolves the
+	// active panel, so no State() lookups happen.
+	if d.stateHits != 0 {
+		t.Errorf("chord steps fetched state %d times, want 0", d.stateHits)
+	}
+	if result.Steps[0].Arg != "C-g w" {
+		t.Errorf("step 1 arg = %q, want %q", result.Steps[0].Arg, "C-g w")
+	}
+}
+
+func TestRunner_Chord_TransportErrorExit1(t *testing.T) {
+	steps := mustParse(t, `
+- chord: "C-g w"
+- snapshot: "unreached"
+`)
+	d := newFakeDriver()
+	d.chordErr = errFake("socket closed")
+	result := fastRunner(d, steps, t.TempDir()).Run()
+
+	if code := result.ExitCode(); code != 1 {
+		t.Fatalf("expected exit 1, got %d", code)
+	}
+	if result.Steps[0].Outcome != OutcomeError {
+		t.Errorf("step 1: expected error outcome, got %s", result.Steps[0].Outcome)
+	}
+	if result.Steps[1].Outcome != OutcomeSkipped {
+		t.Errorf("step 2: expected skipped after failure, got %s", result.Steps[1].Outcome)
+	}
+	if d.chordLog != nil {
+		t.Errorf("failed chord should not have logged, got %v", d.chordLog)
 	}
 }
 

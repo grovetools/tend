@@ -16,13 +16,15 @@ import (
 
 // debugFixture is a minimal, hermetic stand-in for a real app's debug socket. It
 // serves the same /debug/* protocol the driver attaches to (GET /debug/state,
-// POST /debug/keys, POST /debug/kitty-keys) over a Unix socket, so the e2e test
-// exercises the entire drive path — attach, key injection round-trip, stability
-// polling, assertions, and bundle writing — without spawning treemux/tuimux.
+// POST /debug/keys, POST /debug/kitty-keys, POST /debug/root-keys) over a Unix
+// socket, so the e2e test exercises the entire drive path — attach, key
+// injection round-trip, stability polling, assertions, and bundle writing —
+// without spawning treemux/tuimux.
 type debugFixture struct {
 	mu       sync.Mutex
 	snap     tui.DebugSnapshot
 	kittyLog []string
+	chordLog []string
 }
 
 func (f *debugFixture) handler() http.Handler {
@@ -58,6 +60,20 @@ func (f *debugFixture) handler() http.Handler {
 		_ = json.NewDecoder(r.Body).Decode(&body)
 		f.mu.Lock()
 		f.kittyLog = append(f.kittyLog, body.PanelID)
+		f.mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+	})
+
+	mux.HandleFunc("/debug/root-keys", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Keys string `json:"keys"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		f.mu.Lock()
+		f.chordLog = append(f.chordLog, body.Keys)
+		// Simulate a root-handled panel switch so a following assert_structural
+		// can prove the chord round-trip end-to-end.
+		f.snap.ActivePanelID = "nav"
 		f.mu.Unlock()
 		w.WriteHeader(http.StatusOK)
 	})
@@ -129,6 +145,9 @@ func TestDrive_EndToEnd_DebugSocketMode(t *testing.T) {
     focused_count: 1
     panel_type:
       main: shell
+- chord: "C-g w"
+- wait: {}
+- assert_structural: {active_panel: nav}
 - snapshot: "after-type"
 `
 	steps, err := ParseScript([]byte(script))
@@ -161,9 +180,17 @@ func TestDrive_EndToEnd_DebugSocketMode(t *testing.T) {
 	// The kittykey step must have reached the fixture.
 	fixture.mu.Lock()
 	kittyHits := len(fixture.kittyLog)
+	chordLog := append([]string(nil), fixture.chordLog...)
 	fixture.mu.Unlock()
 	if kittyHits != 1 {
 		t.Errorf("expected 1 kitty key injected, got %d", kittyHits)
+	}
+
+	// The chord step must have reached the fixture as one whole sequence, and
+	// the assert_structural above already proved its effect (active panel moved
+	// to nav).
+	if len(chordLog) != 1 || chordLog[0] != "C-g w" {
+		t.Errorf("chordLog = %v, want [\"C-g w\"]", chordLog)
 	}
 
 	// Snapshot artifacts must contain the typed text and structural state.
@@ -186,8 +213,8 @@ func TestDrive_EndToEnd_DebugSocketMode(t *testing.T) {
 	if err := json.Unmarshal(jsonBytes, &snap); err != nil {
 		t.Fatalf("snapshot json is not a valid DebugSnapshot: %v", err)
 	}
-	if snap.ActivePanelID != "main" {
-		t.Errorf("snapshot json active panel = %q, want main", snap.ActivePanelID)
+	if snap.ActivePanelID != "nav" {
+		t.Errorf("snapshot json active panel = %q, want nav (post-chord)", snap.ActivePanelID)
 	}
 
 	// Write the bundle manifest exactly as the CLI does after a run.
@@ -204,8 +231,8 @@ func TestDrive_EndToEnd_DebugSocketMode(t *testing.T) {
 	if m.ExitCode != 0 {
 		t.Errorf("manifest exit_code = %d, want 0", m.ExitCode)
 	}
-	if len(m.Steps) != 7 {
-		t.Fatalf("manifest steps = %d, want 7", len(m.Steps))
+	if len(m.Steps) != 10 {
+		t.Fatalf("manifest steps = %d, want 10", len(m.Steps))
 	}
 	for _, s := range m.Steps {
 		if s.Outcome != string(OutcomeOK) {
