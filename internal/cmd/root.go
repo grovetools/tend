@@ -90,6 +90,7 @@ Features:
 	rootCmd.AddCommand(newTuiCmd())
 	rootCmd.AddCommand(newSessionsCmd())
 	rootCmd.AddCommand(newRecordCmd())
+	rootCmd.AddCommand(newDriveCmd())
 	rootCmd.AddCommand(newDemoCmd())
 
 	return rootCmd
