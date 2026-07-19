@@ -235,6 +235,16 @@ func (r *Runner) runStep(step Step) (Outcome, string, []string) {
 		}
 		return OutcomeOK, "", nil
 
+	case StepAssertStructural:
+		snap, err := r.Driver.State()
+		if err != nil {
+			return OutcomeError, fmt.Sprintf("fetch state for assert_structural: %v", err), nil
+		}
+		if mismatches := checkStructural(snap, step.Structural); len(mismatches) > 0 {
+			return OutcomeAssertFailed, strings.Join(mismatches, "; "), nil
+		}
+		return OutcomeOK, "", nil
+
 	case StepSnapshot:
 		files, err := r.writeSnapshot(step.Text)
 		if err != nil {
@@ -245,6 +255,78 @@ func (r *Runner) runStep(step Step) (Outcome, string, []string) {
 	default:
 		return OutcomeError, fmt.Sprintf("unhandled step kind %q", step.Kind), nil
 	}
+}
+
+// checkStructural evaluates every present assert_structural field against a
+// single snapshot and returns one "field: want X, got Y" line per mismatch
+// ("absent" when a named panel does not exist), so a failure reports all
+// mismatched fields at once rather than just the first.
+func checkStructural(snap *tui.DebugSnapshot, want StructuralAssert) []string {
+	var mismatches []string
+
+	if want.ActivePanel != "" && snap.ActivePanelID != want.ActivePanel {
+		mismatches = append(mismatches, fmt.Sprintf("active_panel: want %q, got %q", want.ActivePanel, snap.ActivePanelID))
+	}
+
+	if want.RailActive != "" {
+		matched := false
+		got := "none"
+		for _, ri := range snap.Rail {
+			if !ri.IsActive {
+				continue
+			}
+			if got == "none" {
+				got = ri.ID
+			}
+			if ri.ID == want.RailActive || ri.Label == want.RailActive {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			mismatches = append(mismatches, fmt.Sprintf("rail_active: want %q, got %q", want.RailActive, got))
+		}
+	}
+
+	if want.Focused != "" {
+		if p, ok := snap.Panels[want.Focused]; !ok {
+			mismatches = append(mismatches, fmt.Sprintf("focused: want %q, got absent", want.Focused))
+		} else if !p.IsFocused {
+			got := "none"
+			for _, id := range sortedPanelIDs(snap) {
+				if snap.Panels[id].IsFocused {
+					got = id
+					break
+				}
+			}
+			mismatches = append(mismatches, fmt.Sprintf("focused: want %q, got %q", want.Focused, got))
+		}
+	}
+
+	if want.FocusedCount != nil {
+		count := 0
+		for _, p := range snap.Panels {
+			if p.IsFocused {
+				count++
+			}
+		}
+		if count != *want.FocusedCount {
+			mismatches = append(mismatches, fmt.Sprintf("focused_count: want %d, got %d", *want.FocusedCount, count))
+		}
+	}
+
+	for _, id := range sortedKeys(want.PanelType) {
+		wantType := want.PanelType[id]
+		p, ok := snap.Panels[id]
+		switch {
+		case !ok:
+			mismatches = append(mismatches, fmt.Sprintf("panel_type[%s]: want %q, got absent", id, wantType))
+		case p.Type != wantType:
+			mismatches = append(mismatches, fmt.Sprintf("panel_type[%s]: want %q, got %q", id, wantType, p.Type))
+		}
+	}
+
+	return mismatches
 }
 
 // waitStable polls the rendered debug state until it is unchanged for
@@ -340,9 +422,44 @@ func stepArg(step Step) string {
 		return ""
 	case StepKittyKey:
 		return fmt.Sprintf("panel=%q keycode=%d mods=%d", step.Kitty.Panel, step.Kitty.Keycode, step.Kitty.Mods)
+	case StepAssertStructural:
+		return structuralArg(step.Structural)
 	default:
 		return ""
 	}
+}
+
+// structuralArg renders an assert_structural step's asserted fields as a
+// compact, deterministic summary for the manifest and result log.
+func structuralArg(a StructuralAssert) string {
+	var parts []string
+	if a.ActivePanel != "" {
+		parts = append(parts, "active_panel="+a.ActivePanel)
+	}
+	if a.RailActive != "" {
+		parts = append(parts, "rail_active="+a.RailActive)
+	}
+	if a.Focused != "" {
+		parts = append(parts, "focused="+a.Focused)
+	}
+	if a.FocusedCount != nil {
+		parts = append(parts, fmt.Sprintf("focused_count=%d", *a.FocusedCount))
+	}
+	for _, id := range sortedKeys(a.PanelType) {
+		parts = append(parts, fmt.Sprintf("panel_type[%s]=%s", id, a.PanelType[id]))
+	}
+	return strings.Join(parts, " ")
+}
+
+// sortedKeys returns a string map's keys in stable order for deterministic
+// messages and summaries.
+func sortedKeys(m map[string]string) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // RenderText flattens a debug snapshot into the text that assertions match

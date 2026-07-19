@@ -38,6 +38,9 @@ const (
 	StepAssertContains StepKind = "assert_contains"
 	// StepAssertPattern asserts the rendered debug state matches a regexp.
 	StepAssertPattern StepKind = "assert_pattern"
+	// StepAssertStructural asserts fields of the parsed structural debug state
+	// (active panel, rail, focus, panel types) against one snapshot.
+	StepAssertStructural StepKind = "assert_structural"
 	// StepSnapshot writes a labelled visual + structural snapshot to the bundle.
 	StepSnapshot StepKind = "snapshot"
 )
@@ -58,6 +61,9 @@ type Step struct {
 	// Kitty carries the argument for kittykey steps.
 	Kitty KittyKey
 
+	// Structural carries the argument for assert_structural steps.
+	Structural StructuralAssert
+
 	// pattern is the compiled form of an assert_pattern step's Text.
 	pattern *regexp.Regexp
 }
@@ -71,16 +77,34 @@ type KittyKey struct {
 	Mods    int
 }
 
+// StructuralAssert is the structured argument of an assert_structural step. It
+// is a one-shot assertion over a single Driver.State() snapshot: all fields are
+// optional (at least one must be present), and every present field must pass.
+type StructuralAssert struct {
+	// ActivePanel asserts snap.ActivePanelID equals this value.
+	ActivePanel string
+	// RailActive asserts some rail item with IsActive has this ID or Label.
+	RailActive string
+	// Focused asserts the named panel exists and is focused.
+	Focused string
+	// FocusedCount asserts the number of focused panels. Nil means not
+	// asserted (zero is a legal expectation).
+	FocusedCount *int
+	// PanelType asserts, per entry, that the named panel exists with this Type.
+	PanelType map[string]string
+}
+
 // knownStepKeys is the closed set of recognized top-level step keys. Anything
 // outside this set is a hard parse error (see decision: never half-execute a
 // typo'd script).
 var knownStepKeys = map[string]bool{
-	string(StepType):           true,
-	string(StepKittyKey):       true,
-	string(StepWait):           true,
-	string(StepAssertContains): true,
-	string(StepAssertPattern):  true,
-	string(StepSnapshot):       true,
+	string(StepType):             true,
+	string(StepKittyKey):         true,
+	string(StepWait):             true,
+	string(StepAssertContains):   true,
+	string(StepAssertPattern):    true,
+	string(StepAssertStructural): true,
+	string(StepSnapshot):         true,
 }
 
 // ParseScript parses a YAML step list into an ordered slice of Steps. It fails
@@ -168,6 +192,9 @@ func parseStep(node *yaml.Node) (Step, error) {
 		}
 		return Step{Kind: StepAssertPattern, Text: s, pattern: re}, nil
 
+	case StepAssertStructural:
+		return parseAssertStructural(valNode)
+
 	case StepWait:
 		return parseWait(valNode)
 
@@ -250,6 +277,82 @@ func parseKittyKey(val *yaml.Node) (Step, error) {
 		return Step{}, fmt.Errorf("kittykey: keycode is required")
 	}
 	return Step{Kind: StepKittyKey, Kitty: kk}, nil
+}
+
+// parseAssertStructural accepts `assert_structural: {active_panel, rail_active,
+// focused, focused_count, panel_type}`. Every field is optional, but at least
+// one must be present — an empty assertion would silently pass.
+func parseAssertStructural(val *yaml.Node) (Step, error) {
+	if val.Kind != yaml.MappingNode {
+		return Step{}, fmt.Errorf("assert_structural must be a mapping {active_panel, rail_active, focused, focused_count, panel_type}, got %s", nodeKindName(val.Kind))
+	}
+	var sa StructuralAssert
+	fields := 0
+	for i := 0; i < len(val.Content); i += 2 {
+		k := val.Content[i].Value
+		v := val.Content[i+1]
+		switch k {
+		case "active_panel":
+			s, err := scalarString(v, "active_panel")
+			if err != nil {
+				return Step{}, err
+			}
+			if s == "" {
+				return Step{}, fmt.Errorf("assert_structural: active_panel must be non-empty")
+			}
+			sa.ActivePanel = s
+		case "rail_active":
+			s, err := scalarString(v, "rail_active")
+			if err != nil {
+				return Step{}, err
+			}
+			if s == "" {
+				return Step{}, fmt.Errorf("assert_structural: rail_active must be non-empty")
+			}
+			sa.RailActive = s
+		case "focused":
+			s, err := scalarString(v, "focused")
+			if err != nil {
+				return Step{}, err
+			}
+			if s == "" {
+				return Step{}, fmt.Errorf("assert_structural: focused must be non-empty")
+			}
+			sa.Focused = s
+		case "focused_count":
+			n, err := scalarInt(v, "focused_count")
+			if err != nil {
+				return Step{}, err
+			}
+			if n < 0 {
+				return Step{}, fmt.Errorf("assert_structural: focused_count must be >= 0")
+			}
+			sa.FocusedCount = &n
+		case "panel_type":
+			if v.Kind != yaml.MappingNode {
+				return Step{}, fmt.Errorf("assert_structural: panel_type must be a mapping of panel ID to type, got %s", nodeKindName(v.Kind))
+			}
+			if len(v.Content) == 0 {
+				return Step{}, fmt.Errorf("assert_structural: panel_type must have at least one entry")
+			}
+			sa.PanelType = make(map[string]string, len(v.Content)/2)
+			for j := 0; j < len(v.Content); j += 2 {
+				id := v.Content[j].Value
+				typ, err := scalarString(v.Content[j+1], "panel_type."+id)
+				if err != nil {
+					return Step{}, err
+				}
+				sa.PanelType[id] = typ
+			}
+		default:
+			return Step{}, fmt.Errorf("assert_structural: unknown field %q", k)
+		}
+		fields++
+	}
+	if fields == 0 {
+		return Step{}, fmt.Errorf("assert_structural requires at least one field")
+	}
+	return Step{Kind: StepAssertStructural, Structural: sa}, nil
 }
 
 // scalarString decodes a scalar node into a string, rejecting non-scalar shapes.

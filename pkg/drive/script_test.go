@@ -14,18 +14,25 @@ func TestParseScript_ValidAllStepTypes(t *testing.T) {
 - assert_contains: "hello"
 - assert_pattern: "he[l]+o"
 - snapshot: "after-type"
+- assert_structural:
+    active_panel: nav
+    rail_active: sessions
+    focused: nav
+    focused_count: 1
+    panel_type:
+      nav: nav
 `
 	steps, err := ParseScript([]byte(script))
 	if err != nil {
 		t.Fatalf("ParseScript returned error: %v", err)
 	}
-	if len(steps) != 7 {
-		t.Fatalf("expected 7 steps, got %d", len(steps))
+	if len(steps) != 8 {
+		t.Fatalf("expected 8 steps, got %d", len(steps))
 	}
 
 	want := []StepKind{
 		StepType, StepKittyKey, StepWait, StepWait,
-		StepAssertContains, StepAssertPattern, StepSnapshot,
+		StepAssertContains, StepAssertPattern, StepSnapshot, StepAssertStructural,
 	}
 	for i, k := range want {
 		if steps[i].Kind != k {
@@ -50,6 +57,67 @@ func TestParseScript_ValidAllStepTypes(t *testing.T) {
 	}
 	if steps[6].Text != "after-type" {
 		t.Errorf("snapshot: expected label %q, got %q", "after-type", steps[6].Text)
+	}
+	sa := steps[7].Structural
+	if sa.ActivePanel != "nav" || sa.RailActive != "sessions" || sa.Focused != "nav" {
+		t.Errorf("assert_structural: unexpected string fields %+v", sa)
+	}
+	if sa.FocusedCount == nil || *sa.FocusedCount != 1 {
+		t.Errorf("assert_structural: expected focused_count 1, got %v", sa.FocusedCount)
+	}
+	if sa.PanelType["nav"] != "nav" {
+		t.Errorf("assert_structural: expected panel_type[nav]=nav, got %v", sa.PanelType)
+	}
+}
+
+func TestParseScript_AssertStructural_SingleFieldShapes(t *testing.T) {
+	cases := []struct {
+		name   string
+		script string
+	}{
+		{"active_panel", `- assert_structural: {active_panel: nav}`},
+		{"rail_active", `- assert_structural: {rail_active: sessions}`},
+		{"focused", `- assert_structural: {focused: nav}`},
+		{"focused_count", `- assert_structural: {focused_count: 0}`},
+		{"panel_type", `- assert_structural: {panel_type: {nav: nav}}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			steps, err := ParseScript([]byte(tc.script))
+			if err != nil {
+				t.Fatalf("ParseScript: %v", err)
+			}
+			if len(steps) != 1 || steps[0].Kind != StepAssertStructural {
+				t.Fatalf("expected one assert_structural step, got %+v", steps)
+			}
+		})
+	}
+}
+
+func TestParseScript_AssertStructural_RejectsEmptyMapping(t *testing.T) {
+	_, err := ParseScript([]byte(`- assert_structural: {}`))
+	if err == nil {
+		t.Fatal("expected error for empty assert_structural, got nil")
+	}
+	if !contains(err.Error(), "at least one field") {
+		t.Errorf("expected 'at least one field' error, got: %v", err)
+	}
+}
+
+func TestParseScript_AssertStructural_RejectsUnknownField(t *testing.T) {
+	_, err := ParseScript([]byte(`- assert_structural: {active_pannel: nav}`))
+	if err == nil {
+		t.Fatal("expected error for unknown assert_structural field, got nil")
+	}
+	if !contains(err.Error(), "unknown field") {
+		t.Errorf("expected 'unknown field' error, got: %v", err)
+	}
+}
+
+func TestParseScript_AssertStructural_RejectsNonMapping(t *testing.T) {
+	_, err := ParseScript([]byte(`- assert_structural: "nav"`))
+	if err == nil {
+		t.Fatal("expected error for scalar assert_structural, got nil")
 	}
 }
 

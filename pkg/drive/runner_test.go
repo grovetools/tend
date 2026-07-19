@@ -139,6 +139,88 @@ func TestRunner_AssertFailedExit2AndStops(t *testing.T) {
 	}
 }
 
+func TestRunner_AssertStructural_Pass(t *testing.T) {
+	steps := mustParse(t, `
+- assert_structural:
+    active_panel: main
+    rail_active: sessions
+    focused: main
+    focused_count: 1
+    panel_type:
+      main: shell
+- assert_structural: {rail_active: "Sessions"}
+`)
+	d := newFakeDriver()
+	d.snap.Rail = []tui.DebugRailItem{{ID: "sessions", Label: "Sessions", IsActive: true}}
+	result := fastRunner(d, steps, t.TempDir()).Run()
+
+	if code := result.ExitCode(); code != 0 {
+		t.Fatalf("expected exit 0, got %d (%s)", code, result.Steps[result.FailedIndex-1].Failure)
+	}
+	for _, s := range result.Steps {
+		if s.Outcome != OutcomeOK {
+			t.Errorf("step %d: expected ok, got %s (%s)", s.Index, s.Outcome, s.Failure)
+		}
+	}
+}
+
+func TestRunner_AssertStructural_FailListsEveryMismatch(t *testing.T) {
+	steps := mustParse(t, `
+- assert_structural:
+    active_panel: nav
+    rail_active: sessions
+    focused: side
+    focused_count: 2
+    panel_type:
+      main: nav
+      ghost: shell
+- snapshot: "unreached"
+`)
+	d := newFakeDriver()
+	d.snap.Panels["side"] = tui.DebugPanelInfo{ID: "side", Type: "nav", IsFocused: false}
+	result := fastRunner(d, steps, t.TempDir()).Run()
+
+	if code := result.ExitCode(); code != 2 {
+		t.Fatalf("expected exit 2, got %d", code)
+	}
+	if result.Steps[0].Outcome != OutcomeAssertFailed {
+		t.Fatalf("step 1: expected assert-failed, got %s", result.Steps[0].Outcome)
+	}
+	if result.Steps[1].Outcome != OutcomeSkipped {
+		t.Errorf("step 2: expected skipped after failure, got %s", result.Steps[1].Outcome)
+	}
+
+	failure := result.Steps[0].Failure
+	for _, part := range []string{
+		`active_panel: want "nav", got "main"`,
+		`rail_active: want "sessions", got "none"`,
+		`focused: want "side", got "main"`,
+		"focused_count: want 2, got 1",
+		`panel_type[ghost]: want "shell", got absent`,
+		`panel_type[main]: want "nav", got "shell"`,
+	} {
+		if !contains(failure, part) {
+			t.Errorf("failure message missing %q; got: %s", part, failure)
+		}
+	}
+}
+
+func TestRunner_AssertStructural_InfraErrorExit1(t *testing.T) {
+	steps := mustParse(t, `
+- assert_structural: {active_panel: main}
+`)
+	d := newFakeDriver()
+	d.stateErr = errFake("socket closed")
+	result := fastRunner(d, steps, t.TempDir()).Run()
+
+	if code := result.ExitCode(); code != 1 {
+		t.Fatalf("expected exit 1, got %d", code)
+	}
+	if result.Steps[0].Outcome != OutcomeError {
+		t.Errorf("expected error outcome, got %s", result.Steps[0].Outcome)
+	}
+}
+
 func TestRunner_InfraErrorExit1(t *testing.T) {
 	steps := mustParse(t, `
 - assert_contains: "x"

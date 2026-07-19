@@ -87,6 +87,9 @@ func startFixture(t *testing.T) (*debugFixture, string) {
 		snap: tui.DebugSnapshot{
 			ActivePanelID: "main",
 			HUD:           "READY",
+			Rail: []tui.DebugRailItem{
+				{ID: "sessions", Label: "Sessions", IsActive: true},
+			},
 			Panels: map[string]tui.DebugPanelInfo{
 				"main": {
 					ID:        "main",
@@ -119,6 +122,13 @@ func TestDrive_EndToEnd_DebugSocketMode(t *testing.T) {
 - kittykey: {panel: "main", keycode: 97, mods: 4}
 - assert_contains: "PLAYWRIGHT_OK"
 - assert_pattern: "PLAYWRIGHT_[A-Z]+"
+- assert_structural:
+    active_panel: main
+    rail_active: sessions
+    focused: main
+    focused_count: 1
+    panel_type:
+      main: shell
 - snapshot: "after-type"
 `
 	steps, err := ParseScript([]byte(script))
@@ -194,8 +204,8 @@ func TestDrive_EndToEnd_DebugSocketMode(t *testing.T) {
 	if m.ExitCode != 0 {
 		t.Errorf("manifest exit_code = %d, want 0", m.ExitCode)
 	}
-	if len(m.Steps) != 6 {
-		t.Fatalf("manifest steps = %d, want 6", len(m.Steps))
+	if len(m.Steps) != 7 {
+		t.Fatalf("manifest steps = %d, want 7", len(m.Steps))
 	}
 	for _, s := range m.Steps {
 		if s.Outcome != string(OutcomeOK) {
@@ -248,6 +258,63 @@ func TestDrive_EndToEnd_AssertFailureWritesBundle(t *testing.T) {
 	got := readManifest(t, out)
 	if got.FailedStep != 2 {
 		t.Errorf("manifest failed_step = %d, want 2", got.FailedStep)
+	}
+	if got.Steps[2].Outcome != string(OutcomeSkipped) {
+		t.Errorf("step 3 outcome = %q, want skipped", got.Steps[2].Outcome)
+	}
+}
+
+func TestDrive_EndToEnd_StructuralAssertFailureWritesBundle(t *testing.T) {
+	_, sockPath := startFixture(t)
+
+	script := `
+- type: "abc"
+- assert_structural: {active_panel: "not-a-panel", focused_count: 9}
+- snapshot: "unreached"
+`
+	steps, err := ParseScript([]byte(script))
+	if err != nil {
+		t.Fatalf("ParseScript: %v", err)
+	}
+	driver, err := Attach(AttachOptions{Socket: sockPath, ReadyTimeout: 5 * time.Second})
+	if err != nil {
+		t.Fatalf("Attach: %v", err)
+	}
+
+	out := t.TempDir()
+	result := (&Runner{
+		Driver:         driver,
+		Steps:          steps,
+		OutDir:         out,
+		DefaultTimeout: 2 * time.Second,
+		StableWindow:   50 * time.Millisecond,
+		PollInterval:   20 * time.Millisecond,
+	}).Run()
+
+	if code := result.ExitCode(); code != 2 {
+		t.Fatalf("expected exit 2 on structural assert failure, got %d", code)
+	}
+
+	// The bundle (most valuable exactly on failure) must still be written.
+	m := BuildManifest(ManifestMeta{Socket: sockPath, Mode: ModeDebugSocket}, result)
+	if err := WriteManifest(out, m); err != nil {
+		t.Fatalf("WriteManifest: %v", err)
+	}
+	got := readManifest(t, out)
+	if got.FailedStep != 2 {
+		t.Errorf("manifest failed_step = %d, want 2", got.FailedStep)
+	}
+	if got.Steps[1].Outcome != string(OutcomeAssertFailed) {
+		t.Errorf("step 2 outcome = %q, want assert-failed", got.Steps[1].Outcome)
+	}
+	// The failure message must list every mismatched field.
+	for _, part := range []string{
+		`active_panel: want "not-a-panel", got "main"`,
+		"focused_count: want 9, got 1",
+	} {
+		if !strings.Contains(got.Steps[1].Failure, part) {
+			t.Errorf("failure missing %q; got: %s", part, got.Steps[1].Failure)
+		}
 	}
 	if got.Steps[2].Outcome != string(OutcomeSkipped) {
 		t.Errorf("step 3 outcome = %q, want skipped", got.Steps[2].Outcome)

@@ -42,6 +42,12 @@ Script schema (a flat, ordered YAML list; one key per step):
   - wait: {timeout: 5s}               ...with a per-step timeout override.
   - assert_contains: "<text>"         Assert the rendered state contains text.
   - assert_pattern: "<regexp>"        Assert the rendered state matches a regexp.
+  - assert_structural: {active_panel: "<id>", rail_active: "<id|label>",
+                        focused: "<id>", focused_count: <n>,
+                        panel_type: {"<id>": "<type>"}}
+                                      Assert fields of the structural debug
+                                      state; all fields optional, at least one
+                                      required.
   - snapshot: "<label>"               Write <label>.txt + <label>.json evidence.
 
 Exit codes:
